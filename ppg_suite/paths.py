@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-BASE_DIR = Path(r"C:\Users\julia\OneDrive\Desktop\tesis\mtest")
+BASE_DIR = Path(r"C:\Users\julia\OneDrive\Desktop\tesis\mtestv2")
 RAW_DIR = BASE_DIR / "raw"
 PROCESSED_DIR = BASE_DIR / "processed"
 SESSION_DIR = BASE_DIR / "sessions"

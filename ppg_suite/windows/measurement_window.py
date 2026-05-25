@@ -289,12 +289,27 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.state.last_line = f"ERROR_SERIAL: {exc}"
             log.exception("Error leyendo serial")
 
-    def looks_like_data(self, line: str) -> bool:
+        def looks_like_data(self, line: str) -> bool:
         parts = line.split(",")
-        if len(parts) != 3:
+
+        # Formatos aceptados:
+        # micros,red,ir
+        # micros,red,ir,tempC
+        # micros,red,ir,tempC,tempRaw
+        if len(parts) not in (3, 4, 5):
             return False
+
         try:
-            int(parts[0]); float(parts[1]); float(parts[2])
+            int(parts[0])
+            float(parts[1])
+            float(parts[2])
+
+            if len(parts) >= 4 and parts[3].lower() != "nan":
+                float(parts[3])
+
+            if len(parts) >= 5 and parts[4].lower() != "nan":
+                float(parts[4])
+
             return True
         except Exception:
             return False
