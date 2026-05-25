@@ -86,10 +86,17 @@ class Metrics:
     polarity: str = "-"
     reason: str = ""
     peaks_count: int = 0
+        temp_latest_c: float = math.nan
+    temp_mean_c: float = math.nan
+    temp_min_c: float = math.nan
+    temp_max_c: float = math.nan
+    temp_raw_latest: float = math.nan
+    temp_raw_mean: float = math.nan
+    temp_n: int = 0
 
 @dataclass
 class CaptureState:
-    mode: Literal["idle", "normal", "long"] = "idle"
+    mode: Literal["idle", "normal", "long", "temp", "temp_ajuste"] = "idle"
     capturing: bool = False
     finished: bool = False
     sensor_ready: bool = False
@@ -103,6 +110,8 @@ class CaptureState:
     t: list[float] = field(default_factory=list)
     red: list[float] = field(default_factory=list)
     ir: list[float] = field(default_factory=list)
+     temp_c: list[float] = field(default_factory=list)
+    temp_raw: list[float] = field(default_factory=list)
     valid_lines: int = 0
     discarded_lines: int = 0
     control_messages: int = 0

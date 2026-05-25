@@ -1,0 +1,36 @@
+@"
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Logs
+logs/
+*.log
+
+# Resultados generados
+raw/
+processed/
+sessions/
+figures/
+screenshots/
+reports/
+configs/
+*.csv
+*.png
+*.json
+
+# Arduino / VS Code
+.vscode/
+build/
+*.hex
+*.elf
+*.bin
+*.eep
+
+# Sistema
+.DS_Store
+Thumbs.db
+"@ | Out-File -Encoding utf8 .gitignore
