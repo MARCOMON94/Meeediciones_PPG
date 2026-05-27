@@ -1,14 +1,10 @@
-@"
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
 env/
 .env
-.venv/
-__pycache__/
-*.pyc
 
 # Logs
 logs/
@@ -37,5 +33,3 @@ build/
 # Sistema
 .DS_Store
 Thumbs.db
-"@ | Out-File -Encoding utf8 .gitignore
-.env
