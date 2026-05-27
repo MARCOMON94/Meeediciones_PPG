@@ -289,7 +289,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.state.last_line = f"ERROR_SERIAL: {exc}"
             log.exception("Error leyendo serial")
 
-        def looks_like_data(self, line: str) -> bool:
+    def looks_like_data(self, line: str) -> bool:
         parts = line.split(",")
 
         # Formatos aceptados:
@@ -355,22 +355,48 @@ class PPGSuite(QtWidgets.QMainWindow):
     def process_data_line(self, line: str):
         st = self.state
         try:
-            micros_s, red_s, ir_s = line.split(",")
+            parts = line.split(",")
+
+            if len(parts) < 3:
+                st.discarded_lines += 1
+                return
+
+            micros_s = parts[0]
+            red_s = parts[1]
+            ir_s = parts[2]
+
             tmicro = int(micros_s.strip())
             red = float(red_s.strip())
             ir = float(ir_s.strip())
+
             if red == 0 and ir == 0:
                 st.discarded_lines += 1
                 return
+
             if st.first_micro is None:
                 st.first_micro = tmicro
+
             trel = (tmicro - st.first_micro) / 1_000_000.0
+
             if trel < -0.01:
                 st.discarded_lines += 1
                 return
-            st.t.append(trel); st.red.append(red); st.ir.append(ir); st.valid_lines += 1
+
+            st.t.append(trel)
+            st.red.append(red)
+            st.ir.append(ir)
+            st.valid_lines += 1
+
             if st.raw_writer:
-                st.raw_writer.writerow([st.crotal_id, st.mode, f"{trel:.6f}", f"{red:.0f}", f"{ir:.0f}", datetime.now().isoformat(timespec="milliseconds")])
+                st.raw_writer.writerow([
+                    st.crotal_id,
+                    st.mode,
+                    f"{trel:.6f}",
+                    f"{red:.0f}",
+                    f"{ir:.0f}",
+                    datetime.now().isoformat(timespec="milliseconds")
+                ])
+
         except Exception as exc:
             st.discarded_lines += 1
             log.warning("Dato descartado '%s': %s", line, exc)
