@@ -4,7 +4,7 @@ setlocal EnableExtensions
 REM =====================================================
 REM Lanzador mtestv2
 REM Lee la ruta del proyecto desde un archivo .env
-REM El .env debe estar en la misma carpeta que este .bat
+REM El .env debe estar en la misma carpeta que este .cmd
 REM =====================================================
 
 set "ENV_FILE=%~dp0.env"
@@ -25,6 +25,13 @@ if not exist "%ENV_FILE%" (
     echo Ruta esperada:
     echo "%ENV_FILE%"
     echo.
+    echo Crea un archivo llamado .env en la misma carpeta que este lanzador.
+    echo.
+    echo Ejemplo de contenido:
+    echo PROJECT_DIR=C:\RUTA\A\mtestv2
+    echo PYTHON_REL=.venv\Scripts\python.exe
+    echo MAIN_FILE=main.py
+    echo.
     goto FIN
 )
 
@@ -38,8 +45,11 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%ENV_FILE%") do (
 REM Validar PROJECT_DIR
 if "%PROJECT_DIR%"=="" (
     echo [ERROR] PROJECT_DIR no esta definido en el archivo .env.
-    echo Ejemplo:
-    echo PROJECT_DIR=C:\Users\julia\OneDrive\Desktop\tesis\mtestv2
+    echo.
+    echo Ejemplo de contenido del .env:
+    echo PROJECT_DIR=C:\RUTA\A\mtestv2
+    echo PYTHON_REL=.venv\Scripts\python.exe
+    echo MAIN_FILE=main.py
     echo.
     goto FIN
 )
@@ -74,7 +84,7 @@ if not exist "%PYTHON_EXE%" (
     echo - El entorno virtual esta en otra ruta
     echo - No se ha creado el entorno virtual en este ordenador
     echo.
-    echo Si hace falta crearlo, desde la carpeta del proyecto:
+    echo Si hace falta crearlo, desde la carpeta del proyecto ejecuta:
     echo python -m venv .venv
     echo .venv\Scripts\python.exe -m pip install -r requirements.txt
     echo.
