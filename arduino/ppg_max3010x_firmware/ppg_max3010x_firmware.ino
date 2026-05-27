@@ -256,6 +256,265 @@ void printDataLine(uint32_t red, uint32_t ir) {
   Serial.println(rawTemp);
 }
 
+// ======================================================
+// Diagnostico manual
+// No se ejecuta solo. Solo responde al comando DIAGNOSTICO.
+// No modifica setup(), loop(), streaming ni formato CSV.
+// ======================================================
+
+const byte MAX3010X_ADDR = 0x57;
+
+void printHexAddress(byte address) {
+  Serial.print(F("0x"));
+  if (address < 16) Serial.print("0");
+  Serial.print(address, HEX);
+}
+
+bool pingI2C(byte address) {
+  Wire.beginTransmission(address);
+  byte error = Wire.endTransmission();
+  return error == 0;
+}
+
+bool scanI2CForMax3010x() {
+  bool maxFound = false;
+  byte count = 0;
+
+  Serial.println(F("I2C_ESCANEO_INICIO"));
+
+  for (byte address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    byte error = Wire.endTransmission();
+
+    if (error == 0) {
+      count++;
+
+      Serial.print(F("I2C_ENCONTRADO "));
+      printHexAddress(address);
+
+      if (address == MAX3010X_ADDR) {
+        Serial.print(F(" MAX3010X"));
+        maxFound = true;
+      } else {
+        Serial.print(F(" OTRO"));
+      }
+
+      Serial.println();
+    }
+  }
+
+  Serial.print(F("I2C_TOTAL "));
+  Serial.println(count);
+
+  if (maxFound) {
+    Serial.println(F("I2C_RESULTADO OK_MAX3010X_ENCONTRADO"));
+  } else {
+    Serial.println(F("I2C_RESULTADO ERROR_MAX3010X_NO_ENCONTRADO"));
+    Serial.println(F("I2C_ACCION Revisar VCC/GND/SDA/SCL. El MAX3010x debe aparecer en 0x57."));
+  }
+
+  Serial.println(F("I2C_ESCANEO_FIN"));
+
+  return maxFound;
+}
+
+void diagnosticoMax3010x(bool maxFound) {
+  Serial.println(F("MAX3010X_INICIO"));
+
+  Serial.print(F("MAX3010X_DIRECCION_ESPERADA "));
+  printHexAddress(MAX3010X_ADDR);
+  Serial.println();
+
+  Serial.print(F("MAX3010X_I2C "));
+  Serial.println(maxFound ? F("CONECTADO") : F("NO_DETECTADO"));
+
+  Serial.print(F("MAX3010X_SENSOR_OK "));
+  Serial.println(sensorOk ? 1 : 0);
+
+  if (!maxFound) {
+    Serial.println(F("MAX3010X_RESULTADO ERROR_NO_DETECTADO"));
+    Serial.println(F("MAX3010X_EXPLICACION El Arduino no ve el sensor en el bus I2C."));
+    Serial.println(F("MAX3010X_ACCION Revisar cableado: VCC a 3V3, GND a GND, SDA a SDA/A4, SCL a SCL/A5."));
+  }
+  else if (!sensorOk) {
+    Serial.println(F("MAX3010X_RESULTADO ERROR_INICIALIZACION"));
+    Serial.println(F("MAX3010X_EXPLICACION El sensor aparece en I2C, pero sensor.begin() fallo al arrancar."));
+    Serial.println(F("MAX3010X_ACCION Reiniciar Arduino. Si persiste, probar cables cortos o I2C_SPEED_STANDARD."));
+  }
+  else {
+    sensor.check();
+
+    int available = sensor.available();
+
+    Serial.print(F("MAX3010X_FIFO_MUESTRAS "));
+    Serial.println(available);
+
+    if (available > 0) {
+      uint32_t red = sensor.getRed();
+      uint32_t ir = sensor.getIR();
+
+      Serial.print(F("MAX3010X_RED "));
+      Serial.println(red);
+
+      Serial.print(F("MAX3010X_IR "));
+      Serial.println(ir);
+
+      Serial.println(F("MAX3010X_RESULTADO OK_CONECTADO_Y_LEYENDO"));
+    } else {
+      Serial.println(F("MAX3010X_RESULTADO OK_CONECTADO_SIN_MUESTRAS_AUN"));
+      Serial.println(F("MAX3010X_ACCION Si no aparecen datos al hacer START_CONTINUOUS, revisar posicion del dedo/sensor o configuracion."));
+    }
+  }
+
+  Serial.println(F("MAX3010X_FIN"));
+}
+
+void diagnosticoTemperatura() {
+  Serial.println(F("TEMP_INICIO"));
+
+  const byte muestras = 20;
+
+  // Lectura normal
+  pinMode(PIN_TEMP, INPUT);
+  delay(5);
+
+  uint32_t rawSum = 0;
+  uint16_t rawMin = 65535;
+  uint16_t rawMax = 0;
+
+  for (byte i = 0; i < muestras; i++) {
+    uint16_t raw = leerTempRaw();
+
+    rawSum += raw;
+
+    if (raw < rawMin) rawMin = raw;
+    if (raw > rawMax) rawMax = raw;
+
+    delay(2);
+  }
+
+  uint16_t rawAvg = rawSum / muestras;
+
+  // Prueba con pullup interno para detectar pin flotante.
+  // Si A0 no esta conectado a nada, al activar pullup suele subir mucho.
+  pinMode(PIN_TEMP, INPUT_PULLUP);
+  delay(20);
+
+  uint32_t rawPullupSum = 0;
+
+  for (byte i = 0; i < muestras; i++) {
+    rawPullupSum += leerTempRaw();
+    delay(2);
+  }
+
+  uint16_t rawPullupAvg = rawPullupSum / muestras;
+
+  // Volvemos a dejarlo como entrada normal para no afectar al resto del programa.
+  pinMode(PIN_TEMP, INPUT);
+  delay(5);
+
+  uint32_t adcMax = adcMaxValue();
+  float tempC = leerTemperaturaC(rawAvg);
+
+  uint16_t variacion = rawMax - rawMin;
+  uint16_t diferenciaPullup;
+
+  if (rawPullupAvg > rawAvg) diferenciaPullup = rawPullupAvg - rawAvg;
+  else diferenciaPullup = rawAvg - rawPullupAvg;
+
+  Serial.println(F("TEMP_SENSOR NTC_A0"));
+
+  Serial.print(F("TEMP_RAW_AVG "));
+  Serial.print(rawAvg);
+  Serial.print(F("/"));
+  Serial.println(adcMax);
+
+  Serial.print(F("TEMP_RAW_MIN "));
+  Serial.println(rawMin);
+
+  Serial.print(F("TEMP_RAW_MAX "));
+  Serial.println(rawMax);
+
+  Serial.print(F("TEMP_RAW_PULLUP "));
+  Serial.println(rawPullupAvg);
+
+  Serial.print(F("TEMP_DIF_PULLUP "));
+  Serial.println(diferenciaPullup);
+
+  Serial.print(F("TEMP_C "));
+  if (isnan(tempC)) Serial.println(F("nan"));
+  else Serial.println(tempC, 2);
+
+  if (diferenciaPullup > adcMax / 4) {
+    Serial.println(F("TEMP_RESULTADO ERROR_A0_FLOTANTE"));
+    Serial.println(F("TEMP_EXPLICACION A0 cambia mucho al activar pullup interno. Probablemente no hay divisor NTC-resistencia conectado."));
+    Serial.println(F("TEMP_ACCION Conectar: 3.3V -> NTC -> A0 -> resistencia fija 10k -> GND."));
+  }
+  else if (rawAvg <= 5) {
+    Serial.println(F("TEMP_RESULTADO ERROR_A0_CASI_0V"));
+    Serial.println(F("TEMP_EXPLICACION A0 esta casi a GND."));
+    Serial.println(F("TEMP_ACCION Puede faltar la NTC superior o A0 puede estar unido a GND por la resistencia fija."));
+  }
+  else if (rawAvg >= adcMax - 5) {
+    Serial.println(F("TEMP_RESULTADO ERROR_A0_CASI_VCC"));
+    Serial.println(F("TEMP_EXPLICACION A0 esta casi a VCC."));
+    Serial.println(F("TEMP_ACCION Puede faltar la resistencia fija a GND o estar mal montado el divisor."));
+  }
+  else if (variacion > adcMax / 10) {
+    Serial.println(F("TEMP_RESULTADO AVISO_A0_INESTABLE"));
+    Serial.println(F("TEMP_EXPLICACION La lectura varia demasiado. Puede haber mala conexion o A0 flotando."));
+    Serial.println(F("TEMP_ACCION Revisar cables del divisor NTC-resistencia."));
+  }
+  else if (isnan(tempC)) {
+    Serial.println(F("TEMP_RESULTADO ERROR_CALCULO_NAN"));
+    Serial.println(F("TEMP_EXPLICACION El calculo de temperatura no es valido."));
+    Serial.println(F("TEMP_ACCION Revisar configuracion VCC/RFIX/RN/BETA/ADCBITS."));
+  }
+  else if (tempC < -10.0 || tempC > 80.0) {
+    Serial.println(F("TEMP_RESULTADO AVISO_TEMPERATURA_RARA"));
+    Serial.println(F("TEMP_EXPLICACION La temperatura calculada esta fuera de rango razonable para una prueba normal."));
+    Serial.println(F("TEMP_ACCION Revisar montaje: 3.3V -> NTC -> A0 -> resistencia fija -> GND."));
+  }
+  else {
+    Serial.println(F("TEMP_RESULTADO OK_PROBABLEMENTE_CONECTADA"));
+    Serial.println(F("TEMP_EXPLICACION La lectura parece estable y no reacciona como un pin flotante."));
+  }
+
+  Serial.println(F("TEMP_NOTA Para deteccion fiable, debe existir siempre una resistencia fija entre A0 y GND."));
+  Serial.println(F("TEMP_FIN"));
+}
+
+void diagnosticoEstado() {
+  Serial.println(F("ESTADO_INICIO"));
+
+  Serial.print(F("STREAMING "));
+  Serial.println(streaming ? 1 : 0);
+
+  Serial.print(F("TEMP_ONLY_MODE "));
+  Serial.println(tempOnlyMode ? 1 : 0);
+
+  Serial.print(F("SKIP_REMAINING "));
+  Serial.println(skipRemaining);
+
+  Serial.println(F("ESTADO_FIN"));
+}
+
+void diagnosticoCompleto() {
+  Serial.println(F("DIAGNOSTICO_INICIO"));
+
+  bool maxFound = scanI2CForMax3010x();
+
+  diagnosticoMax3010x(maxFound);
+  diagnosticoTemperatura();
+  diagnosticoEstado();
+
+  printSensorConfig();
+  printTempConfig();
+
+  Serial.println(F("DIAGNOSTICO_FIN"));
+}
+
+
 
 // ======================================================
 // Comandos
@@ -263,6 +522,11 @@ void printDataLine(uint32_t red, uint32_t ir) {
 
 void handleCommand(const String &cmd) {
   if (cmd.length() == 0) return;
+
+  if (cmd == "DIAGNOSTICO") {
+    diagnosticoCompleto();
+    return;
+  }
 
   if (cmd == "STATUS") {
     Serial.println(sensorOk ? F("STATUS SENSOR_OK") : F("STATUS SENSOR_ERROR"));
