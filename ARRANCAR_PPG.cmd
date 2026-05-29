@@ -115,7 +115,7 @@ if exist "%PROJECT_DIR%\.git" (
             echo.
             echo [WARN] No se pudo actualizar automaticamente con Git.
             echo [WARN] El programa continuara con la version local.
-            echo [WARN] Si hay cambios locales sin guardar, Git puede bloquear el pull.
+            echo [WARN] git pull --ff-only no borra cambios locales; si una actualizacion no es limpia, Git se detiene.
             echo.
         ) else (
             echo [OK] Repositorio actualizado.

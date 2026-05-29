@@ -89,10 +89,14 @@ class CaptureState:
     pulse_prev: str = ""
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
+    measurement_condition: str = ""
     first_micro: Optional[int] = None
     t: list[float] = field(default_factory=list)
     red: list[float] = field(default_factory=list)
     ir: list[float] = field(default_factory=list)
+    temp_c: list[float] = field(default_factory=list)
+    temp_raw: list[float] = field(default_factory=list)
+    config_label: str = ""
     valid_lines: int = 0
     discarded_lines: int = 0
     control_messages: int = 0
@@ -100,6 +104,8 @@ class CaptureState:
     rx_bytes: int = 0
     last_line: str = ""
     last_control: str = ""
+    last_config_ack: str = "sin confirmar"
+    last_config_line: str = ""
     base_name: str = ""
     raw_file: Optional[Path] = None
     raw_handle: Optional[object] = None
