@@ -1,8 +1,6 @@
 ACTUALIZACIONES 29052026
 ========================
 
-Resumen en modo uso diario
---------------------------
 
 Esta actualizacion deja el programa mas preparado para trabajo de campo y para pruebas de configuracion sin tener que tocar archivos ni abrir Git manualmente.
 
