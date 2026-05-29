@@ -80,6 +80,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(40 if self.app_mode != "real" else 60)
+        QtCore.QTimer.singleShot(900, self.try_auto_connect)
         log.warning("PPG Suite v8 arrancado modo=%s", self.app_mode)
 
     def build_ui(self):
@@ -137,7 +138,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.analysis_widget.setVisible(False)
             self.btn_toggle_advanced.setVisible(True)
         else:
-            self.btn_toggle_advanced.setVisible(False)
+            self.sensor_widget.setVisible(False)
+            self.analysis_widget.setVisible(False)
+            self.btn_toggle_advanced.setVisible(True)
 
         self.btn_apply_config = QtWidgets.QPushButton("Aplicar configuración sensor")
         self.btn_start = QtWidgets.QPushButton("Iniciar medición real" if self.app_mode == "real" else "Iniciar toma")
@@ -152,6 +155,8 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.btn_apply_config.setVisible(False)
             self.btn_long.setVisible(False)
             self.btn_open_logs.setVisible(False)
+        elif self.app_mode == "test":
+            self.btn_apply_config.setVisible(False)
         self.btn_apply_config.clicked.connect(lambda: self.apply_sensor_config(self.sensor_widget.get_config()))
         self.btn_start.clicked.connect(self.start_normal_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_MANUAL"))
@@ -245,8 +250,15 @@ class PPGSuite(QtWidgets.QMainWindow):
         return ranked[0][1]
 
     def try_auto_connect(self):
+        if self.serial_port and self.serial_port.is_open:
+            return
+        self.refresh_ports()
         port = self.find_auto_port()
         if port:
+            for i in range(self.port_combo.count()):
+                if self.port_combo.itemData(i) == port:
+                    self.port_combo.setCurrentIndex(i)
+                    break
             self.connect_port(port)
 
     def connect_selected_port(self):
@@ -294,6 +306,59 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.state.last_config_line = self.last_config_line
         self.send_command(self.last_config_command)
         self.save_current_config_json(prefix="sensor_config")
+
+    def expected_config_matches_last_ack(self, cfg: SensorConfig) -> bool:
+        if self.last_config_ack != "confirmada" or not self.last_config_line:
+            return False
+        values = self.parse_cfg_line(self.last_config_line)
+        expected = cfg.clean()
+        return all(
+            values.get(key) == value
+            for key, value in {
+                "RED": str(expected.red),
+                "IR": str(expected.ir),
+                "AVG": str(expected.avg),
+                "RATE": str(expected.rate),
+                "WIDTH": str(expected.width),
+                "ADC": str(expected.adc),
+                "SKIP": str(expected.skip),
+                "DEBUG": "1" if expected.debug else "0",
+            }.items()
+        )
+
+    def confirm_config_before_start(self, cfg: SensorConfig) -> bool:
+        if self.expected_config_matches_last_ack(cfg):
+            return True
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg.setWindowTitle("Configuración Arduino no confirmada")
+        msg.setText("La configuración confirmada por Arduino no coincide con la que se va a usar.")
+        msg.setInformativeText(
+            "Pulsa Aplicar y continuar para enviar la configuración actual al Arduino antes de iniciar."
+        )
+        apply_btn = msg.addButton("Aplicar y continuar", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        cancel_btn = msg.addButton("Cancelar", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+        if msg.clickedButton() != apply_btn:
+            return False
+        try:
+            self.serial_port.reset_input_buffer()
+        except Exception:
+            pass
+        self.apply_sensor_config(cfg)
+        deadline = time.time() + 1.5
+        while time.time() < deadline:
+            self.read_serial()
+            if self.expected_config_matches_last_ack(cfg):
+                return True
+            QtWidgets.QApplication.processEvents()
+            time.sleep(0.03)
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Configuración sin confirmar",
+            "Se envió la configuración, pero Arduino no la confirmó a tiempo. Revisa el puerto serie.",
+        )
+        return False
 
     def parse_cfg_line(self, line: str) -> dict[str, str]:
         out: dict[str, str] = {}
@@ -534,7 +599,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.serial_port.reset_input_buffer(); self.serial_port.reset_output_buffer()
         except Exception:
             pass
-        self.apply_sensor_config(self.sensor_widget.get_config())
+        cfg = self.sensor_widget.get_config()
+        if not self.confirm_config_before_start(cfg):
+            st.capturing = False
+            return
         self.open_raw_file()
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
@@ -561,7 +629,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.serial_port.reset_input_buffer(); self.serial_port.reset_output_buffer()
         except Exception:
             pass
-        self.apply_sensor_config(self.sensor_widget.get_config())
+        cfg = self.sensor_widget.get_config()
+        if not self.confirm_config_before_start(cfg):
+            st.capturing = False
+            return
         self.open_raw_file()
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")

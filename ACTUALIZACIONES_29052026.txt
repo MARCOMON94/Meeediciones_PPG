@@ -1,0 +1,91 @@
+ACTUALIZACIONES 29052026
+========================
+
+Resumen en modo uso diario
+--------------------------
+
+Esta actualizacion deja el programa mas preparado para trabajo de campo y para pruebas de configuracion sin tener que tocar archivos ni abrir Git manualmente.
+
+1. Arranque del programa
+- El programa se sigue abriendo desde `ARRANCAR_PPG.cmd`.
+- Al arrancar, intenta actualizarse desde Git automaticamente.
+- Si no puede actualizarse, no pasa nada: avisa y abre la version que ya esta en el ordenador.
+- Tambien revisa si faltan librerias de Python y las instala si hace falta.
+
+2. Menu inicial mas simple
+- Ahora el boton principal es `Medicion de campo`.
+- Ese modo es el recomendado para una toma normal y rapida.
+- Debajo aparecen botones mas pequenos para modos especiales:
+  - `Test de campo`
+  - `Solo temperatura`
+  - `Reajustes`
+  - `64 configuraciones`
+  - `12 configuraciones`
+
+3. Medicion de campo
+- Es el modo sencillo para tomar datos normales.
+- Muestra lo importante: BPM, calidad, temperatura, contacto y archivo raw.
+- Tiene menos botones visibles para evitar tocar cosas por error.
+
+4. Test de campo
+- Es parecido a Medicion de campo, pero con mas opciones.
+- Sirve para probar parametros, ver graficas y anadir notas sobre la toma.
+- La configuracion avanzada queda plegada para que no moleste.
+
+5. Solo temperatura
+- Modo para registrar solo la temperatura del NTC.
+- No muestra controles de PPG innecesarios.
+- Guarda temperatura calculada y lectura raw del NTC.
+
+6. Reajustes
+- Modo avanzado para calibrar y revisar la senal con mas detalle.
+- Sirve para tocar LEDs, promediado, ADC, ventanas de calculo y diagnostico.
+- Se quito el boton duplicado de solo temperatura para no mezclar modos.
+
+7. 64 configuraciones
+- Modo automatico de 20 minutos.
+- El programa va cambiando solo por 64 configuraciones distintas.
+- Cada dato guardado indica que configuracion estaba activa en ese momento.
+- Sirve para comparar despues que combinacion funciona mejor.
+
+8. 12 configuraciones
+- Modo manual con 12 configuraciones recomendadas.
+- Hay un desplegable para elegir la configuracion.
+- El boton `Aplicar configuracion seleccionada` manda esa configuracion al Arduino.
+- Sirve para probar una configuracion concreta sin hacer el barrido completo.
+
+9. Aviso de configuracion Arduino
+- Antes de empezar una toma, el programa comprueba si Arduino ha confirmado la configuracion.
+- Si la configuracion que tiene Arduino no coincide con la que aparece en pantalla, salta un aviso.
+- En ese aviso se puede aplicar la configuracion correcta antes de continuar.
+- Esto ayuda a evitar tomas hechas con una configuracion distinta a la esperada.
+
+10. Puerto Arduino
+- El programa intenta detectar y conectar automaticamente el Arduino.
+- Se mejoro para que no elija puertos Bluetooth por error.
+- Si aun asi no conecta, sigue estando el boton `Conectar` para hacerlo manualmente.
+
+11. Rueda del raton
+- Se bloqueo la rueda del raton en varios desplegables y campos numericos.
+- Esto evita cambiar parametros sin querer al hacer scroll.
+
+12. Datos guardados
+- Los raw ahora guardan mas informacion:
+  - crotal
+  - modo de medicion
+  - condiciones de medida
+  - configuracion activa
+  - RED e IR raw
+  - temperatura
+  - parametros del sensor
+  - si Arduino confirmo la configuracion
+- Esto facilita revisar despues que se hizo exactamente en cada toma.
+
+Recomendacion de uso
+--------------------
+
+- Para una toma normal: `Medicion de campo`.
+- Para probar y ajustar: `Test de campo` o `Reajustes`.
+- Para temperatura solamente: `Solo temperatura`.
+- Para comparar muchas configuraciones: `64 configuraciones`.
+- Para probar una configuracion recomendada concreta: `12 configuraciones`.

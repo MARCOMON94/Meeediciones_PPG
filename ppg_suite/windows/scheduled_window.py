@@ -10,7 +10,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from ..models import SensorConfig
 from ..processing import estimate_hz, processed_for_plot
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
-from ..widgets import AnalysisConfigWidget, SensorConfigWidget
+from ..widgets import AnalysisConfigWidget, NoWheelComboBox, NoWheelDoubleSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite
 
 
@@ -101,11 +101,11 @@ class ScheduledConfigWindow(PPGSuite):
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.condition_edit = QtWidgets.QLineEdit(self.scheduled_condition)
-        self.duration_spin = QtWidgets.QDoubleSpinBox()
-        self.duration_spin.setRange(10, 7200)
+        self.duration_spin = NoWheelDoubleSpinBox()
+        self.duration_spin.setRange(1, 120)
         self.duration_spin.setDecimals(1)
-        self.duration_spin.setValue(self.scheduled_total_duration_s)
-        self.duration_spin.setSuffix(" s")
+        self.duration_spin.setValue(self.scheduled_total_duration_s / 60.0)
+        self.duration_spin.setSuffix(" min")
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         form.addRow("Condiciones:", self.condition_edit)
@@ -160,7 +160,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.reset_capture_state(keep_identity=False)
         st = self.state
         st.mode = "scheduled"
-        st.requested_duration_s = float(self.duration_spin.value())
+        st.requested_duration_s = float(self.duration_spin.value()) * 60.0
         self.scheduled_total_duration_s = st.requested_duration_s
         self.scheduled_step_duration_s = self.scheduled_total_duration_s / max(1, len(self.scheduled_steps))
         self.scheduled_step_index = 0
@@ -176,6 +176,9 @@ class ScheduledConfigWindow(PPGSuite):
         except Exception:
             pass
         self.open_raw_file()
+        if not self.confirm_config_before_start(self.scheduled_steps[0].config):
+            st.capturing = False
+            return
         self.apply_scheduled_step(0)
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
@@ -257,14 +260,14 @@ class Scheduled12Window(ScheduledConfigWindow):
         super().__init__(
             "Selector manual - 12 configuraciones recomendadas",
             build_12_config_steps(),
-            12 * 60,
+            20 * 60,
             "toma manual seleccionando una de las 12 configuraciones recomendadas",
         )
 
     def build_ui(self):
         super().build_ui()
         self.btn_start.setText("Iniciar toma manual")
-        self.config_selector = QtWidgets.QComboBox()
+        self.config_selector = NoWheelComboBox()
         for step in self.scheduled_steps:
             self.config_selector.addItem(step.label, step)
         self.btn_apply_selected = QtWidgets.QPushButton("Aplicar configuración seleccionada")
@@ -306,7 +309,7 @@ class Scheduled12Window(ScheduledConfigWindow):
         self.reset_capture_state(keep_identity=False)
         st = self.state
         st.mode = "scheduled"
-        st.requested_duration_s = float(self.duration_spin.value())
+        st.requested_duration_s = float(self.duration_spin.value()) * 60.0
         st.crotal_id = sanitize_id(self.crotal_edit.text())
         st.pulse_prev = safe_float_text(self.prev_pulse_edit.text())
         st.measurement_condition = self.current_condition_text() or self.scheduled_condition
@@ -319,6 +322,10 @@ class Scheduled12Window(ScheduledConfigWindow):
         except Exception:
             pass
         self.open_raw_file()
+        step = self.scheduled_steps[max(0, self.config_selector.currentIndex())]
+        if not self.confirm_config_before_start(step.config):
+            st.capturing = False
+            return
         self.apply_selected_step()
         self.state.config_label = self.scheduled_steps[self.scheduled_step_index].label
         self.save_current_config_json(prefix=f"config_{st.base_name}")

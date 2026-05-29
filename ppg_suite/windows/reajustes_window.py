@@ -92,7 +92,6 @@ class ReajustesWindow(PPGSuite):
 
         self.btn_apply_config = QtWidgets.QPushButton("Aplicar configuración al Arduino")
         self.btn_start = QtWidgets.QPushButton("Iniciar larga duración")
-        self.btn_start_temp = QtWidgets.QPushButton("Iniciar solo temperatura")
         self.btn_diagnostic = QtWidgets.QPushButton("Diagnóstico Arduino")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_snapshot = QtWidgets.QPushButton("Guardar snapshot")
@@ -100,12 +99,11 @@ class ReajustesWindow(PPGSuite):
         self.btn_open_base = QtWidgets.QPushButton("Abrir carpeta mtest/resultados")
         self.btn_open_logs = QtWidgets.QPushButton("Abrir logs")
 
-        for b in [self.btn_apply_config, self.btn_start, self.btn_start_temp, self.btn_diagnostic, self.btn_stop, self.btn_snapshot, self.btn_back_menu, self.btn_open_base, self.btn_open_logs]:
+        for b in [self.btn_apply_config, self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_snapshot, self.btn_back_menu, self.btn_open_base, self.btn_open_logs]:
             left.addWidget(b)
 
         self.btn_apply_config.clicked.connect(lambda: self.apply_sensor_config(self.sensor_widget.get_config()))
         self.btn_start.clicked.connect(self.start_long_capture)
-        self.btn_start_temp.clicked.connect(self.start_temperature_capture)
         self.btn_diagnostic.clicked.connect(self.send_diagnostic_command)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_LONG_MANUAL"))
         self.btn_snapshot.clicked.connect(self.save_snapshot)
