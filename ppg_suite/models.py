@@ -79,7 +79,7 @@ class Metrics:
 
 @dataclass
 class CaptureState:
-    mode: Literal["idle", "normal", "long", "temp", "temp_ajuste"] = "idle"
+    mode: Literal["idle", "normal", "long", "scheduled", "temp", "temp_ajuste"] = "idle"
     capturing: bool = False
     finished: bool = False
     sensor_ready: bool = False

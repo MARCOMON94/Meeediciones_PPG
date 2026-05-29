@@ -225,12 +225,24 @@ class PPGSuite(QtWidgets.QMainWindow):
 
     def find_auto_port(self) -> Optional[str]:
         ports = list(list_ports.comports())
-        preferred = []
+        ranked: list[tuple[int, str]] = []
         for p in ports:
             txt = f"{p.device} {p.description} {p.hwid}".upper()
-            if any(k in txt for k in ["ARDUINO", "NANO", "COM", "USB", "CH340", "CP210"]):
-                preferred.append(p.device)
-        return preferred[0] if preferred else (ports[0].device if ports else None)
+            score = 0
+            if any(k in txt for k in ["ARDUINO", "GENUINO", "NANO 33", "NANO33", "MKR"]):
+                score += 100
+            if any(k in txt for k in ["VID:2341", "VID_2341", "VID:2A03", "VID_2A03"]):
+                score += 80
+            if any(k in txt for k in ["CH340", "CH341", "CP210", "FTDI", "USB SERIAL", "USB-SERIAL"]):
+                score += 50
+            if "BLUETOOTH" in txt:
+                score -= 100
+            if score > 0:
+                ranked.append((score, p.device))
+        if not ranked:
+            return None
+        ranked.sort(reverse=True)
+        return ranked[0][1]
 
     def try_auto_connect(self):
         port = self.find_auto_port()

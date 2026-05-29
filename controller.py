@@ -6,6 +6,7 @@ from ppg_suite.menu import ModeSelectDialog
 from ppg_suite.windows.real_window import RealWindow
 from ppg_suite.windows.test_window import TestWindow
 from ppg_suite.windows.reajustes_window import ReajustesWindow
+from ppg_suite.windows.scheduled_window import Scheduled12Window, Scheduled64Window
 
 
 class AppController(QtCore.QObject):
@@ -37,6 +38,12 @@ class AppController(QtCore.QObject):
             self.show_test()
         elif dialog.selected_mode == "reajustes":
             self.show_reajustes()
+        elif dialog.selected_mode == "scheduled64":
+            self.show_scheduled64()
+        elif dialog.selected_mode == "scheduled12":
+            self.show_scheduled12()
+        elif dialog.selected_mode == "temp":
+            self.show_reajustes()
 
     def _wire_common_signals(self, win):
         win.back_to_menu.connect(self.show_menu)
@@ -60,6 +67,20 @@ class AppController(QtCore.QObject):
     def show_reajustes(self):
         self.close_current_window()
         win = ReajustesWindow()
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.show()
+
+    def show_scheduled64(self):
+        self.close_current_window()
+        win = Scheduled64Window()
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.show()
+
+    def show_scheduled12(self):
+        self.close_current_window()
+        win = Scheduled12Window()
         self._wire_common_signals(win)
         self.current_window = win
         win.show()
