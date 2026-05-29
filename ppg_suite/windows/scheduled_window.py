@@ -10,7 +10,9 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from ..models import SensorConfig
 from ..processing import estimate_hz, processed_for_plot
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
-from ..widgets import AnalysisConfigWidget, NoWheelComboBox, NoWheelDoubleSpinBox, SensorConfigWidget
+from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
+from ..paths import RESULTS_DIR
+from ..utils import open_folder
 from .measurement_window import PPGSuite
 
 
@@ -114,12 +116,14 @@ class ScheduledConfigWindow(PPGSuite):
 
         self.btn_start = QtWidgets.QPushButton("Iniciar bloque")
         self.btn_stop = QtWidgets.QPushButton("Parar")
+        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        for b in [self.btn_start, self.btn_stop, self.btn_back_menu]:
+        for b in [self.btn_start, self.btn_stop, self.btn_open_base, self.btn_back_menu]:
             b.setMinimumHeight(42)
             left.addWidget(b)
         self.btn_start.clicked.connect(self.start_scheduled_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_BLOQUE_MANUAL"))
+        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
 
         self.info = QtWidgets.QLabel()
@@ -175,10 +179,10 @@ class ScheduledConfigWindow(PPGSuite):
             self.serial_port.reset_output_buffer()
         except Exception:
             pass
-        self.open_raw_file()
         if not self.confirm_config_before_start(self.scheduled_steps[0].config):
             st.capturing = False
             return
+        self.open_raw_file()
         self.apply_scheduled_step(0)
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
@@ -245,96 +249,168 @@ class ScheduledConfigWindow(PPGSuite):
         )
 
 
-class Scheduled64Window(ScheduledConfigWindow):
-    def __init__(self):
-        super().__init__(
-            "Medición 64 configuraciones - 20 minutos",
-            build_64_config_steps(),
-            20 * 60,
-            "toma de muestras de 20 minutos pasando por 64 configuraciones",
-        )
+class ConfigTableWidget(QtWidgets.QTableWidget):
+    headers = ["label", "red", "ir", "avg", "rate", "width", "adc", "skip", "debug", "descripcion"]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setColumnCount(len(self.headers))
+        self.setHorizontalHeaderLabels(self.headers)
+        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ContiguousSelection)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectItems)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent):
+        if event.matches(QtGui.QKeySequence.StandardKey.Paste):
+            self.paste_from_clipboard()
+            return
+        if event.matches(QtGui.QKeySequence.StandardKey.Copy):
+            self.copy_to_clipboard()
+            return
+        super().keyPressEvent(event)
+
+    def paste_from_clipboard(self):
+        text = QtWidgets.QApplication.clipboard().text()
+        if not text:
+            return
+        start_row = self.currentRow() if self.currentRow() >= 0 else 0
+        start_col = self.currentColumn() if self.currentColumn() >= 0 else 0
+        rows = [r for r in text.splitlines() if r != ""]
+        needed_rows = start_row + len(rows)
+        if needed_rows > self.rowCount():
+            self.setRowCount(needed_rows)
+        for r_offset, row_text in enumerate(rows):
+            cells = row_text.split("\t")
+            for c_offset, value in enumerate(cells):
+                row = start_row + r_offset
+                col = start_col + c_offset
+                if col >= self.columnCount():
+                    continue
+                self.setItem(row, col, QtWidgets.QTableWidgetItem(value.strip()))
+
+    def copy_to_clipboard(self):
+        ranges = self.selectedRanges()
+        if not ranges:
+            return
+        r = ranges[0]
+        lines = []
+        for row in range(r.topRow(), r.bottomRow() + 1):
+            values = []
+            for col in range(r.leftColumn(), r.rightColumn() + 1):
+                item = self.item(row, col)
+                values.append(item.text() if item else "")
+            lines.append("\t".join(values))
+        QtWidgets.QApplication.clipboard().setText("\n".join(lines))
 
 
-class Scheduled12Window(ScheduledConfigWindow):
+class ConfigurationsWindow(ScheduledConfigWindow):
     def __init__(self):
+        self.table_ready = False
         super().__init__(
-            "Selector manual - 12 configuraciones recomendadas",
+            "Configuraciones personalizadas",
             build_12_config_steps(),
             20 * 60,
-            "toma manual seleccionando una de las 12 configuraciones recomendadas",
+            "toma con tabla personalizada de configuraciones",
         )
 
     def build_ui(self):
         super().build_ui()
-        self.btn_start.setText("Iniciar toma manual")
-        self.config_selector = NoWheelComboBox()
-        for step in self.scheduled_steps:
-            self.config_selector.addItem(step.label, step)
-        self.btn_apply_selected = QtWidgets.QPushButton("Aplicar configuración seleccionada")
+        self.setWindowTitle("PPG Suite v8 | Configuraciones personalizadas")
+        self.btn_start.setText("Iniciar tabla")
 
-        group = QtWidgets.QGroupBox("Configuración manual")
-        form = QtWidgets.QVBoxLayout(group)
-        form.addWidget(self.config_selector)
-        form.addWidget(self.btn_apply_selected)
+        self.count_spin = NoWheelSpinBox()
+        self.count_spin.setRange(1, 200)
+        self.count_spin.setValue(len(self.scheduled_steps))
+        self.btn_resize_table = QtWidgets.QPushButton("Crear cuadricula")
+        self.btn_load_12 = QtWidgets.QPushButton("Cargar plantilla 12")
+        self.btn_load_64 = QtWidgets.QPushButton("Cargar plantilla 64")
 
-        left_layout = self.centralWidget().layout().itemAt(0).layout()
-        left_layout.insertWidget(2, group)
+        controls = QtWidgets.QGroupBox("Tabla de configuraciones")
+        controls_layout = QtWidgets.QGridLayout(controls)
+        controls_layout.addWidget(QtWidgets.QLabel("Numero de configuraciones:"), 0, 0)
+        controls_layout.addWidget(self.count_spin, 0, 1)
+        controls_layout.addWidget(self.btn_resize_table, 0, 2)
+        controls_layout.addWidget(self.btn_load_12, 1, 0)
+        controls_layout.addWidget(self.btn_load_64, 1, 1)
 
-        self.config_selector.currentIndexChanged.connect(self.preview_selected_step)
-        self.btn_apply_selected.clicked.connect(self.apply_selected_step)
-        self.preview_selected_step()
+        self.config_table = ConfigTableWidget()
+        self.config_table.setMinimumHeight(260)
 
-    def preview_selected_step(self):
-        index = max(0, self.config_selector.currentIndex())
-        self.scheduled_step_index = index
-        step = self.scheduled_steps[index]
-        self.state.config_label = step.label
-        self.sensor_widget.set_config(step.config)
+        table_panel = QtWidgets.QWidget()
+        table_layout = QtWidgets.QVBoxLayout(table_panel)
+        table_layout.addWidget(controls)
+        table_layout.addWidget(self.config_table)
+        self.tabs.insertTab(0, table_panel, "Tabla")
+        self.tabs.setCurrentWidget(table_panel)
 
-    def apply_selected_step(self):
-        index = max(0, self.config_selector.currentIndex())
-        if self.state.capturing:
-            self.apply_scheduled_step(index)
-        else:
-            self.preview_selected_step()
-            if self.serial_port and self.serial_port.is_open:
-                self.apply_sensor_config(self.scheduled_steps[index].config)
+        self.btn_resize_table.clicked.connect(lambda: self.set_table_row_count(self.count_spin.value()))
+        self.btn_load_12.clicked.connect(lambda: self.load_steps_to_table(build_12_config_steps()))
+        self.btn_load_64.clicked.connect(lambda: self.load_steps_to_table(build_64_config_steps()))
+
+        self.load_steps_to_table(self.scheduled_steps)
+        self.table_ready = True
+
+    def set_table_row_count(self, count: int):
+        old = self.config_table.rowCount()
+        self.config_table.setRowCount(count)
+        for row in range(old, count):
+            defaults = [f"CONFIG {row + 1:02d}", "31", "31", "1", "100", "411", "16384", "50", "0", ""]
+            for col, value in enumerate(defaults):
+                self.config_table.setItem(row, col, QtWidgets.QTableWidgetItem(value))
+
+    def load_steps_to_table(self, steps: list[ScheduledStep]):
+        self.scheduled_steps = steps
+        self.count_spin.setValue(len(steps))
+        self.config_table.setRowCount(len(steps))
+        for row, step in enumerate(steps):
+            values = [
+                step.label,
+                str(step.config.red),
+                str(step.config.ir),
+                str(step.config.avg),
+                str(step.config.rate),
+                str(step.config.width),
+                str(step.config.adc),
+                str(step.config.skip),
+                "1" if step.config.debug else "0",
+                step.description,
+            ]
+            for col, value in enumerate(values):
+                self.config_table.setItem(row, col, QtWidgets.QTableWidgetItem(value))
+
+    def steps_from_table(self) -> list[ScheduledStep]:
+        steps: list[ScheduledStep] = []
+        for row in range(self.config_table.rowCount()):
+            vals = []
+            for col in range(self.config_table.columnCount()):
+                item = self.config_table.item(row, col)
+                vals.append(item.text().strip() if item else "")
+            label = vals[0] or f"CONFIG {row + 1:02d}"
+            try:
+                cfg = SensorConfig(
+                    red=int(vals[1] or 31),
+                    ir=int(vals[2] or 31),
+                    avg=int(vals[3] or 1),
+                    rate=int(vals[4] or 100),
+                    width=int(vals[5] or 411),
+                    adc=int(vals[6] or 16384),
+                    skip=int(vals[7] or 50),
+                    debug=(vals[8].lower() in ("1", "true", "si", "sí", "yes")),
+                ).clean()
+            except ValueError as exc:
+                raise ValueError(f"Fila {row + 1}: valor numerico no valido") from exc
+            desc = vals[9] or f"Configuracion personalizada {row + 1}"
+            steps.append(ScheduledStep(label, desc, cfg))
+        if not steps:
+            raise ValueError("La tabla no tiene configuraciones.")
+        return steps
 
     def start_scheduled_capture(self):
-        if not self.serial_port or not self.serial_port.is_open:
-            QtWidgets.QMessageBox.warning(self, "Serial", "No hay puerto serie abierto.")
-            return
-        if self.state.capturing:
-            return
-        self.reset_capture_state(keep_identity=False)
-        st = self.state
-        st.mode = "scheduled"
-        st.requested_duration_s = float(self.duration_spin.value()) * 60.0
-        st.crotal_id = sanitize_id(self.crotal_edit.text())
-        st.pulse_prev = safe_float_text(self.prev_pulse_edit.text())
-        st.measurement_condition = self.current_condition_text() or self.scheduled_condition
-        st.base_name = f"MANUAL_12CFG_{st.crotal_id}_{now_stamp()}"
-        st.capture_start_wall = time.time()
-        st.capturing = True
         try:
-            self.serial_port.reset_input_buffer()
-            self.serial_port.reset_output_buffer()
-        except Exception:
-            pass
-        self.open_raw_file()
-        step = self.scheduled_steps[max(0, self.config_selector.currentIndex())]
-        if not self.confirm_config_before_start(step.config):
-            st.capturing = False
+            self.scheduled_steps = self.steps_from_table()
+        except ValueError as exc:
+            QtWidgets.QMessageBox.warning(self, "Tabla de configuraciones", str(exc))
             return
-        self.apply_selected_step()
-        self.state.config_label = self.scheduled_steps[self.scheduled_step_index].label
-        self.save_current_config_json(prefix=f"config_{st.base_name}")
-        self.send_command("START_CONTINUOUS")
-
-    def check_auto_stop(self):
-        st = self.state
-        if not st.capturing:
-            return
-        elapsed = time.time() - st.capture_start_wall
-        if elapsed >= st.requested_duration_s:
-            self.stop_capture("TOMA_MANUAL_12CFG_COMPLETADA")
+        self.scheduled_title = f"Configuraciones personalizadas ({len(self.scheduled_steps)})"
+        super().start_scheduled_capture()

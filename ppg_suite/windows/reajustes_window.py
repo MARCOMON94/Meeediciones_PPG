@@ -8,7 +8,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
 from ..models import CaptureState, Metrics
-from ..paths import BASE_DIR, FIGURES_DIR, LOG_DIR, SCREENSHOT_DIR
+from ..paths import FIGURES_DIR, RESULTS_DIR, SCREENSHOT_DIR
 from ..processing import estimate_hz, processed_for_plot, score_and_merge_metrics
 from ..utils import fmt, now_stamp, open_folder
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
@@ -96,10 +96,9 @@ class ReajustesWindow(PPGSuite):
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_snapshot = QtWidgets.QPushButton("Guardar snapshot")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir carpeta mtest/resultados")
-        self.btn_open_logs = QtWidgets.QPushButton("Abrir logs")
+        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
 
-        for b in [self.btn_apply_config, self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_snapshot, self.btn_back_menu, self.btn_open_base, self.btn_open_logs]:
+        for b in [self.btn_apply_config, self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_snapshot, self.btn_open_base, self.btn_back_menu]:
             left.addWidget(b)
 
         self.btn_apply_config.clicked.connect(lambda: self.apply_sensor_config(self.sensor_widget.get_config()))
@@ -108,8 +107,7 @@ class ReajustesWindow(PPGSuite):
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_LONG_MANUAL"))
         self.btn_snapshot.clicked.connect(self.save_snapshot)
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_open_base.clicked.connect(lambda: open_folder(BASE_DIR))
-        self.btn_open_logs.clicked.connect(lambda: open_folder(LOG_DIR))
+        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 9))

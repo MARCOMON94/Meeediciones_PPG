@@ -44,21 +44,23 @@ Instala/crea `.venv`, instala dependencias y crea `.env` si no existe.
 - Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.
 - Solo temperatura: registro NTC sin PPG.
 - Reajustes: calibracion larga con controles completos.
-- 64 configuraciones: barrido automatico de 20 minutos.
-- 12 configuraciones: selector manual de configuraciones recomendadas.
+- Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor.
+
+El menu incluye un boton `Ultimas actualizaciones` que abre el archivo `actualizaciones/ACTUALIZACIONES_*.txt` mas reciente.
 
 ## Datos guardados
 
-Los resultados se guardan dentro del `PROJECT_DIR` de cada ordenador:
+Los resultados se guardan dentro de `PROJECT_DIR/resultados/` para separar datos de uso normal y codigo del programa:
 
-- `raw/`: datos crudos unificados.
-- `processed/`: datos procesados.
-- `sessions/`: resumen global de sesion.
-- `reports/`: resumenes JSON y bloques.
-- `figures/`: graficas.
-- `screenshots/`: capturas de pantalla.
-- `configs/`: configuraciones aplicadas.
-- `logs/`: logs de ejecucion.
+- `resultados/raw/`: datos crudos unificados.
+- `resultados/processed/`: datos procesados.
+- `resultados/sessions/`: resumen global de sesion.
+- `resultados/reports/`: resumenes JSON y bloques.
+- `resultados/figures/`: graficas.
+- `resultados/screenshots/`: capturas de pantalla.
+- `resultados/configs/`: configuraciones aplicadas.
+- `resultados/logs/`: logs de ejecucion.
+- `actualizaciones/`: notas de cambios visibles desde el menu principal.
 
 Los raw incluyen, de forma unificada:
 
@@ -91,7 +93,7 @@ ppg_suite/
     test_window.py              # modo test
     temperature_window.py       # modo solo temperatura
     reajustes_window.py         # modo reajustes independiente
-    scheduled_window.py         # modos 64/12 configuraciones
+    scheduled_window.py         # modo configuraciones con tabla editable
 arduino/
   ppg_max3010x_firmware/
     ppg_max3010x_firmware.ino   # firmware compatible con el protocolo Python

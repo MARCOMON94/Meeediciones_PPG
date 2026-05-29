@@ -16,7 +16,7 @@ import pyqtgraph as pg
 
 from ..menu import AppMode
 from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
-from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, LOG_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, SCREENSHOT_DIR, SESSION_DIR, log
+from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR, log
 from ..processing import (
     block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, find_local_peaks,
     processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, uniform_resample,
@@ -27,7 +27,6 @@ from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWi
 
 class PPGSuite(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
-    open_reajustes_requested = QtCore.pyqtSignal()
 
     def __init__(self, app_mode: AppMode = "real"):
         super().__init__()
@@ -146,24 +145,18 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.btn_start = QtWidgets.QPushButton("Iniciar medición real" if self.app_mode == "real" else "Iniciar toma")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        self.btn_long = QtWidgets.QPushButton("Abrir reajustes / larga duración")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir carpeta mtest/resultados")
-        self.btn_open_logs = QtWidgets.QPushButton("Abrir logs")
-        for b in [self.btn_apply_config, self.btn_start, self.btn_stop, self.btn_back_menu, self.btn_long, self.btn_open_base, self.btn_open_logs]:
+        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
+        for b in [self.btn_apply_config, self.btn_start, self.btn_stop, self.btn_open_base, self.btn_back_menu]:
             left.addWidget(b)
         if self.app_mode == "real":
             self.btn_apply_config.setVisible(False)
-            self.btn_long.setVisible(False)
-            self.btn_open_logs.setVisible(False)
         elif self.app_mode == "test":
             self.btn_apply_config.setVisible(False)
         self.btn_apply_config.clicked.connect(lambda: self.apply_sensor_config(self.sensor_widget.get_config()))
         self.btn_start.clicked.connect(self.start_normal_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_long.clicked.connect(self.open_long_window)
-        self.btn_open_base.clicked.connect(lambda: open_folder(BASE_DIR))
-        self.btn_open_logs.clicked.connect(lambda: open_folder(LOG_DIR))
+        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 9))
@@ -215,8 +208,6 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.start_normal_capture()
         elif key == QtCore.Qt.Key.Key_S:
             self.stop_capture("STOP_MANUAL")
-        elif key == QtCore.Qt.Key.Key_L:
-            self.open_long_window()
         else:
             super().keyPressEvent(event)
 
@@ -768,7 +759,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.pulse_final_fonendo = safe_float_text(fonendo.text())
 
     def save_current_config_json(self, prefix: str):
-        data = {"sensor": asdict(self.sensor_widget.get_config()), "analysis": asdict(self.analysis_widget.get_config()), "base_dir": str(BASE_DIR), "created": datetime.now().isoformat()}
+        data = {"sensor": asdict(self.sensor_widget.get_config()), "analysis": asdict(self.analysis_widget.get_config()), "base_dir": str(BASE_DIR), "results_dir": str(RESULTS_DIR), "created": datetime.now().isoformat()}
         path = CONFIG_DIR / f"{prefix}_{now_stamp()}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -1026,11 +1017,6 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.peak_scatter.setData(tt[peaks], yy_norm[peaks])
         else:
             self.peak_scatter.setData([], [])
-
-    def open_long_window(self):
-        if self.state.capturing:
-            self.stop_capture("ABRIR_REAJUSTES")
-        self.open_reajustes_requested.emit()
 
     def return_to_menu(self):
         if self.state.capturing:

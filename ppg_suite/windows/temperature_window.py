@@ -6,7 +6,7 @@ import time
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
-from ..paths import BASE_DIR
+from ..paths import RESULTS_DIR
 from ..utils import fmt, now_stamp, open_folder, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite
@@ -61,14 +61,14 @@ class TemperatureWindow(PPGSuite):
         self.btn_start = QtWidgets.QPushButton("Iniciar temperatura")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir carpeta mtestv2")
+        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
         for b in [self.btn_start, self.btn_stop, self.btn_back_menu, self.btn_open_base]:
             b.setMinimumHeight(42)
             left.addWidget(b)
         self.btn_start.clicked.connect(self.start_temperature_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_TEMP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_open_base.clicked.connect(lambda: open_folder(BASE_DIR))
+        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 10))

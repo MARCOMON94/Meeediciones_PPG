@@ -31,16 +31,17 @@ def _read_project_dir_from_env() -> Path:
 
 
 BASE_DIR = _read_project_dir_from_env()
-RAW_DIR = BASE_DIR / "raw"
-PROCESSED_DIR = BASE_DIR / "processed"
-SESSION_DIR = BASE_DIR / "sessions"
-FIGURES_DIR = BASE_DIR / "figures"
-SCREENSHOT_DIR = BASE_DIR / "screenshots"
-LOG_DIR = BASE_DIR / "logs"
-CONFIG_DIR = BASE_DIR / "configs"
-REPORT_DIR = BASE_DIR / "reports"
+RESULTS_DIR = BASE_DIR / "resultados"
+RAW_DIR = RESULTS_DIR / "raw"
+PROCESSED_DIR = RESULTS_DIR / "processed"
+SESSION_DIR = RESULTS_DIR / "sessions"
+FIGURES_DIR = RESULTS_DIR / "figures"
+SCREENSHOT_DIR = RESULTS_DIR / "screenshots"
+LOG_DIR = RESULTS_DIR / "logs"
+CONFIG_DIR = RESULTS_DIR / "configs"
+REPORT_DIR = RESULTS_DIR / "reports"
 
-RESULT_FOLDERS = (RAW_DIR, PROCESSED_DIR, SESSION_DIR, FIGURES_DIR, SCREENSHOT_DIR, LOG_DIR, CONFIG_DIR, REPORT_DIR)
+RESULT_FOLDERS = (RESULTS_DIR, RAW_DIR, PROCESSED_DIR, SESSION_DIR, FIGURES_DIR, SCREENSHOT_DIR, LOG_DIR, CONFIG_DIR, REPORT_DIR)
 
 for folder in RESULT_FOLDERS:
     folder.mkdir(parents=True, exist_ok=True)
