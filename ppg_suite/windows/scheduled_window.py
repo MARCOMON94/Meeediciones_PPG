@@ -179,11 +179,15 @@ class ScheduledConfigWindow(PPGSuite):
             self.serial_port.reset_output_buffer()
         except Exception:
             pass
-        if not self.confirm_config_before_start(self.scheduled_steps[0].config):
+        first_step = self.scheduled_steps[0]
+        self.scheduled_step_index = 0
+        self.scheduled_step_start_wall = time.time()
+        self.state.config_label = first_step.label
+        self.sensor_widget.set_config(first_step.config)
+        if not self.apply_config_and_wait(first_step.config, show_warning=True):
             st.capturing = False
             return
         self.open_raw_file()
-        self.apply_scheduled_step(0)
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
 

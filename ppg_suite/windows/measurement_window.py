@@ -332,23 +332,27 @@ class PPGSuite(QtWidgets.QMainWindow):
         msg.exec()
         if msg.clickedButton() != apply_btn:
             return False
+        return self.apply_config_and_wait(cfg, show_warning=True)
+
+    def apply_config_and_wait(self, cfg: SensorConfig, show_warning: bool = True, timeout_s: float = 1.5) -> bool:
         try:
             self.serial_port.reset_input_buffer()
         except Exception:
             pass
         self.apply_sensor_config(cfg)
-        deadline = time.time() + 1.5
+        deadline = time.time() + timeout_s
         while time.time() < deadline:
             self.read_serial()
             if self.expected_config_matches_last_ack(cfg):
                 return True
             QtWidgets.QApplication.processEvents()
             time.sleep(0.03)
-        QtWidgets.QMessageBox.warning(
-            self,
-            "Configuración sin confirmar",
-            "Se envió la configuración, pero Arduino no la confirmó a tiempo. Revisa el puerto serie.",
-        )
+        if show_warning:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Configuración sin confirmar",
+                "Se envió la configuración, pero Arduino no la confirmó a tiempo. Revisa el puerto serie.",
+            )
         return False
 
     def parse_cfg_line(self, line: str) -> dict[str, str]:
