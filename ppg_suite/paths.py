@@ -4,7 +4,33 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-BASE_DIR = Path(r"C:\Users\julia\OneDrive\Desktop\tesis\mtestv2")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _read_project_dir_from_env() -> Path:
+    env_file = PROJECT_ROOT / ".env"
+    if not env_file.exists():
+        return PROJECT_ROOT
+
+    try:
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key.strip().upper() == "PROJECT_DIR":
+                value = value.strip().strip('"')
+                if value:
+                    path = Path(value)
+                    if path.exists():
+                        return path
+    except OSError:
+        return PROJECT_ROOT
+
+    return PROJECT_ROOT
+
+
+BASE_DIR = _read_project_dir_from_env()
 RAW_DIR = BASE_DIR / "raw"
 PROCESSED_DIR = BASE_DIR / "processed"
 SESSION_DIR = BASE_DIR / "sessions"

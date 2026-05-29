@@ -1,22 +1,12 @@
 from __future__ import annotations
 
 import math
+import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
 import numpy as np
-
-
-
-def open_folder(path: Path):
-    path.mkdir(parents=True, exist_ok=True)
-    if sys.platform.startswith("win"):
-        os.startfile(str(path))
-    elif sys.platform == "darwin":
-        os.system(f'open "{path}"')
-    else:
-        os.system(f'xdg-open "{path}"')
 
 
 @dataclass
@@ -33,7 +23,7 @@ class SensorConfig:
     def command(self) -> str:
         return (
             f"CONFIG RED={self.red} IR={self.ir} AVG={self.avg} RATE={self.rate} "
-            f"WIDTH={self.width} ADC={self.adc} SKIP={self.skip} DEBUG=0"
+            f"WIDTH={self.width} ADC={self.adc} SKIP={self.skip} DEBUG={1 if self.debug else 0}"
         )
 
     def clean(self) -> "SensorConfig":

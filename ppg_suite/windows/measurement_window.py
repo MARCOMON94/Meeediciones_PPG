@@ -14,6 +14,7 @@ from serial.tools import list_ports
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
+from ..menu import AppMode
 from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
 from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, LOG_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, SCREENSHOT_DIR, SESSION_DIR, log
 from ..processing import (
@@ -43,7 +44,6 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.rx_buffer = ""
         self.port_name = "NO CONECTADO"
         self.last_sensor_config = SensorConfig()
-        self.long_window: Optional[LongModeWindow] = None
 
         self._last_info_update = 0.0
         self._last_metric_update = 0.0

@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions
+chcp 65001 >nul
 
 REM =====================================================
 REM Lanzador mtestv2
@@ -73,6 +74,10 @@ cd /d "%PROJECT_DIR%"
 REM Construir rutas
 set "PYTHON_EXE=%PROJECT_DIR%\%PYTHON_REL%"
 set "MAIN_PATH=%PROJECT_DIR%\%MAIN_FILE%"
+set "REQUIREMENTS_PATH=%PROJECT_DIR%\requirements.txt"
+
+REM Asegurar UTF-8 tambien dentro de Python
+set "PYTHONUTF8=1"
 
 REM Comprobar Python del entorno virtual
 if not exist "%PYTHON_EXE%" (
@@ -99,6 +104,62 @@ if not exist "%MAIN_PATH%" (
     echo Revisa MAIN_FILE en el archivo .env.
     goto FIN
 )
+
+REM Actualizar repositorio si Git esta disponible
+if exist "%PROJECT_DIR%\.git" (
+    where git >nul 2>nul
+    if not errorlevel 1 (
+        echo [INFO] Actualizando repositorio con git pull --ff-only...
+        git pull --ff-only
+        if errorlevel 1 (
+            echo.
+            echo [WARN] No se pudo actualizar automaticamente con Git.
+            echo [WARN] El programa continuara con la version local.
+            echo [WARN] Si hay cambios locales sin guardar, Git puede bloquear el pull.
+            echo.
+        ) else (
+            echo [OK] Repositorio actualizado.
+            echo.
+        )
+    ) else (
+        echo [WARN] Git no esta disponible en PATH. Se omite actualizacion automatica.
+        echo.
+    )
+) else (
+    echo [WARN] Esta carpeta no parece ser un repositorio Git. Se omite git pull.
+    echo.
+)
+
+REM Comprobar dependencias principales e instalarlas si faltan
+echo [INFO] Comprobando dependencias Python...
+"%PYTHON_EXE%" -c "import numpy, serial, PyQt6, pyqtgraph; print('OK_IMPORTS')" >nul 2>nul
+if errorlevel 1 (
+    echo [INFO] Faltan dependencias o alguna no importa correctamente.
+
+    if exist "%REQUIREMENTS_PATH%" (
+        echo [INFO] Instalando dependencias desde requirements.txt...
+        "%PYTHON_EXE%" -m pip install -r "%REQUIREMENTS_PATH%"
+    ) else (
+        echo [WARN] No existe requirements.txt. Instalando dependencias basicas...
+        "%PYTHON_EXE%" -m pip install numpy pyserial PyQt6 pyqtgraph
+    )
+
+    if errorlevel 1 (
+        echo [ERROR] Fallo instalando dependencias.
+        echo.
+        echo Revisa la conexion a internet o ejecuta instalarmtestv2.cmd.
+        goto FIN
+    )
+
+    echo [INFO] Reintentando comprobacion de dependencias...
+    "%PYTHON_EXE%" -c "import numpy, serial, PyQt6, pyqtgraph; print('OK_IMPORTS')" >nul 2>nul
+    if errorlevel 1 (
+        echo [ERROR] Las dependencias siguen sin importar correctamente.
+        goto FIN
+    )
+)
+echo [OK] Dependencias listas.
+echo.
 
 echo [OK] Carpeta del proyecto:
 echo "%PROJECT_DIR%"

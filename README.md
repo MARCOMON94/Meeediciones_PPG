@@ -5,10 +5,14 @@ Versión modular de `ppg_suite_v5.py`.
 ## Arranque
 
 ```bash
-cd mtest_modular
+cd mtestv2
 python -m pip install -r requirements.txt
 python main.py
 ```
+
+En Windows se recomienda usar `ARRANCAR_PPG.cmd`. El lanzador lee `.env`,
+actualiza el repositorio con `git pull --ff-only` si Git está disponible y
+comprueba las dependencias del entorno virtual antes de abrir la aplicación.
 
 ## Estructura
 
