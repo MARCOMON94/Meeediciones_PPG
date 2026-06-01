@@ -15,7 +15,9 @@ from ..paths import RAW_DIR
 from ..processing import (
     detect_artifacts,
     estimate_bpm_autocorr,
+    estimate_spo2,
     estimate_hz,
+    moving_average_edge,
     processed_ppg,
     replace_nan_with_last,
     uniform_resample,
@@ -82,6 +84,13 @@ class SpectrumResult:
     band_ratio_ir: float
     peak_snr_db: float
     entropy_ir: float
+    spo2_est_pct: float
+    spo2_ratio_r: float
+    spo2_quality: float
+    spo2_reason: str
+    resp_rate_rpm: float
+    resp_quality: float
+    resp_reason: str
     pi_ir_pct: float
     pi_red_pct: float
     artifact_ir_pct: float
@@ -170,6 +179,109 @@ def _ac_dc_pi(t: np.ndarray, y: np.ndarray, cfg: AnalysisConfig) -> tuple[float,
     return ac, dc, pi
 
 
+def _estimate_spo2_quality(
+    spo2: float,
+    ratio_r: float,
+    pi_red: float,
+    pi_ir: float,
+    artifact_red_pct: float,
+    artifact_ir_pct: float,
+    saturation_pct: float,
+    duration_s: float,
+) -> tuple[float, str]:
+    if not np.isfinite(spo2) or not np.isfinite(ratio_r):
+        return 0.0, "SpO2 no estimable: falta ratio RED/IR valido"
+    quality = 45.0
+    reasons: list[str] = ["SpO2 estimada no calibrada desde ratio RED/IR"]
+    if 0.35 <= ratio_r <= 1.8:
+        quality += 12
+        reasons.append(f"ratio R plausible ({ratio_r:.3f})")
+    else:
+        quality -= 18
+        reasons.append(f"ratio R extremo ({ratio_r:.3f})")
+    if np.isfinite(pi_red) and np.isfinite(pi_ir):
+        min_pi = min(pi_red, pi_ir)
+        if min_pi >= 0.15:
+            quality += 18
+            reasons.append(f"PI RED/IR suficiente (min {min_pi:.3f} %)")
+        elif min_pi >= 0.06:
+            quality += 6
+            reasons.append(f"PI RED/IR bajo pero usable (min {min_pi:.3f} %)")
+        else:
+            quality -= 18
+            reasons.append(f"PI RED/IR muy bajo (min {min_pi:.3f} %)")
+    artifact_penalty = 0.0
+    for value in (artifact_red_pct, artifact_ir_pct):
+        if np.isfinite(value):
+            artifact_penalty += min(14.0, value * 0.9)
+    if artifact_penalty > 0:
+        quality -= artifact_penalty
+        reasons.append(f"penalizacion por artefactos RED/IR {artifact_penalty:.1f} puntos")
+    if np.isfinite(saturation_pct) and saturation_pct > 0:
+        penalty = min(25.0, saturation_pct * 2.0)
+        quality -= penalty
+        reasons.append(f"saturacion penaliza SpO2 ({saturation_pct:.1f} %)")
+    if np.isfinite(duration_s) and duration_s < 12.0:
+        quality -= 10
+        reasons.append("tramo corto para ratio RED/IR estable")
+    if np.isfinite(spo2) and (spo2 <= 70.0 or spo2 >= 100.0):
+        quality -= 6
+        reasons.append(f"valor SpO2 en borde de formula ({spo2:.1f} %)")
+    return float(np.clip(quality, 0.0, 100.0)), "; ".join(reasons)
+
+
+def _estimate_respiration(t: np.ndarray, ir: np.ndarray, hz: float) -> tuple[float, float, str]:
+    if t.size < 80 or not np.isfinite(hz) or hz <= 0:
+        return math.nan, 0.0, "respiracion no estimable: pocas muestras"
+    duration = float(t[-1] - t[0]) if t.size > 1 else math.nan
+    if not np.isfinite(duration) or duration < 20.0:
+        return math.nan, 0.0, "respiracion no estimable: toma menor de 20 s"
+    yy = replace_nan_with_last(ir)
+    tt, yy, hz_u = uniform_resample(t, yy, hz)
+    if yy.size < max(200, int(20 * hz_u)):
+        return math.nan, 0.0, "respiracion no estimable: ventana corta tras remuestreo"
+
+    short_win = max(3, int(round(0.75 * hz_u)))
+    long_win = max(short_win + 2, int(round(8.0 * hz_u)))
+    envelope = moving_average_edge(yy, short_win)
+    baseline = moving_average_edge(envelope, long_win)
+    resp_sig = envelope - baseline
+    resp_sig = resp_sig - float(np.mean(resp_sig))
+    sd = float(np.std(resp_sig))
+    if sd <= 1e-9:
+        return math.nan, 0.0, "respiracion no estimable: modulacion lenta plana"
+
+    win = np.hanning(resp_sig.size)
+    spectrum = np.abs(np.fft.rfft(resp_sig * win))
+    freqs = np.fft.rfftfreq(resp_sig.size, d=1.0 / hz_u)
+    resp_band = (freqs >= 0.10) & (freqs <= 1.00)
+    useful = (freqs >= 0.05) & (freqs <= 1.50)
+    if not np.any(resp_band):
+        return math.nan, 0.0, "respiracion no estimable: sin banda respiratoria"
+    band = spectrum[resp_band]
+    fband = freqs[resp_band]
+    if band.size < 3 or float(np.max(band)) <= 0:
+        return math.nan, 0.0, "respiracion no estimable: sin pico lento"
+    idx = int(np.argmax(band))
+    rpm = float(fband[idx] * 60.0)
+    sorted_band = np.sort(band)
+    peak = float(sorted_band[-1])
+    second = float(sorted_band[-2]) if sorted_band.size > 1 else 0.0
+    dominance = peak / (second + 1e-9)
+    band_power = float(np.sum(band**2))
+    useful_power = float(np.sum(spectrum[useful] ** 2)) if np.any(useful) else band_power
+    band_ratio = band_power / (useful_power + 1e-9)
+    cycles = duration * (rpm / 60.0)
+    quality = (
+        20.0 * min(dominance, 3.0) / 3.0
+        + 35.0 * band_ratio
+        + 25.0 * np.clip((cycles - 2.0) / 6.0, 0.0, 1.0)
+        + 20.0 * np.clip(duration / 45.0, 0.0, 1.0)
+    )
+    reason = f"experimental: pico lento {rpm:.1f} resp/min; dominancia={dominance:.2f}; banda={band_ratio:.2f}; ciclos~{cycles:.1f}"
+    return rpm, float(np.clip(quality, 0.0, 100.0)), reason
+
+
 def _group_rows(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
     groups: dict[str, list[dict[str, str]]] = {}
     for row in rows:
@@ -219,6 +331,24 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         raw_digital_ceiling = 262143.0
         limit = raw_digital_ceiling * 0.98
         saturation = _safe_percent(np.concatenate([ir >= limit, red >= limit]))
+        spo2, ratio_r, spo2_reason, ac_red, dc_red, ac_ir, dc_ir, pi_red_spo2, pi_ir_spo2 = estimate_spo2(t, red, ir, cfg)
+        if np.isfinite(pi_red_spo2):
+            pi_red = pi_red_spo2
+        if np.isfinite(pi_ir_spo2):
+            pi_ir = pi_ir_spo2
+        artifact_red = _safe_percent(art_red)
+        artifact_ir = _safe_percent(art_ir)
+        spo2_quality, spo2_quality_reason = _estimate_spo2_quality(
+            spo2,
+            ratio_r,
+            pi_red,
+            pi_ir,
+            artifact_red,
+            artifact_ir,
+            saturation,
+            duration,
+        )
+        resp_rate, resp_quality, resp_reason = _estimate_respiration(t, ir, hz)
 
         bpm_ir = float(fft_ir.get("bpm", math.nan))
         bpm_red = float(fft_red.get("bpm", math.nan))
@@ -258,13 +388,23 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                 score -= 12
                 reasons.append(f"PI IR muy bajo ({pi_ir:.3f} %): pulso poco visible")
 
-        artifact = _safe_percent(art_ir)
+        artifact = artifact_ir
         if np.isfinite(artifact):
             score -= min(25.0, artifact * 1.8)
             reasons.append(f"artefactos IR {artifact:.1f} %")
         if np.isfinite(saturation) and saturation > 0:
             score -= min(35.0, saturation * 2.0)
-            reasons.append(f"saturacion cerca del techo ADC {saturation:.1f} %")
+            reasons.append(f"saturacion cerca del techo digital raw {saturation:.1f} %")
+        if np.isfinite(spo2_quality):
+            if spo2_quality >= 70:
+                score += 6
+                reasons.append(f"calidad SpO2 buena ({spo2_quality:.0f}/100): ratio RED/IR coherente")
+            elif spo2_quality >= 45:
+                score += 2
+                reasons.append(f"calidad SpO2 aceptable ({spo2_quality:.0f}/100)")
+            else:
+                score -= 10
+                reasons.append(f"calidad SpO2 baja ({spo2_quality:.0f}/100): revisar RED/IR")
         if np.isfinite(hz_jitter):
             if hz_jitter <= 10:
                 score += 5
@@ -308,10 +448,17 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
             band_ratio_ir=float(fft_ir.get("band_ratio", math.nan)),
             peak_snr_db=float(fft_ir.get("snr_db", math.nan)),
             entropy_ir=float(fft_ir.get("entropy", math.nan)),
+            spo2_est_pct=spo2,
+            spo2_ratio_r=ratio_r,
+            spo2_quality=spo2_quality,
+            spo2_reason=f"{spo2_reason}; {spo2_quality_reason}",
+            resp_rate_rpm=resp_rate,
+            resp_quality=resp_quality,
+            resp_reason=resp_reason,
             pi_ir_pct=pi_ir,
             pi_red_pct=pi_red,
             artifact_ir_pct=artifact,
-            artifact_red_pct=_safe_percent(art_red),
+            artifact_red_pct=artifact_red,
             saturation_pct=saturation,
             agreement_bpm=agreement,
             score=score,
@@ -329,7 +476,8 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     result_headers = [
         "Puntuacion", "Veredicto", "Animal", "Configuracion", "BPM FFT IR", "BPM FFT RED",
         "BPM autocorr", "Dominancia", "Banda", "SNR dB", "PI IR %", "Artefactos %",
-        "Saturacion %", "Jitter %", "Duracion", "Muestras", "Archivo",
+        "SpO2 est.", "Calidad SpO2", "Resp/min", "Calidad Resp.", "Saturacion %",
+        "Jitter %", "Duracion", "Muestras", "Archivo",
     ]
 
     def __init__(self):
@@ -515,7 +663,10 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 fmt(result.score, 1, ""), result.verdict, result.animal, result.config_label,
                 fmt(result.bpm_fft_ir, 1, ""), fmt(result.bpm_fft_red, 1, ""), fmt(result.bpm_autocorr, 1, ""),
                 fmt(result.dominance_ir, 2, ""), fmt(result.band_ratio_ir, 3, ""), fmt(result.peak_snr_db, 1, ""),
-                fmt(result.pi_ir_pct, 3, ""), fmt(result.artifact_ir_pct, 1, ""), fmt(result.saturation_pct, 1, ""),
+                fmt(result.pi_ir_pct, 3, ""), fmt(result.artifact_ir_pct, 1, ""),
+                fmt(result.spo2_est_pct, 1, ""), fmt(result.spo2_quality, 0, ""),
+                fmt(result.resp_rate_rpm, 1, ""), fmt(result.resp_quality, 0, ""),
+                fmt(result.saturation_pct, 1, ""),
                 fmt(result.hz_jitter_pct, 1, ""), fmt(result.duration_s, 1, ""), str(result.n), result.file.name,
             ]
             for col, value in enumerate(values):
@@ -577,6 +728,8 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         <tr><td><b>Fourier IR</b></td><td>{fmt(result.bpm_fft_ir, 1, '-')} BPM; dominancia {fmt(result.dominance_ir, 2, '-')}; banda cardiaca {fmt(result.band_ratio_ir, 3, '-')}; SNR {fmt(result.peak_snr_db, 1, '-')} dB; entropia {fmt(result.entropy_ir, 3, '-')}</td></tr>
         <tr><td><b>Acuerdo</b></td><td>FFT RED {fmt(result.bpm_fft_red, 1, '-')} BPM; autocorrelacion {fmt(result.bpm_autocorr, 1, '-')} BPM; diferencia maxima {fmt(result.agreement_bpm, 1, '-')} BPM</td></tr>
         <tr><td><b>Senal</b></td><td>PI IR {fmt(result.pi_ir_pct, 3, '-')} %; PI RED {fmt(result.pi_red_pct, 3, '-')} %; artefactos IR {fmt(result.artifact_ir_pct, 1, '-')} %; saturacion {fmt(result.saturation_pct, 1, '-')} %</td></tr>
+        <tr><td><b>SpO2 experimental</b></td><td>{fmt(result.spo2_est_pct, 1, '-')} %; ratio R {fmt(result.spo2_ratio_r, 4, '-')}; calidad {fmt(result.spo2_quality, 0, '-')} / 100; {html.escape(result.spo2_reason)}</td></tr>
+        <tr><td><b>Respiracion experimental</b></td><td>{fmt(result.resp_rate_rpm, 1, '-')} resp/min; calidad {fmt(result.resp_quality, 0, '-')} / 100; {html.escape(result.resp_reason)}</td></tr>
         </table>
         <h3>Por que puntua asi</h3>
         <ul>{reasons}</ul>
