@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -89,7 +90,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
 
     def show_latest_updates(self):
         update_dir = BASE_DIR / "actualizaciones"
-        files = sorted(update_dir.glob("ACTUALIZACIONES_*.txt"), key=lambda p: p.name)
+        files = sorted(update_dir.glob("ACTUALIZACIONES_*.txt"), key=self.update_file_date)
         if not files:
             QtWidgets.QMessageBox.information(self, "Ultimas actualizaciones", "No hay archivo de actualizaciones.")
             return
@@ -111,3 +112,12 @@ class ModeSelectDialog(QtWidgets.QDialog):
         buttons.accepted.connect(dialog.accept)
         layout.addWidget(buttons)
         dialog.exec()
+
+    def update_file_date(self, path):
+        stem = path.stem.replace("ACTUALIZACIONES_", "")
+        for fmt in ("%d%m%Y", "%Y%m%d"):
+            try:
+                return datetime.strptime(stem, fmt)
+            except ValueError:
+                pass
+        return datetime.min

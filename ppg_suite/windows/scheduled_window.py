@@ -124,6 +124,13 @@ class ScheduledConfigWindow(PPGSuite):
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         form.addRow("Condiciones:", self.condition_edit)
         form.addRow("Duración total:", self.duration_spin)
+        self.duration_warning = QtWidgets.QLabel(
+            "Aviso: para comparar configuraciones, usa al menos 10-15 s por fila. "
+            "Con menos tiempo puede no calcular BPM o calidad fiable."
+        )
+        self.duration_warning.setWordWrap(True)
+        self.duration_warning.setStyleSheet("color: #8a5a00; font-weight: bold;")
+        form.addRow("", self.duration_warning)
         left.addWidget(capture_group)
 
         self.btn_start = QtWidgets.QPushButton("Iniciar bloque")
@@ -588,5 +595,14 @@ class ConfigurationsWindow(ScheduledConfigWindow):
         except ValueError as exc:
             QtWidgets.QMessageBox.warning(self, "Tabla de configuraciones", str(exc))
             return
+        seconds_per_config = float(self.duration_spin.value()) * 60.0 / max(1, len(self.scheduled_steps))
+        if seconds_per_config < 10.0:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Duracion corta por configuracion",
+                "Cada configuracion tendra menos de 10 segundos.\n\n"
+                "Puede guardarse igualmente, pero el BPM, la calidad y la saturacion pueden salir vacios o poco fiables.\n"
+                "Para comparar configuraciones se recomienda usar al menos 10-15 segundos por fila.",
+            )
         self.scheduled_title = f"Configuraciones personalizadas ({len(self.scheduled_steps)})"
         super().start_scheduled_capture()

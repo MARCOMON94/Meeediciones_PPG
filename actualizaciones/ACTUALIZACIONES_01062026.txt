@@ -1,0 +1,45 @@
+ACTUALIZACIONES 01062026
+========================
+
+Esta actualizacion mejora la revision de resultados y el modo Configuraciones, pensando en que sea mas facil ver que toma pertenece a cada prueba y que configuracion funciono mejor.
+
+1. Nuevo boton Estadisticas
+- En el menu inicial ahora aparece el boton `Estadisticas`.
+- La pantalla se organiza por sesiones.
+- Dentro de cada sesion se ven las tomas realizadas.
+- Al seleccionar una toma se muestran debajo su resumen, graficas y datos tecnicos relacionados.
+
+2. Datos relacionados
+- Las nuevas tomas guardan identificadores internos para relacionar mejor los archivos.
+- Se anade `session_id`, `base_name` y `sample_index` donde corresponde.
+- Esto permite unir una toma con sus archivos raw, procesados, resumen, bloques y graficas.
+
+3. Configuraciones como tomas separadas
+- En el modo `Configuraciones`, cada fila de la tabla se guarda como una toma independiente.
+- Cada configuracion conserva su propia etiqueta.
+- Cada una genera sus archivos relacionados:
+  - raw
+  - procesado
+  - resumen
+  - bloques BPM
+  - grafica
+- Asi es mas facil comparar que configuracion dio mejor BPM, calidad, contacto, oxigeno o temperatura.
+
+4. Aviso de duracion minima
+- Se anade un aviso en `Configuraciones`.
+- Para comparar configuraciones se recomienda usar al menos 10-15 segundos por fila.
+- Si cada configuracion dura menos de 10 segundos, el programa avisa antes de iniciar.
+- Con duraciones cortas, BPM, calidad o saturacion pueden salir vacios o poco fiables.
+
+5. Arduino IDE
+- No hace falta abrir Arduino IDE para usar el programa.
+- Arduino IDE solo es necesario para cargar el firmware al Arduino.
+- Una vez cargado, la aplicacion Python manda las configuraciones por el puerto serie.
+- Arduino responde con la configuracion confirmada y el programa la guarda como `cfg_confirmacion=confirmada`.
+
+Recomendacion de uso
+--------------------
+
+- Para comparar configuraciones, ajustar la duracion total para que cada fila tenga al menos 10-15 segundos.
+- Ejemplo: 12 configuraciones necesitan al menos 2-3 minutos en total.
+- Si se ven muchos `BPM no fiable`, revisar primero la duracion por configuracion y el contacto del sensor.
