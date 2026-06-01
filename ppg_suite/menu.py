@@ -7,7 +7,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from .paths import BASE_DIR
 
 
-AppMode = Literal["reajustes", "test", "real", "configurations", "temp"]
+AppMode = Literal["reajustes", "test", "real", "configurations", "temp", "relations"]
 
 
 class ModeSelectDialog(QtWidgets.QDialog):
@@ -43,20 +43,23 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_temp = QtWidgets.QPushButton("Solo temperatura")
         self.btn_reajustes = QtWidgets.QPushButton("Reajustes")
         self.btn_configurations = QtWidgets.QPushButton("Configuraciones")
+        self.btn_relations = QtWidgets.QPushButton("Estadisticas")
 
-        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations]:
+        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_relations]:
             button.setMinimumHeight(38)
 
         grid.addWidget(self.btn_test, 0, 0)
         grid.addWidget(self.btn_temp, 0, 1)
         grid.addWidget(self.btn_reajustes, 1, 0)
         grid.addWidget(self.btn_configurations, 1, 1)
+        grid.addWidget(self.btn_relations, 2, 0, 1, 2)
 
         info = QtWidgets.QLabel(
             "Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.\n"
             "Solo temperatura: registro NTC sin PPG.\n"
             "Reajustes: calibracion larga con controles completos.\n"
-            "Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor."
+            "Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor.\n"
+            "Estadisticas: sesiones, resultados, configuraciones y graficas comparativas."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -77,6 +80,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_temp.clicked.connect(lambda: self.choose("temp"))
         self.btn_reajustes.clicked.connect(lambda: self.choose("reajustes"))
         self.btn_configurations.clicked.connect(lambda: self.choose("configurations"))
+        self.btn_relations.clicked.connect(lambda: self.choose("relations"))
         self.btn_updates.clicked.connect(self.show_latest_updates)
 
     def choose(self, mode: AppMode):

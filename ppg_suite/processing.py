@@ -123,7 +123,8 @@ def uniform_resample(t: np.ndarray, y: np.ndarray, hz: Optional[float] = None) -
     if hz is None or not np.isfinite(hz) or hz <= 0:
         dt = np.median(np.diff(t))
         hz = 1.0 / dt if dt > 0 else estimate_hz(t)
-    hz = float(np.clip(hz, 20, 500))
+    hz_value = float(hz) if hz is not None and np.isfinite(hz) else 100.0
+    hz = float(np.clip(hz_value, 20.0, 500.0))
     grid = np.arange(t[0], t[-1], 1.0 / hz)
     if grid.size < 4:
         return t.copy(), y.copy(), hz

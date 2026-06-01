@@ -520,10 +520,13 @@ class PPGSuite(QtWidgets.QMainWindow):
             if st.raw_writer:
                 cfg = self.last_sensor_config
                 st.raw_writer.writerow([
+                    st.session_id or st.base_name,
                     st.crotal_id,
+                    st.base_name,
                     st.mode,
                     st.measurement_condition,
                     st.config_label,
+                    st.valid_lines,
                     f"{trel:.6f}",
                     f"{red:.0f}",
                     f"{ir:.0f}",
@@ -565,7 +568,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.raw_handle = open(st.raw_file, "w", newline="", encoding="utf-8")
         st.raw_writer = csv.writer(st.raw_handle, delimiter=";")
         st.raw_writer.writerow([
-            "id", "modo", "condiciones_medida", "config_label", "tiempo_s",
+            "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
             "red_raw", "ir_raw", "temp_c", "temp_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
             "cfg_confirmacion", "system_time"
@@ -587,6 +590,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.measurement_condition = self.current_condition_text()
         st.config_label = "manual"
         st.base_name = f"{st.crotal_id}_{now_stamp()}"
+        st.session_id = st.base_name
         st.capture_start_wall = time.time()
         st.capturing = True
         st.finished = False
@@ -618,6 +622,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.measurement_condition = self.current_condition_text()
         st.config_label = "larga_manual"
         st.base_name = f"LONG_{st.crotal_id}_{now_stamp()}"
+        st.session_id = st.base_name
         st.capture_start_wall = time.time()
         st.capturing = True
         try:
@@ -648,6 +653,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.measurement_condition = self.current_condition_text() or "solo temperatura"
         st.config_label = "solo_temperatura"
         st.base_name = f"TEMP_{st.crotal_id}_{now_stamp()}"
+        st.session_id = st.base_name
         st.capture_start_wall = time.time()
         st.capturing = True
         self.last_config_ack = "no aplica en solo temperatura"
@@ -806,7 +812,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         with open(st.processed_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "id", "modo", "condiciones_medida", "config_label", "tiempo_s",
+                "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
                 "red_raw", "ir_raw", "temp_c", "temp_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s"
@@ -815,7 +821,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
                 w.writerow([
-                    st.crotal_id, st.mode, st.measurement_condition, st.config_label, f"{t[i]:.6f}",
+                    st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, st.measurement_condition, st.config_label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, "")
@@ -828,11 +834,11 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.blocks_file = REPORT_DIR / f"bpm_blocks_10s_{st.base_name}.csv"
         with open(st.blocks_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
-            w.writerow(["id", "modo", "bloque", "inicio_s", "fin_s", "bpm_medio_10s"] )
+            w.writerow(["session_id", "id", "base_name", "modo", "bloque", "inicio_s", "fin_s", "bpm_medio_10s"] )
             for i, bpm in enumerate(st.bpm_blocks_10s):
                 start = i * 10
                 end = start + 10
-                w.writerow([st.crotal_id, st.mode, i + 1, start, end, fmt(bpm, 2, "")])
+                w.writerow([st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, i + 1, start, end, fmt(bpm, 2, "")])
 
     def save_images(self):
         st = self.state
@@ -850,7 +856,9 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.summary_file = REPORT_DIR / f"summary_{st.base_name}.json"
         temp = self.temperature_summary()
         data = {
+            "session_id": st.session_id or st.base_name,
             "id": st.crotal_id,
+            "base_name": st.base_name,
             "mode": st.mode,
             "measurement_condition": st.measurement_condition,
             "config_label": st.config_label,
@@ -882,13 +890,13 @@ class PPGSuite(QtWidgets.QMainWindow):
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     def write_session_header(self):
-        header = ["id", "fecha", "hora", "modo", "condiciones_medida", "config_label", "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real", "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label", "spo2_pct", "ratio_r", "temp_c_media", "temp_c_ultima", "temp_raw_ultima", "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto", "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file"]
+        header = ["session_id", "id", "base_name", "fecha", "hora", "modo", "condiciones_medida", "config_label", "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real", "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label", "spo2_pct", "ratio_r", "temp_c_media", "temp_c_ultima", "temp_raw_ultima", "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto", "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file"]
         self.session_writer.writerow(header); self.session_handle.flush()
 
     def write_session_row(self, reason: str):
         st = self.state; m = st.metrics; now = datetime.now()
         temp = self.temperature_summary()
-        row = [st.crotal_id, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.mode, st.measurement_condition, st.config_label, reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""), fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""), fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""), fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""), m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo, st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "", st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "", st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "", json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else ""]
+        row = [st.session_id or st.base_name, st.crotal_id, st.base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.mode, st.measurement_condition, st.config_label, reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""), fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""), fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""), fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""), m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo, st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "", st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "", st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "", json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else ""]
         self.session_writer.writerow(row); self.session_handle.flush()
 
     def tick(self):

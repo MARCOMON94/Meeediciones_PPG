@@ -107,6 +107,7 @@ class CaptureState:
     last_config_ack: str = "sin confirmar"
     last_config_line: str = ""
     base_name: str = ""
+    session_id: str = ""
     raw_file: Optional[Path] = None
     raw_handle: Optional[object] = None
     raw_writer: Optional[csv.writer] = None

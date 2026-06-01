@@ -8,6 +8,7 @@ from ppg_suite.windows.test_window import TestWindow
 from ppg_suite.windows.reajustes_window import ReajustesWindow
 from ppg_suite.windows.scheduled_window import ConfigurationsWindow
 from ppg_suite.windows.temperature_window import TemperatureWindow
+from ppg_suite.windows.relations_window import RelationExplorerWindow
 
 
 class AppController(QtCore.QObject):
@@ -43,6 +44,8 @@ class AppController(QtCore.QObject):
             self.show_configurations()
         elif dialog.selected_mode == "temp":
             self.show_temperature()
+        elif dialog.selected_mode == "relations":
+            self.show_relations()
 
     def _wire_common_signals(self, win):
         win.back_to_menu.connect(self.show_menu)
@@ -78,6 +81,13 @@ class AppController(QtCore.QObject):
     def show_temperature(self):
         self.close_current_window()
         win = TemperatureWindow()
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.show()
+
+    def show_relations(self):
+        self.close_current_window()
+        win = RelationExplorerWindow()
         self._wire_common_signals(win)
         self.current_window = win
         win.show()

@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import math
 import time
-from dataclasses import dataclass
+import csv
+import json
+from dataclasses import asdict, dataclass
+from datetime import datetime
 
 import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from ..models import SensorConfig
-from ..processing import estimate_hz, processed_for_plot
+from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
-from ..paths import RESULTS_DIR
+from ..paths import FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR
 from ..utils import open_folder
 from .measurement_window import PPGSuite
 
@@ -21,6 +24,14 @@ class ScheduledStep:
     label: str
     description: str
     config: SensorConfig
+
+
+@dataclass
+class ScheduledSegment:
+    step: ScheduledStep
+    index: int
+    start_sample: int
+    end_sample: int | None = None
 
 
 def build_64_config_steps() -> list[ScheduledStep]:
@@ -69,6 +80,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.scheduled_step_index = 0
         self.scheduled_step_start_wall = 0.0
         self.scheduled_step_duration_s = self.scheduled_total_duration_s / max(1, len(self.scheduled_steps))
+        self.scheduled_segments: list[ScheduledSegment] = []
         super().__init__("test")
         self.setWindowTitle(f"PPG Suite v8 | {title}")
         self.resize(1120, 740)
@@ -168,10 +180,12 @@ class ScheduledConfigWindow(PPGSuite):
         self.scheduled_total_duration_s = st.requested_duration_s
         self.scheduled_step_duration_s = self.scheduled_total_duration_s / max(1, len(self.scheduled_steps))
         self.scheduled_step_index = 0
+        self.scheduled_segments = []
         st.crotal_id = sanitize_id(self.crotal_edit.text())
         st.pulse_prev = safe_float_text(self.prev_pulse_edit.text())
         st.measurement_condition = self.current_condition_text() or self.scheduled_condition
         st.base_name = f"BLOQUE_{len(self.scheduled_steps)}CFG_{st.crotal_id}_{now_stamp()}"
+        st.session_id = st.base_name
         st.capture_start_wall = time.time()
         st.capturing = True
         try:
@@ -188,16 +202,20 @@ class ScheduledConfigWindow(PPGSuite):
             st.capturing = False
             return
         self.open_raw_file()
+        self.scheduled_segments.append(ScheduledSegment(first_step, 0, 0))
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
 
     def apply_scheduled_step(self, index: int):
+        if self.scheduled_segments and self.scheduled_segments[-1].end_sample is None:
+            self.scheduled_segments[-1].end_sample = len(self.state.t)
         step = self.scheduled_steps[index]
         self.scheduled_step_index = index
         self.scheduled_step_start_wall = time.time()
         self.state.config_label = step.label
         self.sensor_widget.set_config(step.config)
         self.apply_sensor_config(step.config)
+        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t)))
 
     def check_auto_stop(self):
         st = self.state
@@ -210,6 +228,160 @@ class ScheduledConfigWindow(PPGSuite):
         next_index = min(int(elapsed // self.scheduled_step_duration_s), len(self.scheduled_steps) - 1)
         if next_index != self.scheduled_step_index:
             self.apply_scheduled_step(next_index)
+
+    def finalize_capture(self, reason: str):
+        if self.scheduled_segments and self.scheduled_segments[-1].end_sample is None:
+            self.scheduled_segments[-1].end_sample = len(self.state.t)
+        if not self.scheduled_segments:
+            super().finalize_capture(reason)
+            return
+        written = 0
+        for segment in self.scheduled_segments:
+            if self.save_segment_capture(segment, reason):
+                written += 1
+        self.session_handle.flush()
+        self.tabs.grab().save(str(FIGURES_DIR / f"plot_{self.state.base_name}_COMPLETO.png"), "PNG")
+        self.info.setText(self.info.text() + f"\nGuardadas {written} tomas independientes en la sesion.\n")
+
+    def segment_arrays(self, segment: ScheduledSegment) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        st = self.state
+        start = max(0, segment.start_sample)
+        end = min(segment.end_sample if segment.end_sample is not None else len(st.t), len(st.t))
+        t = np.asarray(st.t[start:end], dtype=float)
+        red = np.asarray(st.red[start:end], dtype=float)
+        ir = np.asarray(st.ir[start:end], dtype=float)
+        temp_c = np.asarray(st.temp_c[start:end], dtype=float)
+        temp_raw = np.asarray(st.temp_raw[start:end], dtype=float)
+        if t.size:
+            t = t - t[0]
+        return t, red, ir, temp_c, temp_raw
+
+    def temp_summary_for_arrays(self, temp_c: np.ndarray, temp_raw: np.ndarray) -> dict[str, float | int]:
+        finite_temp = temp_c[np.isfinite(temp_c)] if temp_c.size else np.asarray([], dtype=float)
+        finite_raw = temp_raw[np.isfinite(temp_raw)] if temp_raw.size else np.asarray([], dtype=float)
+        return {
+            "temp_samples": int(finite_temp.size),
+            "temp_c_last": float(finite_temp[-1]) if finite_temp.size else math.nan,
+            "temp_c_mean": float(np.mean(finite_temp)) if finite_temp.size else math.nan,
+            "temp_c_min": float(np.min(finite_temp)) if finite_temp.size else math.nan,
+            "temp_c_max": float(np.max(finite_temp)) if finite_temp.size else math.nan,
+            "temp_raw_last": float(finite_raw[-1]) if finite_raw.size else math.nan,
+        }
+
+    def save_segment_capture(self, segment: ScheduledSegment, reason: str) -> bool:
+        st = self.state
+        t, red, ir, temp_c, temp_raw = self.segment_arrays(segment)
+        if t.size < 2:
+            return False
+        step = segment.step
+        label_id = sanitize_id(step.label)[:42]
+        base_name = f"{st.base_name}_CFG{segment.index + 1:03d}_{label_id}"
+        session_id = base_name
+        analysis_cfg = self.analysis_widget.get_config()
+        metrics = score_and_merge_metrics(t, red, ir, step.config, analysis_cfg)
+        blocks = block_bpm(t, ir, step.config, analysis_cfg, block_s=10)
+        temp = self.temp_summary_for_arrays(temp_c, temp_raw)
+
+        raw_file = RAW_DIR / f"raw_{base_name}.csv"
+        with open(raw_file, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f, delimiter=";")
+            w.writerow([
+                "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw",
+                "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
+                "cfg_confirmacion", "system_time",
+            ])
+            for i in range(t.size):
+                tc = temp_c[i] if i < temp_c.size else math.nan
+                tr = temp_raw[i] if i < temp_raw.size else math.nan
+                w.writerow([
+                    session_id, st.crotal_id, base_name, "configurations", st.measurement_condition, step.label, i + 1, f"{t[i]:.6f}",
+                    f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
+                    step.config.red, step.config.ir, step.config.avg, step.config.rate, step.config.width, step.config.adc,
+                    step.config.skip, 1 if step.config.debug else 0, self.last_config_ack, datetime.now().isoformat(timespec="milliseconds"),
+                ])
+
+        processed_file = PROCESSED_DIR / f"proc_{base_name}.csv"
+        hz = estimate_hz(t)
+        red_proc = processed_for_plot(red, hz, analysis_cfg)
+        ir_proc = processed_for_plot(ir, hz, analysis_cfg)
+        art_red = detect_artifacts(red)
+        art_ir = detect_artifacts(ir)
+        peak_flags = np.zeros(t.size, dtype=int)
+        _, _, _, _, peaks, peak_t = estimate_bpm_peaks(t, ir, analysis_cfg)
+        if peaks.size and peak_t.size:
+            nearest = np.searchsorted(t, peak_t[peaks])
+            nearest = nearest[(nearest >= 0) & (nearest < t.size)]
+            peak_flags[nearest] = 1
+        with open(processed_file, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f, delimiter=";")
+            w.writerow([
+                "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw",
+                "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
+                "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
+            ])
+            for i in range(t.size):
+                tc = temp_c[i] if i < temp_c.size else math.nan
+                tr = temp_raw[i] if i < temp_raw.size else math.nan
+                w.writerow([
+                    session_id, st.crotal_id, base_name, "configurations", st.measurement_condition, step.label, i + 1, f"{t[i]:.6f}",
+                    f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
+                    f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
+                    "", "", "", "",
+                ])
+
+        blocks_file = REPORT_DIR / f"bpm_blocks_10s_{base_name}.csv"
+        with open(blocks_file, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f, delimiter=";")
+            w.writerow(["session_id", "id", "base_name", "modo", "bloque", "inicio_s", "fin_s", "bpm_medio_10s"])
+            for i, bpm in enumerate(blocks):
+                w.writerow([session_id, st.crotal_id, base_name, "configurations", i + 1, i * 10, i * 10 + 10, fmt(bpm, 2, "")])
+
+        plot_file = FIGURES_DIR / f"plot_{base_name}.png"
+        self.tabs.grab().save(str(plot_file), "PNG")
+        summary_file = REPORT_DIR / f"summary_{base_name}.json"
+        with open(summary_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "session_id": session_id,
+                "id": st.crotal_id,
+                "base_name": base_name,
+                "mode": "configurations",
+                "measurement_condition": st.measurement_condition,
+                "config_label": step.label,
+                "config_description": step.description,
+                "reason": reason,
+                "requested_duration_s": self.scheduled_step_duration_s,
+                "samples": int(t.size),
+                "metrics": asdict(metrics),
+                "temperature": temp,
+                "bpm_blocks_10s_mean": blocks,
+                "sensor_config": asdict(step.config),
+                "analysis_config": asdict(analysis_cfg),
+                "files": {
+                    "raw": str(raw_file),
+                    "processed": str(processed_file),
+                    "plot": str(plot_file),
+                    "bpm_blocks_10s": str(blocks_file),
+                },
+                "created": datetime.now().isoformat(),
+            }, f, indent=2, ensure_ascii=False)
+
+        now = datetime.now()
+        self.session_writer.writerow([
+            session_id, st.crotal_id, base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
+            "configurations", st.measurement_condition, step.label, reason, fmt(self.scheduled_step_duration_s, 1, ""),
+            int(t.size), fmt(metrics.duration_s, 3, ""), fmt(metrics.hz, 2, ""), fmt(metrics.bpm, 1, ""),
+            fmt(metrics.bpm_peak, 1, ""), fmt(metrics.bpm_fft, 1, ""), fmt(metrics.bpm_autocorr, 1, ""),
+            fmt(metrics.quality, 1, ""), metrics.quality_label, fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
+            fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),
+            fmt(metrics.pi_ir_pct, 4, ""), fmt(metrics.pi_red_pct, 4, ""), fmt(metrics.artifact_ir_pct, 1, ""),
+            fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, st.pulse_prev,
+            st.pulse_final_pulsio, st.pulse_final_fonendo, raw_file.name, processed_file.name, plot_file.name,
+            "", summary_file.name, st.config_file.name if st.config_file else "", json.dumps(blocks, ensure_ascii=False),
+            blocks_file.name,
+        ])
+        return True
 
     def update_plots(self):
         t, red, ir = self.arrays()
