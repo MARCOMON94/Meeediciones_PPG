@@ -1,22 +1,45 @@
 # mtestv2
 
-Aplicacion modular de medicion PPG con sensor MAX3010x, lectura de temperatura NTC y firmware Arduino compatible.
+Aplicacion modular de medicion PPG para Windows con sensor MAX3010x, lectura de temperatura NTC, interfaz PyQt6 y firmware Arduino compatible.
 
-## Arranque recomendado en Windows
+El proyecto esta pensado para dos formas de uso:
 
-Usar:
+- Uso de desarrollo/equipo: se arranca desde el repositorio con entorno virtual, `.env` y actualizacion opcional por Git.
+- Uso portable: se genera un `.exe` para otra persona, sin Git, sin Python visible y sin actualizaciones automaticas.
 
-```bat
-ARRANCAR_PPG.cmd
+## Requisitos
+
+Para trabajar desde el repositorio:
+
+- Windows.
+- Python 3.
+- Git, si se quiere usar la actualizacion automatica del lanzador.
+- Una placa Arduino con el firmware compatible cargado.
+
+Dependencias Python:
+
+```txt
+numpy
+pyserial
+PyQt6
+pyqtgraph
 ```
 
-El lanzador:
+## Instalacion inicial
 
-- Lee `.env` para localizar `PROJECT_DIR`, `PYTHON_REL` y `MAIN_FILE`.
-- Entra en la carpeta del proyecto definida para cada ordenador.
-- Intenta actualizar con `git pull --ff-only`.
-- Comprueba las dependencias Python y las instala desde `requirements.txt` si faltan.
-- Abre `main.py` con el Python del entorno virtual.
+Para preparar un ordenador por primera vez desde la carpeta del proyecto:
+
+```bat
+instalarmtestv2.cmd
+```
+
+El instalador:
+
+- Busca Python.
+- Crea `.venv` si no existe.
+- Instala dependencias desde `requirements.txt`.
+- Crea `.env` si no existe.
+- Comprueba que las librerias principales importan correctamente.
 
 Ejemplo de `.env`:
 
@@ -26,82 +49,90 @@ PYTHON_REL=.venv\Scripts\python.exe
 MAIN_FILE=main.py
 ```
 
-`git pull --ff-only` no borra cambios locales. Si Git no puede actualizar de forma limpia, se detiene y el programa continua con la version local.
+## Arranque recomendado
 
-## Instalacion
-
-Para preparar un ordenador por primera vez:
+Usar:
 
 ```bat
-instalarmtestv2.cmd
+ARRANCAR_PPG.cmd
 ```
 
-Instala/crea `.venv`, instala dependencias y crea `.env` si no existe.
+El lanzador:
+
+- Lee `.env` para localizar el proyecto, Python y archivo principal.
+- Entra en `PROJECT_DIR`.
+- Intenta actualizar el repositorio con `git pull --ff-only` si Git esta disponible.
+- Comprueba dependencias y las instala si faltan.
+- Ejecuta `main.py`.
+
+`git pull --ff-only` no borra cambios locales. Si Git no puede actualizar de forma limpia, muestra aviso y continua con la version local.
+
+Tambien se puede arrancar manualmente:
+
+```bat
+.venv\Scripts\python.exe main.py
+```
 
 ## Modos de trabajo
 
-- Medicion de campo: toma rapida con la interfaz minima y los datos esenciales.
+El menu inicial permite elegir:
+
+- Medicion de campo: toma rapida con la interfaz minima y datos esenciales.
 - Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.
 - Solo temperatura: registro NTC sin PPG.
-- Reajustes: calibracion larga con controles completos.
-- Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor.
+- Reajustes: medicion larga con controles completos, diagnostico Arduino y snapshots.
+- Configuraciones: tabla editable para crear, pegar y ejecutar bloques de configuracion del sensor.
+- Estadisticas: explorador de sesiones, raws, procesados, resumenes, graficas y capturas.
+- Analisis experimental de Fourier + Hilbert: comparacion de raws para razonar que configuracion separa mejor el pulso y mantiene una envolvente/fase mas estable. Permite exportar un informe PDF con fecha, ranking, explicacion metodologica y graficas para documentacion o tesis.
 
-El menu incluye un boton `Ultimas actualizaciones` que abre el archivo `actualizaciones/ACTUALIZACIONES_*.txt` mas reciente.
+El menu tambien incluye `Ultimas actualizaciones`, que abre el archivo mas reciente de:
+
+```txt
+actualizaciones/ACTUALIZACIONES_*.txt
+```
 
 ## Datos guardados
 
-Los resultados se guardan dentro de `PROJECT_DIR/resultados/` para separar datos de uso normal y codigo del programa:
+En uso normal desde el repositorio, los resultados se guardan en:
+
+```txt
+PROJECT_DIR\resultados
+```
+
+Carpetas principales:
 
 - `resultados/raw/`: datos crudos unificados.
 - `resultados/processed/`: datos procesados.
-- `resultados/sessions/`: resumen global de sesion.
-- `resultados/reports/`: resumenes JSON y bloques.
+- `resultados/sessions/`: resumen global de sesiones.
+- `resultados/reports/`: resumenes JSON y bloques de BPM.
+- `resultados/reports/informe_fourier_hilbert_*.pdf`: informes exportados del analisis experimental.
 - `resultados/figures/`: graficas.
-- `resultados/screenshots/`: capturas de pantalla.
+- `resultados/screenshots/`: capturas.
 - `resultados/configs/`: configuraciones aplicadas.
 - `resultados/logs/`: logs de ejecucion.
-- `actualizaciones/`: notas de cambios visibles desde el menu principal.
 
-Los raw incluyen, de forma unificada:
+Los raws incluyen informacion como:
 
-- id/crotal
-- modo
-- condiciones de medida
-- etiqueta de configuracion
-- tiempo
-- RED/IR raw
-- temperatura calculada y raw NTC
-- parametros de configuracion del sensor
-- estado de confirmacion de configuracion Arduino
-- hora del sistema
-
-## Estructura
-
-```txt
-main.py                         # arrancador unico
-controller.py                   # abre/cierra una unica ventana activa
-ppg_suite/
-  paths.py                      # rutas desde .env y logging
-  utils.py                      # utilidades generales
-  models.py                     # dataclasses de configuracion/estado/metricas
-  processing.py                 # BPM, FFT, autocorrelacion, SpO2, artefactos
-  widgets.py                    # widgets de configuracion
-  menu.py                       # menu inicial
-  windows/
-    measurement_window.py       # ventana base para campo/test
-    real_window.py              # modo campo
-    test_window.py              # modo test
-    temperature_window.py       # modo solo temperatura
-    reajustes_window.py         # modo reajustes independiente
-    scheduled_window.py         # modo configuraciones con tabla editable
-arduino/
-  ppg_max3010x_firmware/
-    ppg_max3010x_firmware.ino   # firmware compatible con el protocolo Python
-```
+- id/crotal.
+- modo de trabajo.
+- condiciones de medida.
+- etiqueta de configuracion.
+- tiempo.
+- RED/IR raw.
+- temperatura calculada y raw NTC.
+- parametros de configuracion del sensor.
+- estado de confirmacion de configuracion Arduino.
+- hora del sistema.
 
 ## Arduino
 
-El firmware se carga una vez en la placa. Python se comunica por serie con comandos de texto:
+El firmware se carga una vez en la placa:
+
+```txt
+arduino/ppg_max3010x_firmware/ppg_max3010x_firmware.ino
+```
+
+La aplicacion se comunica por serie con comandos de texto:
 
 - `STATUS`
 - `CONFIG RED=... IR=... AVG=... RATE=... WIDTH=... ADC=... SKIP=... DEBUG=...`
@@ -111,4 +142,77 @@ El firmware se carga una vez en la placa. Python se comunica por serie con coman
 - `STOP`
 - `DIAGNOSTICO`
 
-Antes de iniciar una toma, la aplicacion verifica la configuracion confirmada por Arduino con la linea `CFG ...`. Si no coincide, muestra aviso y permite aplicar los cambios antes de continuar.
+Antes de iniciar una toma, la aplicacion verifica la configuracion confirmada por Arduino con la linea `CFG ...`. Si no coincide, muestra aviso y permite aplicar cambios antes de continuar.
+
+## Ejecutable portable para Windows
+
+La carpeta:
+
+```txt
+preparar_ejecutable/
+```
+
+contiene una copia preparada para generar un `.exe` portable sin modificar el proyecto principal.
+
+Para construirlo:
+
+```bat
+preparar_ejecutable\BUILD_EXE.cmd
+```
+
+Ese script:
+
+- Crea un entorno temporal de build en `preparar_ejecutable/.build_venv/`.
+- Instala dependencias y `pyinstaller`.
+- Usa `preparar_ejecutable/source/mtestv2.spec`.
+- Genera el ejecutable en `preparar_ejecutable/source/dist/mtestv2.exe`.
+
+En la version empaquetada, los resultados se guardan en:
+
+```txt
+%USERPROFILE%\Documents\mtestv2\resultados
+```
+
+La version portable no se actualiza automaticamente. Para entregar cambios nuevos hay que generar y pasar un nuevo `.exe`.
+
+Los artefactos pesados quedan ignorados por Git:
+
+- `.build_venv/`
+- `source/build/`
+- `source/dist/`
+- `entrega/`
+- `*.exe`
+- `*.zip`
+
+## Estructura
+
+```txt
+main.py                         # arrancador unico
+controller.py                   # controlador de ventanas
+requirements.txt                # dependencias Python
+ARRANCAR_PPG.cmd                # lanzador de uso normal
+instalarmtestv2.cmd             # instalacion inicial
+actualizaciones/                # notas visibles desde la interfaz
+arduino/
+  ppg_max3010x_firmware/
+    ppg_max3010x_firmware.ino   # firmware Arduino
+ppg_suite/
+  paths.py                      # rutas, resultados y logging
+  utils.py                      # utilidades generales
+  models.py                     # dataclasses de configuracion, estado y metricas
+  processing.py                 # BPM, FFT, autocorrelacion, SpO2 y artefactos
+  widgets.py                    # widgets reutilizables de configuracion
+  menu.py                       # menu inicial
+  windows/
+    measurement_window.py       # ventana base para campo/test
+    real_window.py              # modo medicion de campo
+    test_window.py              # modo test de campo
+    temperature_window.py       # modo solo temperatura
+    reajustes_window.py         # modo reajustes/larga duracion
+    scheduled_window.py         # modo configuraciones
+    relations_window.py         # estadisticas y relacion entre archivos
+    fourier_window.py           # analisis experimental de Fourier + Hilbert
+preparar_ejecutable/
+  BUILD_EXE.cmd                 # build del ejecutable portable
+  source/                       # copia adaptada para PyInstaller
+```

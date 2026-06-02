@@ -83,7 +83,7 @@ El menu inicial permite elegir:
 - Reajustes: medicion larga con controles completos, diagnostico Arduino y snapshots.
 - Configuraciones: tabla editable para crear, pegar y ejecutar bloques de configuracion del sensor.
 - Estadisticas: explorador de sesiones, raws, procesados, resumenes, graficas y capturas.
-- Analisis experimental de Fourier: comparacion de raws para razonar que configuracion separa mejor el pulso.
+- Analisis experimental de Fourier + Hilbert: comparacion de raws para razonar que configuracion separa mejor el pulso y mantiene una envolvente/fase mas estable. Permite exportar un informe PDF con fecha, ranking, explicacion metodologica y graficas para documentacion o tesis.
 
 El menu tambien incluye `Ultimas actualizaciones`, que abre el archivo mas reciente de:
 
@@ -105,6 +105,7 @@ Carpetas principales:
 - `resultados/processed/`: datos procesados.
 - `resultados/sessions/`: resumen global de sesiones.
 - `resultados/reports/`: resumenes JSON y bloques de BPM.
+- `resultados/reports/informe_fourier_hilbert_*.pdf`: informes exportados del analisis experimental.
 - `resultados/figures/`: graficas.
 - `resultados/screenshots/`: capturas.
 - `resultados/configs/`: configuraciones aplicadas.
@@ -210,7 +211,7 @@ ppg_suite/
     reajustes_window.py         # modo reajustes/larga duracion
     scheduled_window.py         # modo configuraciones
     relations_window.py         # estadisticas y relacion entre archivos
-    fourier_window.py           # analisis experimental de Fourier
+    fourier_window.py           # analisis experimental de Fourier + Hilbert
 preparar_ejecutable/
   BUILD_EXE.cmd                 # build del ejecutable portable
   source/                       # copia adaptada para PyInstaller

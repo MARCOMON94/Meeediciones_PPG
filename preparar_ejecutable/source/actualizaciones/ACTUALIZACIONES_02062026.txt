@@ -138,6 +138,81 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 - En las pantallas se muestra como `Respiraciones (experimental)` para dejar claro que todavia requiere validacion externa.
 - Fourier y Estadisticas leen el mismo calculo, de forma que ya no hablan idiomas distintos para respiracion.
 
+12. Fourier + Hilbert
+- El analisis experimental de Fourier se amplia con transformada de Hilbert sobre la senal IR filtrada.
+- Hilbert aporta una lectura temporal complementaria a Fourier:
+  - envolvente del pulso
+  - fase instantanea
+  - BPM estimado por fase
+  - estabilidad de la envolvente
+  - calidad Hilbert experimental
+- La tabla de resultados muestra:
+  - BPM Hilbert
+  - Hilbert env. CV %
+  - Hilbert calidad
+- El detalle explica como interpretar Hilbert:
+  - una envolvente con CV bajo indica amplitud mas regular
+  - una fase con IQR bajo indica ritmo mas coherente
+  - si Fourier, autocorrelacion e Hilbert coinciden, aumenta la confianza en la configuracion
+- Hilbert se usa como apoyo para detectar si una configuracion mantiene un pulso estable o si solo parece buena por un pico aislado en Fourier.
+
+13. Exportacion de informe para documentacion o tesis
+- En `Analisis experimental de Fourier` se anade el boton `Exportar informe`.
+- El informe se genera en PDF dentro de:
+  - `resultados/reports/informe_fourier_hilbert_*.pdf`
+- Incluye:
+  - fecha y hora de generacion
+  - resumen ejecutivo
+  - mejor configuracion candidata
+  - ranking comparativo
+  - explicacion de por que gana la mejor configuracion
+  - metricas Fourier, autocorrelacion e Hilbert
+  - graficas SVG del espectro IR normalizado
+  - nota metodologica para memoria/tesis
+- El PDF se puede abrir directamente y adjuntar en documentacion, memoria o tesis.
+- La exportacion se genera ahora como PDF nativo desde Qt, no como HTML convertido.
+- Las ultimas paginas incluyen explicaciones de lectura para Fourier, autocorrelacion, Hilbert, PI, artefactos, saturacion, SpO2, respiracion y puntuacion final.
+- La explicacion larga de Hilbert se mueve al final del PDF para no sobrecargar el panel resumen de la ventana.
+- Se ajusta la paginacion del PDF cuando se seleccionan muchos raws:
+  - la lista de raws se resume si es larga
+  - las tablas fuerzan menos saltos de pagina
+  - la seccion final de explicaciones aprovecha mejor el espacio disponible
+- Al final del PDF se anade una leyenda de escalas e interpretacion:
+  - que metricas van de 0 a 100
+  - que valores son porcentajes, ratios, BPM o dB
+  - como leer puntuacion, calidad Hilbert, calidad SpO2, calidad respiracion, PI, artefactos, saturacion y jitter
+- Tambien se anade una mini nota de formulas y criterios usados:
+  - FFT/rFFT
+  - dominancia
+  - energia de banda
+  - SNR
+  - autocorrelacion
+  - Hilbert y BPM por fase
+  - PI
+  - SpO2 experimental
+  - respiracion experimental
+  - criterio de puntuacion final
+
+14. Legibilidad en modo oscuro
+- Se deja de forzar la interfaz completa de Fourier/Hilbert a modo claro.
+- La pantalla respeta el tema visual del ordenador.
+- Solo se fuerza texto oscuro en las filas coloreadas por puntuacion, para que los fondos verde/rojo claro sigan siendo legibles aunque Windows este en modo oscuro.
+
+15. Preparacion de ejecutable portable
+- Se anade la carpeta `preparar_ejecutable/` como referencia para crear un ejecutable Windows portable.
+- Incluye:
+  - `BUILD_EXE.cmd`
+  - copia adaptada del proyecto en `preparar_ejecutable/source/`
+  - configuracion PyInstaller en `mtestv2.spec`
+- El ejecutable portable no usa Git ni actualizaciones automaticas.
+- En la version empaquetada, los resultados se guardan en:
+  - `%USERPROFILE%\Documents\mtestv2\resultados`
+- Los artefactos pesados quedan fuera de Git:
+  - entorno de build
+  - carpetas `build` y `dist`
+  - `.exe`
+  - `.zip`
+
 Recomendacion de uso
 --------------------
 
@@ -145,6 +220,8 @@ Recomendacion de uso
 - Mirar primero la calidad, contacto, PI, artefactos, saturacion y duracion.
 - Usar doble click para abrir el raw o el resumen original cuando haga falta.
 - Para comparar configuraciones, usar `Analisis experimental de Fourier`.
+- Si se necesita justificar una configuracion para documentacion, generar el informe desde `Exportar informe PDF`.
 - Para respiracion, hacer tomas mas largas. Con tomas cortas puede salir como no estimable.
 - En `Configuraciones`, tomar la lectura del pulsioximetro en cada pausa entre configuraciones.
 - Recordar que SpO2 y respiracion son experimentales y deben validarse con referencia externa antes de usarlos como criterio definitivo.
+- Recordar tambien que Fourier + Hilbert es un criterio comparativo interno: ayuda a elegir configuraciones, pero no sustituye una referencia fisiologica externa.
