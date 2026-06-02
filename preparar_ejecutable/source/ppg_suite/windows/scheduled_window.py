@@ -197,7 +197,7 @@ class ScheduledConfigWindow(PPGSuite):
         st.base_name = f"BLOQUE_{len(self.scheduled_steps)}CFG_{st.crotal_id}_{now_stamp()}"
         st.session_id = st.base_name
         st.capture_start_wall = time.time()
-        st.capturing = True
+        st.capturing = False
         try:
             self.serial_port.reset_input_buffer()
             self.serial_port.reset_output_buffer()
@@ -205,16 +205,21 @@ class ScheduledConfigWindow(PPGSuite):
             pass
         first_step = self.scheduled_steps[0]
         self.scheduled_step_index = 0
-        self.scheduled_step_start_wall = time.time()
         self.state.config_label = first_step.label
         self.sensor_widget.set_config(first_step.config)
         if not self.apply_config_and_wait(first_step.config, show_warning=True):
             st.capturing = False
             return
+        try:
+            self.serial_port.reset_input_buffer()
+        except Exception:
+            pass
         self.open_raw_file()
         self.scheduled_segments.append(ScheduledSegment(first_step, 0, 0, pulse_prev=st.pulse_prev))
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
+        self.scheduled_step_start_wall = time.time()
+        st.capturing = True
 
     def ask_transition_reference(self, previous_step: ScheduledStep, next_step: ScheduledStep) -> str:
         dialog = QtWidgets.QDialog(self)
@@ -279,13 +284,17 @@ class ScheduledConfigWindow(PPGSuite):
             self.state.pulse_prev = pulse_between
             self.prev_pulse_edit.setText(pulse_between)
         self.scheduled_step_index = index
-        self.scheduled_step_start_wall = time.time()
         self.state.config_label = step.label
         self.sensor_widget.set_config(step.config)
         self.apply_sensor_config(step.config)
+        try:
+            self.serial_port.reset_input_buffer()
+        except Exception:
+            pass
         self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t), pulse_prev=self.state.pulse_prev))
-        self.state.capturing = True
         self.send_command("START_CONTINUOUS")
+        self.scheduled_step_start_wall = time.time()
+        self.state.capturing = True
 
     def check_auto_stop(self):
         st = self.state

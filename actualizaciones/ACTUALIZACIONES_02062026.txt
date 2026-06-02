@@ -213,6 +213,15 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
   - `.exe`
   - `.zip`
 
+16. Ajuste del modo Configuraciones y analizador
+- En `Configuraciones`, se limpia el buffer serie justo antes de iniciar cada configuracion.
+- La captura de cada configuracion empieza despues de enviar `START_CONTINUOUS`, evitando que una linea vieja pueda entrar como primera muestra del segmento.
+- El contador de tiempo de cada configuracion se inicia despues del arranque real de esa configuracion.
+- El analizador Fourier + Hilbert detecta gaps grandes dentro de un raw y usa el tramo continuo mas largo para evitar que pausas o muestras aisladas distorsionen FFT, Hilbert y jitter.
+- Si se descartan muestras por gaps, el informe lo indica en las razones.
+- El acuerdo entre estimadores ya no usa autocorrelacion fuera del rango configurado ni Hilbert con calidad muy baja como si fueran estimadores igual de fiables.
+- Esto evita que armonicos o lecturas debiles hundan artificialmente la puntuacion de una configuracion.
+
 Recomendacion de uso
 --------------------
 

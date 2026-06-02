@@ -310,6 +310,53 @@ def _group_rows(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
     return list(groups.values())
 
 
+def _drop_leading_timestamp_gap(t: np.ndarray, red: np.ndarray, ir: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
+    if t.size < 5:
+        return t, red, ir, ""
+    diffs = np.diff(t)
+    positive = diffs[np.isfinite(diffs) & (diffs > 0)]
+    if positive.size < 3:
+        return t, red, ir, ""
+    baseline = positive[1:] if positive.size > 3 else positive
+    median_dt = float(np.median(baseline))
+    first_dt = float(diffs[0])
+    if median_dt > 0 and first_dt > max(1.0, median_dt * 8.0):
+        return t[1:] - float(t[1]), red[1:], ir[1:], f"se descarta primera muestra aislada por gap inicial {first_dt:.2f} s"
+    return t, red, ir, ""
+
+
+def _keep_longest_contiguous_chunk(t: np.ndarray, red: np.ndarray, ir: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
+    if t.size < 5:
+        return t, red, ir, ""
+    diffs = np.diff(t)
+    positive = diffs[np.isfinite(diffs) & (diffs > 0)]
+    if positive.size < 3:
+        return t, red, ir, ""
+    median_dt = float(np.median(positive))
+    if median_dt <= 0:
+        return t, red, ir, ""
+    gap_limit = max(1.0, median_dt * 8.0)
+    gap_indices = np.where(diffs > gap_limit)[0]
+    if gap_indices.size == 0:
+        return t, red, ir, ""
+    starts = [0, *[int(i + 1) for i in gap_indices]]
+    ends = [*[int(i + 1) for i in gap_indices], int(t.size)]
+    chunks = [(end - start, start, end) for start, end in zip(starts, ends) if end > start]
+    if not chunks:
+        return t, red, ir, ""
+    _length, start, end = max(chunks, key=lambda item: item[0])
+    if start == 0 and end == t.size:
+        return t, red, ir, ""
+    dropped = int(t.size - (end - start))
+    max_gap = float(np.max(diffs[gap_indices]))
+    return (
+        t[start:end] - float(t[start]),
+        red[start:end],
+        ir[start:end],
+        f"analizado tramo continuo mas largo; descartadas {dropped} muestras separadas por gaps (max {max_gap:.2f} s)",
+    )
+
+
 def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
     rows = _read_csv(path)
     results: list[SpectrumResult] = []
@@ -324,6 +371,10 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         if t.size < 40:
             continue
         t = t - float(t[0])
+        t, red, ir, leading_gap_reason = _drop_leading_timestamp_gap(t, red, ir)
+        t, red, ir, chunk_reason = _keep_longest_contiguous_chunk(t, red, ir)
+        if t.size < 40:
+            continue
         row0 = group[0]
         hz = estimate_hz(t)
         duration = float(t[-1] - t[0]) if t.size > 1 else math.nan
@@ -365,21 +416,38 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         bpm_ir = float(fft_ir.get("bpm", math.nan))
         bpm_red = float(fft_red.get("bpm", math.nan))
         bpm_hilbert = float(hilbert_ir.get("bpm", math.nan))
-        candidates = [v for v in [bpm_ir, bpm_red, bpm_ac, bpm_hilbert] if np.isfinite(v)]
+        hilbert_quality = float(hilbert_ir.get("quality", 0.0))
+        envelope_cv = float(hilbert_ir.get("envelope_cv_pct", math.nan))
+        phase_iqr = float(hilbert_ir.get("phase_iqr_bpm", math.nan))
+        candidates = [v for v in [bpm_ir, bpm_red] if np.isfinite(v)]
+        ac_reliable = np.isfinite(bpm_ac) and cfg.bpm_min <= bpm_ac <= cfg.bpm_max and q_ac >= 20.0
+        hilbert_reliable = np.isfinite(bpm_hilbert) and hilbert_quality >= 35.0
+        if ac_reliable:
+            candidates.append(bpm_ac)
+        if hilbert_reliable:
+            candidates.append(bpm_hilbert)
         agreement = float(np.max(candidates) - np.min(candidates)) if len(candidates) >= 2 else math.nan
 
         score = float(fft_ir.get("quality", 0.0))
         reasons: list[str] = []
+        if leading_gap_reason:
+            reasons.append(leading_gap_reason)
+        if chunk_reason:
+            reasons.append(chunk_reason)
         if np.isfinite(bpm_ir):
             reasons.append(f"FFT IR detecta {bpm_ir:.1f} BPM")
         else:
             reasons.append(str(fft_ir.get("reason", "FFT IR no valido")))
         if np.isfinite(bpm_red):
             reasons.append(f"FFT RED detecta {bpm_red:.1f} BPM")
-        if np.isfinite(bpm_ac):
+        if ac_reliable:
             reasons.append(f"autocorrelacion IR {bpm_ac:.1f} BPM ({reason_ac})")
-        if np.isfinite(bpm_hilbert):
+        elif np.isfinite(bpm_ac):
+            reasons.append(f"autocorrelacion IR no se usa en acuerdo ({bpm_ac:.1f} BPM; {reason_ac})")
+        if hilbert_reliable:
             reasons.append(f"Hilbert IR estima {bpm_hilbert:.1f} BPM por fase instantanea ({hilbert_ir.get('reason', '')})")
+        elif np.isfinite(bpm_hilbert):
+            reasons.append(f"Hilbert IR no se usa en acuerdo por calidad baja ({bpm_hilbert:.1f} BPM; {hilbert_ir.get('reason', '')})")
         else:
             reasons.append(f"Hilbert IR no estima BPM fiable ({hilbert_ir.get('reason', 'sin motivo')})")
 
@@ -405,9 +473,6 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                 score -= 12
                 reasons.append(f"PI IR muy bajo ({pi_ir:.3f} %): pulso poco visible")
 
-        hilbert_quality = float(hilbert_ir.get("quality", 0.0))
-        envelope_cv = float(hilbert_ir.get("envelope_cv_pct", math.nan))
-        phase_iqr = float(hilbert_ir.get("phase_iqr_bpm", math.nan))
         if hilbert_quality >= 70:
             score += 7
             reasons.append(f"Hilbert estable ({hilbert_quality:.0f}/100): envolvente limpia y fase coherente")
