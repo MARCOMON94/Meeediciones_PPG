@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import json
 import math
 from dataclasses import dataclass, field
@@ -13,6 +14,31 @@ import pyqtgraph as pg
 
 from ..paths import FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..utils import fmt
+
+
+MODE_LABELS = {
+    "real": "Medicion de campo",
+    "normal": "Medicion de campo",
+    "test": "Test de campo",
+    "temp": "Solo temperatura",
+    "temperature": "Solo temperatura",
+    "temp_ajuste": "Solo temperatura",
+    "reajustes": "Reajustes",
+    "long": "Reajustes",
+    "configurations": "Configuraciones",
+    "scheduled": "Configuraciones",
+}
+
+
+def _mode_label(mode: str) -> str:
+    return MODE_LABELS.get((mode or "").strip(), mode or "")
+
+
+def _mode_from_label(label: str) -> str:
+    for raw, translated in MODE_LABELS.items():
+        if translated == label:
+            return raw
+    return label
 
 
 def _read_csv(path: Path, limit: int | None = None) -> list[dict[str, str]]:
@@ -134,10 +160,13 @@ class DictTableModel(QtCore.QAbstractTableModel):
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
-    session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Buenas", "BPM medio", "Calidad media"]
+    session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Configuracion", "Estado", "BPM", "Oxigeno", "Temp.",
-        "Calidad", "Contacto", "RED", "IR", "AVG", "ADC", "Duracion", "Muestras",
+        "Hora", "Animal", "Modo", "Configuracion", "Estado", "BPM medio", "BPM picos",
+        "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
+        "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
+        "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
+        "Duracion", "Hz", "Muestras",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
 
@@ -208,12 +237,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_table.setAlternatingRowColors(True)
         self.sessions_table.verticalHeader().setVisible(False)
         self.sessions_table.selectionModel().selectionChanged.connect(self.select_session)
+        self.sessions_table.doubleClicked.connect(self.open_selected_session_file)
         sessions_layout.addWidget(self.sessions_table)
         main_splitter.addWidget(sessions_panel)
 
         captures_panel = QtWidgets.QWidget()
         captures_layout = QtWidgets.QVBoxLayout(captures_panel)
-        self.captures_label = QtWidgets.QLabel("Tomas de la sesion seleccionada")
+        self.captures_label = QtWidgets.QLabel("Raws / tomas de la sesion seleccionada")
         self.captures_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         captures_layout.addWidget(self.captures_label)
         self.captures_model = DictTableModel(self.capture_headers)
@@ -224,6 +254,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_table.setAlternatingRowColors(True)
         self.captures_table.verticalHeader().setVisible(False)
         self.captures_table.selectionModel().selectionChanged.connect(self.select_capture)
+        self.captures_table.doubleClicked.connect(self.open_selected_capture_file)
         captures_layout.addWidget(self.captures_table)
         main_splitter.addWidget(captures_panel)
 
@@ -256,24 +287,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         graph_layout.addWidget(self.plot_capture, stretch=1)
         self.detail_tabs.addTab(graph_page, "Graficas")
 
-        technical_tabs = QtWidgets.QTabWidget()
+        self.params = QtWidgets.QTextEdit()
+        self.params.setReadOnly(True)
+        self.detail_tabs.addTab(self.params, "Parametros dispositivo")
+
         self.files_model = DictTableModel(self.files_headers)
         self.files_table = QtWidgets.QTableView()
         self.files_table.setModel(self.files_model)
-        self.raw_model = DictTableModel([])
-        self.raw_table = QtWidgets.QTableView()
-        self.raw_table.setModel(self.raw_model)
-        self.proc_model = DictTableModel([])
-        self.proc_table = QtWidgets.QTableView()
-        self.proc_table.setModel(self.proc_model)
-        self.blocks_model = DictTableModel([])
-        self.blocks_table = QtWidgets.QTableView()
-        self.blocks_table.setModel(self.blocks_model)
-        technical_tabs.addTab(self.files_table, "Archivos")
-        technical_tabs.addTab(self.raw_table, "Raw")
-        technical_tabs.addTab(self.proc_table, "Procesado")
-        technical_tabs.addTab(self.blocks_table, "Bloques")
-        self.detail_tabs.addTab(technical_tabs, "Datos tecnicos")
+        self.files_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.files_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.files_table.setAlternatingRowColors(True)
+        self.files_table.verticalHeader().setVisible(False)
+        self.files_table.doubleClicked.connect(self.open_file_from_files_table)
+        self.detail_tabs.addTab(self.files_table, "Archivos")
 
     def pick_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Seleccionar carpeta con CSV", str(RESULTS_DIR))
@@ -292,7 +318,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     def reload_data(self):
         self.sessions = self._discover_sessions()
-        modes = sorted({cap.value("modo") for session in self.sessions for cap in session.captures if cap.value("modo")})
+        modes = sorted({_mode_label(cap.value("modo")) for session in self.sessions for cap in session.captures if cap.value("modo")})
         current = self.mode_filter.currentText()
         self.mode_filter.blockSignals(True)
         self.mode_filter.clear()
@@ -334,27 +360,65 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         cap.row.setdefault("modo", str(data.get("mode") or ""))
         cap.row.setdefault("condiciones_medida", str(data.get("measurement_condition") or ""))
         cap.row.setdefault("config_label", str(data.get("config_label") or ""))
+        cap.row.setdefault("config_description", str(data.get("config_description") or ""))
+        cap.row.setdefault("motivo_fin", str(data.get("reason") or ""))
+        cap.row.setdefault("duracion_solicitada_s", str(data.get("requested_duration_s") or ""))
         cap.row.setdefault("muestras", str(data.get("samples") or ""))
         metrics = data.get("metrics") or {}
         temp = data.get("temperature") or {}
         sensor = data.get("sensor_config") or {}
+        analysis = data.get("analysis_config") or {}
         values = {
+            "duracion_real_s": metrics.get("duration_s"),
+            "hz_real": metrics.get("hz"),
             "bpm": metrics.get("bpm"),
+            "bpm_peak": metrics.get("bpm_peak"),
+            "bpm_fft": metrics.get("bpm_fft"),
+            "bpm_autocorr": metrics.get("bpm_autocorr"),
             "calidad": metrics.get("quality"),
             "calidad_label": metrics.get("quality_label"),
             "spo2_pct": metrics.get("spo2"),
+            "ratio_r": metrics.get("ratio_r"),
             "temp_c_media": temp.get("temp_c_mean"),
             "temp_c_ultima": temp.get("temp_c_last"),
+            "temp_c_min": temp.get("temp_c_min"),
+            "temp_c_max": temp.get("temp_c_max"),
+            "temp_raw_ultima": temp.get("temp_raw_last"),
             "artefactos_ir_pct": metrics.get("artifact_ir_pct"),
+            "artefactos_red_pct": metrics.get("artifact_red_pct"),
+            "pi_ir_pct": metrics.get("pi_ir_pct"),
+            "pi_red_pct": metrics.get("pi_red_pct"),
+            "ac_ir": metrics.get("ac_ir"),
+            "dc_ir": metrics.get("dc_ir"),
+            "ac_red": metrics.get("ac_red"),
+            "dc_red": metrics.get("dc_red"),
+            "saturation_pct": metrics.get("saturation_pct"),
+            "metrics_reason": metrics.get("reason"),
+            "peaks_count": metrics.get("peaks_count"),
             "contacto": metrics.get("contact_label"),
             "cfg_red": sensor.get("red"),
             "cfg_ir": sensor.get("ir"),
             "cfg_avg": sensor.get("avg"),
+            "cfg_rate": sensor.get("rate"),
+            "cfg_width": sensor.get("width"),
             "cfg_adc": sensor.get("adc"),
+            "cfg_skip": sensor.get("skip"),
+            "cfg_debug": sensor.get("debug"),
+            "analysis_bpm_min": analysis.get("bpm_min"),
+            "analysis_bpm_max": analysis.get("bpm_max"),
+            "analysis_detrend_seconds": analysis.get("detrend_seconds"),
+            "analysis_smooth_seconds": analysis.get("smooth_seconds"),
+            "analysis_ignore_initial_seconds": analysis.get("ignore_initial_seconds"),
+            "analysis_spo2_formula": analysis.get("spo2_formula"),
         }
         for key, value in values.items():
             if value is not None and not cap.row.get(key):
                 cap.row[key] = str(value)
+        for kind, file_path in (data.get("files") or {}).items():
+            path_obj = Path(str(file_path))
+            if path_obj.exists():
+                normalized_kind = "blocks" if str(kind) == "bpm_blocks_10s" else str(kind)
+                cap.files.setdefault(normalized_kind, path_obj)
 
     def _discover_sessions(self) -> list[SessionGroup]:
         files_by_base = self._find_files()
@@ -413,10 +477,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         for session in self.sessions:
             captures = []
             for cap in session.captures:
-                haystack = " ".join([session.name, cap.capture_id, cap.base_name, " ".join(cap.row.values())]).lower()
+                haystack = " ".join([session.name, cap.capture_id, cap.base_name, _mode_label(cap.value("modo")), " ".join(cap.row.values())]).lower()
                 if text and text not in haystack:
                     continue
-                if mode != "Todos" and cap.value("modo") != mode:
+                if mode != "Todos" and _mode_label(cap.value("modo")) != mode:
                     continue
                 quality = _as_float(cap.value("calidad"))
                 if np.isfinite(quality) and quality < quality_min:
@@ -435,22 +499,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     def _session_row(self, session: SessionGroup) -> dict[str, str]:
         caps = session.captures
-        modes = sorted({cap.value("modo") for cap in caps if cap.value("modo")})
+        modes = sorted({_mode_label(cap.value("modo")) for cap in caps if cap.value("modo")})
         dates = [cap.value("fecha") for cap in caps if cap.value("fecha")]
         hours = [cap.value("hora") for cap in caps if cap.value("hora")]
         qualities = [_as_float(cap.value("calidad")) for cap in caps]
         qualities = [q for q in qualities if np.isfinite(q)]
-        bpms = [_as_float(cap.value("bpm")) for cap in caps]
-        bpms = [b for b in bpms if np.isfinite(b)]
-        good = sum(1 for q in qualities if q >= 70)
+        animals = {cap.value("id").strip() for cap in caps if cap.value("id").strip()}
         return {
             "Sesion": session.name,
             "Fecha": min(dates) if dates else "",
             "Inicio": min(hours) if hours else "",
             "Modos": ", ".join(modes),
             "Tomas": str(len(caps)),
-            "Buenas": str(good),
-            "BPM medio": fmt(float(np.mean(bpms)) if bpms else math.nan, 0, ""),
+            "Animales": str(len(animals)),
             "Calidad media": fmt(float(np.mean(qualities)) if qualities else math.nan, 0, ""),
         }
 
@@ -466,11 +527,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_session = session
         self.current_capture = None
         if session is None:
-            self.captures_label.setText("Tomas de la sesion seleccionada")
+            self.captures_label.setText("Raws / tomas de la sesion seleccionada")
             self.captures_model.set_rows(self.capture_headers, [])
             self.set_capture(None)
             return
-        self.captures_label.setText(f"Tomas dentro de {session.name}")
+        self.captures_label.setText(f"Raws / tomas dentro de {session.name}")
         self.captures_model.set_rows(self.capture_headers, [self._capture_row(cap) for cap in session.captures])
         self.captures_table.resizeColumnsToContents()
         if session.captures:
@@ -489,19 +550,33 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         return {
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
-            "Modo": cap.value("modo"),
+            "Modo": _mode_label(cap.value("modo")),
             "Configuracion": cap.value("config_label"),
             "Estado": state,
-            "BPM": fmt(_as_float(cap.value("bpm")), 0, ""),
-            "Oxigeno": fmt(_as_float(cap.value("spo2_pct")), 1, ""),
-            "Temp.": fmt(_as_float(cap.value("temp_c_media") or cap.value("temp_c_ultima")), 1, ""),
+            "BPM medio": fmt(_as_float(cap.value("bpm")), 0, ""),
+            "BPM picos": fmt(_as_float(cap.value("bpm_peak")), 0, ""),
+            "BPM FFT": fmt(_as_float(cap.value("bpm_fft")), 0, ""),
+            "BPM autocorr": fmt(_as_float(cap.value("bpm_autocorr")), 0, ""),
+            "Oxigeno medio": fmt(_as_float(cap.value("spo2_pct")), 1, ""),
+            "Ratio R": fmt(_as_float(cap.value("ratio_r")), 4, ""),
+            "Temp media": fmt(_as_float(cap.value("temp_c_media")), 1, ""),
+            "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
+            "Temp raw": fmt(_as_float(cap.value("temp_raw_ultima")), 0, ""),
             "Calidad": fmt(quality, 0, ""),
             "Contacto": cap.value("contacto"),
+            "PI IR %": fmt(_as_float(cap.value("pi_ir_pct")), 3, ""),
+            "PI RED %": fmt(_as_float(cap.value("pi_red_pct")), 3, ""),
+            "Artef. IR %": fmt(_as_float(cap.value("artefactos_ir_pct")), 1, ""),
+            "Artef. RED %": fmt(_as_float(cap.value("artefactos_red_pct")), 1, ""),
+            "Sat. %": fmt(_as_float(cap.value("saturation_pct")), 1, ""),
             "RED": cap.value("cfg_red"),
             "IR": cap.value("cfg_ir"),
             "AVG": cap.value("cfg_avg"),
+            "RATE": cap.value("cfg_rate"),
+            "WIDTH": cap.value("cfg_width"),
             "ADC": cap.value("cfg_adc"),
             "Duracion": fmt(_as_float(cap.value("duracion_real_s")), 1, ""),
+            "Hz": fmt(_as_float(cap.value("hz_real")), 1, ""),
             "Muestras": cap.value("muestras"),
         }
 
@@ -524,13 +599,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         cap = self.current_capture
         if cap is None:
             self.summary.clear()
+            self.params.clear()
             self.files_model.set_rows(self.files_headers, [])
-            self.raw_model.set_rows([], [])
-            self.proc_model.set_rows([], [])
-            self.blocks_model.set_rows([], [])
             self.plot_capture.clear()
             return
         self.summary.setHtml(self._summary_html(cap))
+        self.params.setHtml(self._params_html(cap))
         file_rows = []
         for kind, path in sorted(cap.files.items()):
             file_rows.append({
@@ -543,28 +617,137 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         raw_rows = _read_csv(cap.files["raw"], limit=5000) if "raw" in cap.files else []
         proc_rows = _read_csv(cap.files["processed"], limit=5000) if "processed" in cap.files else []
         block_rows = _read_csv(cap.files["blocks"], limit=5000) if "blocks" in cap.files else []
-        self.raw_model.set_rows(list(raw_rows[0].keys()) if raw_rows else [], raw_rows)
-        self.proc_model.set_rows(list(proc_rows[0].keys()) if proc_rows else [], proc_rows)
-        self.blocks_model.set_rows(list(block_rows[0].keys()) if block_rows else [], block_rows)
+        self.files_table.resizeColumnsToContents()
         self.update_capture_plot(raw_rows, proc_rows, block_rows)
 
+    def open_path(self, path: Path | None):
+        if path is None:
+            return
+        if not path.exists():
+            QtWidgets.QMessageBox.warning(self, "Abrir archivo", f"No se encontro el archivo:\n{path}")
+            return
+        ok = QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
+        if not ok:
+            QtWidgets.QMessageBox.warning(self, "Abrir archivo", f"No se pudo abrir:\n{path}")
+
+    def open_selected_session_file(self, *_args):
+        indexes = self.sessions_table.selectionModel().selectedRows()
+        if not indexes:
+            return
+        row = indexes[0].row()
+        if 0 <= row < len(self.filtered_sessions):
+            self.open_path(self.filtered_sessions[row].path)
+
+    def open_selected_capture_file(self, *_args):
+        cap = self.current_capture
+        if cap is None:
+            return
+        for key in ("raw", "processed", "summary", "plot", "screenshot", "blocks", "session"):
+            if key in cap.files:
+                self.open_path(cap.files[key])
+                return
+
+    def open_file_from_files_table(self, index: QtCore.QModelIndex):
+        if not index.isValid() or not (0 <= index.row() < len(self.files_model.rows)):
+            return
+        path_text = self.files_model.rows[index.row()].get("ruta", "")
+        self.open_path(Path(path_text) if path_text else None)
+
     def _summary_html(self, cap: CaptureRecord) -> str:
+        quality = _as_float(cap.value("calidad"))
+        bpm = _as_float(cap.value("bpm"))
+        spo2 = _as_float(cap.value("spo2_pct"))
+        pi_ir = _as_float(cap.value("pi_ir_pct"))
+        artifacts = _as_float(cap.value("artefactos_ir_pct"))
+        saturation = _as_float(cap.value("saturation_pct"))
+        warnings: list[str] = []
+        if not np.isfinite(bpm):
+            warnings.append("BPM no fiable o no estimable en esta toma.")
+        if np.isfinite(quality) and quality < 45:
+            warnings.append("Calidad global baja: interpretar con cautela.")
+        if np.isfinite(pi_ir) and pi_ir < 0.15:
+            warnings.append("Perfusion/PI IR bajo: el pulso tiene poca amplitud relativa.")
+        if np.isfinite(artifacts) and artifacts > 8:
+            warnings.append("Artefactos IR elevados: posible movimiento, contacto irregular o ruido.")
+        if np.isfinite(saturation) and saturation > 0:
+            warnings.append("Hay muestras saturadas: revisar potencia LED/rango ADC.")
+        if np.isfinite(spo2):
+            warnings.append("Oxigeno calculado de forma no calibrada; usar como orientacion tecnica, no como valor clinico.")
+
+        if not warnings:
+            warnings.append("Sin avisos tecnicos destacados en las metricas guardadas.")
+
+        def row(name: str, value: str) -> str:
+            return f"<tr><td><b>{html.escape(name)}</b></td><td>{html.escape(value)}</td></tr>"
+
         fields = [
-            ("Animal", cap.value("id")),
-            ("Modo de recogida", cap.value("modo")),
-            ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip()),
-            ("Configuracion", cap.value("config_label")),
-            ("BPM", fmt(_as_float(cap.value("bpm")), 0, "-")),
-            ("Oxigeno", fmt(_as_float(cap.value("spo2_pct")), 1, "-")),
-            ("Temperatura media", fmt(_as_float(cap.value("temp_c_media") or cap.value("temp_c_ultima")), 1, "-")),
-            ("Calidad", fmt(_as_float(cap.value("calidad")), 0, "-")),
-            ("Contacto", cap.value("contacto")),
-            ("Sensor", f"RED {cap.value('cfg_red')} | IR {cap.value('cfg_ir')} | AVG {cap.value('cfg_avg')} | ADC {cap.value('cfg_adc')}"),
-            ("Condiciones", cap.value("condiciones_medida")),
+            ("Animal", cap.value("id") or "-"),
+            ("Modo de recogida", _mode_label(cap.value("modo")) or "-"),
+            ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip() or "-"),
+            ("Configuracion", cap.value("config_label") or "-"),
+            ("Descripcion configuracion", cap.value("config_description") or "-"),
+            ("Condiciones", cap.value("condiciones_medida") or "-"),
+            ("BPM medio", fmt(bpm, 1, "-")),
+            ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
+            ("Oxigeno medio", f"{fmt(spo2, 1, '-')} %"),
+            ("Ratio R", fmt(_as_float(cap.value("ratio_r")), 5, "-")),
+            ("Calidad", f"{fmt(quality, 1, '-')} | {cap.value('calidad_label') or '-'}"),
+            ("Contacto", cap.value("contacto") or "-"),
+            ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
+            ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
+            ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
+            ("Temperatura media / ultima", f"{fmt(_as_float(cap.value('temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
+            ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
+            ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
         ]
-        rows = "".join(f"<tr><td><b>{name}</b></td><td>{value}</td></tr>" for name, value in fields)
-        return f"<h2>Toma seleccionada</h2><table cellspacing='8'>{rows}</table>"
+        rows = "".join(row(name, value) for name, value in fields)
+        warning_items = "".join(f"<li>{html.escape(item)}</li>" for item in warnings)
+        reason = cap.value("metrics_reason") or "-"
+        return f"""
+        <h2>Toma seleccionada</h2>
+        <p><b>Lectura rapida:</b> esta vista resume como fue la toma, que estimadores coincidieron, si hubo contacto util y que limitaciones tecnicas debe tener presentes quien revise los datos.</p>
+        <table cellspacing='8'>{rows}</table>
+        <h3>Avisos de interpretacion</h3>
+        <ul>{warning_items}</ul>
+        <p><b>Razon interna del calculo:</b> {html.escape(reason)}</p>
+        """
+
+    def _params_html(self, cap: CaptureRecord) -> str:
+        def row(name: str, value: str) -> str:
+            return f"<tr><td><b>{html.escape(name)}</b></td><td>{html.escape(value or '-')}</td></tr>"
+
+        sensor_fields = [
+            ("Configuracion", cap.value("config_label")),
+            ("Descripcion", cap.value("config_description")),
+            ("RED", cap.value("cfg_red")),
+            ("IR", cap.value("cfg_ir")),
+            ("AVG", cap.value("cfg_avg")),
+            ("RATE", cap.value("cfg_rate")),
+            ("WIDTH", cap.value("cfg_width")),
+            ("ADC", cap.value("cfg_adc")),
+            ("SKIP", cap.value("cfg_skip")),
+            ("DEBUG", cap.value("cfg_debug")),
+            ("Confirmacion Arduino", cap.value("cfg_confirmacion")),
+        ]
+        analysis_fields = [
+            ("BPM minimo", cap.value("analysis_bpm_min")),
+            ("BPM maximo", cap.value("analysis_bpm_max")),
+            ("Detrend", f"{cap.value('analysis_detrend_seconds')} s" if cap.value("analysis_detrend_seconds") else ""),
+            ("Suavizado", f"{cap.value('analysis_smooth_seconds')} s" if cap.value("analysis_smooth_seconds") else ""),
+            ("Ignorar inicio", f"{cap.value('analysis_ignore_initial_seconds')} s" if cap.value("analysis_ignore_initial_seconds") else ""),
+            ("Formula SpO2", cap.value("analysis_spo2_formula")),
+        ]
+        sensor_rows = "".join(row(name, value) for name, value in sensor_fields)
+        analysis_rows = "".join(row(name, value) for name, value in analysis_fields)
+        return f"""
+        <h2>Parametros dispositivo</h2>
+        <p>Estos son los parametros de sensor y analisis asociados al raw seleccionado. Sirven para saber exactamente con que configuracion se genero la toma.</p>
+        <h3>Sensor MAX3010x</h3>
+        <table cellspacing='8'>{sensor_rows}</table>
+        <h3>Analisis usado al guardar resumen</h3>
+        <table cellspacing='8'>{analysis_rows}</table>
+        """
 
     def update_capture_plot(self, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]], block_rows: list[dict[str, str]]):
         self.plot_capture.clear()
