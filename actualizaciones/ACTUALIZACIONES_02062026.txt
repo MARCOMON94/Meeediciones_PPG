@@ -159,7 +159,7 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 13. Exportacion de informe para documentacion o tesis
 - En `Analisis experimental de Fourier` se anade el boton `Exportar informe`.
 - El informe se genera en PDF dentro de:
-  - `resultados/reports/informe_fourier_hilbert_*.pdf`
+  - `resultados/documentos_generados/informe_fourier_hilbert_*.pdf`
 - Incluye:
   - fecha y hora de generacion
   - resumen ejecutivo
@@ -222,6 +222,111 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 - El acuerdo entre estimadores ya no usa autocorrelacion fuera del rango configurado ni Hilbert con calidad muy baja como si fueran estimadores igual de fiables.
 - Esto evita que armonicos o lecturas debiles hundan artificialmente la puntuacion de una configuracion.
 
+17. Informe y comparacion centrados en pulso de referencia
+- `Analisis experimental de Fourier` incorpora `BPM ref.` y `Dif FFT-ref` junto a las BPM estimadas.
+- La referencia manual se calcula como media de:
+  - pulso previo
+  - pulsioximetro final
+  - fonendo final
+- Las lecturas a 0 o vacias se ignoran, porque se consideran no anotadas.
+- La puntuacion de calidad tiene en cuenta la diferencia frente al pulso de referencia cuando existe.
+- El PDF se reorganiza para que las primeras paginas sean un procedimiento comparativo simple:
+  - mejor configuracion
+  - pulso de referencia
+  - BPM por Fourier/autocorrelacion/Hilbert
+  - diferencia frente a referencia
+  - calidad de senal
+- Las explicaciones de Fourier, autocorrelacion, Hilbert y formulas quedan como anexo tecnico al final del PDF.
+- En `Estadisticas` se anaden columnas de `Pulso ref.` y `Dif. BPM-ref`, y el resumen de toma muestra la media manual y sus lecturas originales.
+- Los raw generados por medicion de campo, test de campo, reajustes/larga duracion, configuraciones y Experimento 3M guardan ahora las columnas:
+  - `pulso_previo`
+  - `pulso_final_pulsio`
+  - `pulso_final_fonendo`
+- En tomas normales y largas, el pulso final se pide al terminar y se rellena despues dentro del propio raw, para que Fourier pueda usarlo aunque solo se copie el CSV raw.
+- Los `summary_*.json` de tomas normales/largas tambien incluyen `manual_reference`.
+
+18. Experimento 3M
+- Se anade un modo nuevo en el menu inicial: `Experimento 3M`.
+- El objetivo es buscar una configuracion real del sensor en menos de 20 minutos:
+  - pulso PPG parecido al pulsioximetro/fonendo
+  - SpO2 calculable de forma experimental
+  - PI IR y PI RED suficientes
+  - pocos artefactos
+  - sin saturacion ADC
+- El programa no recorre solo una lista fija: prueba hasta 12 tramos y elige el siguiente ajuste dentro de un espacio de busqueda RED/IR/AVG/ADC.
+- Entre tramos pide pulsioximetro/fonendo para anclar la optimizacion a una referencia manual. Las lecturas 0 o vacias se ignoran.
+- La decision de la siguiente configuracion usa reglas trazables:
+  - si hay saturacion, baja brillo y mantiene ADC amplio
+  - si PI IR es bajo, sube IR
+  - si SpO2 no es usable o PI RED es bajo, ajusta RED respecto a IR
+  - si hay artefactos, sube AVG
+  - si hay buena candidata provisional, explora alrededor de ella
+- Si Experimento 3M encuentra una candidata suficientemente cercana a la referencia, con SpO2 usable, calidad aceptable y saturacion baja, puede cerrar antes de agotar todos los tramos.
+- Experimento 3M muestra en vivo una explicacion de la decision actual:
+  - ultima configuracion evaluada
+  - BPM estimada
+  - pulso de referencia
+  - diferencia frente a referencia
+  - PI IR/RED, SpO2, artefactos, saturacion y nota de lectura
+  - mejor candidata provisional
+- Al terminar, Experimento 3M guarda un informe JSON de decisiones en:
+  - `resultados/reports/experimento_3m_decision_*.json`
+- Ese informe deja trazado el protocolo:
+  - regla de referencia manual
+  - regla de decision
+  - regla de parada
+  - historial de tramos probados
+  - decisiones tomadas para elegir el siguiente candidato
+  - mejor configuracion candidata
+- Los raws de Experimento 3M se pueden revisar despues igual que los de `Configuraciones`, desde `Estadisticas` y `Analisis experimental de Fourier`.
+- Los raw de configuraciones guardan ahora tambien las referencias manuales dentro del propio CSV para que no dependan solo del resumen JSON.
+
+19. Confirmacion del modelo clasico de guardado
+- Se mantiene el modelo clasico por carpetas:
+  - `resultados/raw`
+  - `resultados/processed`
+  - `resultados/reports`
+  - `resultados/figures`
+  - `resultados/screenshots`
+  - `resultados/configs`
+  - `resultados/sessions`
+- La mejora importante queda en el raw: los CSV nuevos incluyen `pulso_previo`, `pulso_final_pulsio` y `pulso_final_fonendo`.
+- `Analisis experimental de Fourier` vuelve a trabajar sobre `resultados/raw`.
+- `Estadisticas` mantiene el flujo por sesiones/resumenes y tambien puede leer raws autosuficientes si se importa una carpeta externa con CSVs sueltos.
+- En `Estadisticas`, la pestaña `Archivos` enlaza tambien la grafica guardada (`plot_*.png`) y la captura (`screen_*.png`) usando tanto el indice por carpeta como los nombres guardados en `session.csv`.
+- Se hacen mas defensivas las selecciones internas de tablas para evitar avisos de Qt tipo `QItemSelectionModel: Selecting when no model has been set`.
+- Las celdas coloreadas de `Estado` en `Estadisticas` fuerzan texto oscuro sobre fondos claros para que se lean bien en modo oscuro.
+- En `Configuraciones` y `Experimento 3M`, los `plot_*.png` de cada tramo se generan ahora como grafica real IR/RED del tramo, no como captura de la pestana activa.
+- El plot completo del bloque tambien se genera como grafica de senal, evitando que se guarde accidentalmente la tabla de configuraciones.
+
+20. Documentos generados y avisos de BPM inicial
+- Se crea una carpeta especifica para documentos exportables:
+  - `resultados/documentos_generados`
+- El PDF de `Analisis experimental de Fourier` pasa a guardarse ahi:
+  - `resultados/documentos_generados/informe_fourier_hilbert_*.pdf`
+- `Experimento 3M` genera al finalizar un PDF propio:
+  - `resultados/documentos_generados/informe_experimento_3m_*.pdf`
+- El PDF de 3M incluye:
+  - fecha y hora de generacion
+  - animal/crotal
+  - motivo de cierre
+  - mejor configuracion candidata
+  - parametros RED/IR/AVG/ADC
+  - pulso de referencia
+  - BPM estimada
+  - diferencia frente a referencia
+  - SpO2 experimental
+  - ranking de tramos
+  - decisiones tomadas y motivo de cada ajuste
+  - criterio de lectura final
+- Los JSON tecnicos y CSV de bloques siguen en `resultados/reports`, para separar documentacion entregable de archivos internos.
+- Antes de iniciar una toma normal, larga/reajustes, `Configuraciones` o `Experimento 3M`, si no hay pulso inicial se muestra un aviso.
+- Desde ese aviso se puede:
+  - introducir BPM inicial e iniciar
+  - iniciar igualmente sin BPM
+  - cancelar la toma
+- Esto evita olvidos, porque el pulso manual ahora pesa en la comparacion con el sensor.
+
 Recomendacion de uso
 --------------------
 
@@ -230,7 +335,9 @@ Recomendacion de uso
 - Usar doble click para abrir el raw o el resumen original cuando haga falta.
 - Para comparar configuraciones, usar `Analisis experimental de Fourier`.
 - Si se necesita justificar una configuracion para documentacion, generar el informe desde `Exportar informe PDF`.
+- Si se quiere una busqueda guiada con el animal conectado menos de 20 minutos, usar `Experimento 3M`.
+- Los PDFs exportables quedan en `resultados/documentos_generados`.
 - Para respiracion, hacer tomas mas largas. Con tomas cortas puede salir como no estimable.
-- En `Configuraciones`, tomar la lectura del pulsioximetro en cada pausa entre configuraciones.
+- En `Configuraciones` o `Experimento 3M`, tomar la lectura del pulsioximetro/fonendo en cada pausa entre configuraciones.
 - Recordar que SpO2 y respiracion son experimentales y deben validarse con referencia externa antes de usarlos como criterio definitivo.
 - Recordar tambien que Fourier + Hilbert es un criterio comparativo interno: ayuda a elegir configuraciones, pero no sustituye una referencia fisiologica externa.

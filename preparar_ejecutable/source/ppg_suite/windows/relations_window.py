@@ -12,7 +12,7 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
-from ..paths import FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
+from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..utils import fmt
 
 
@@ -27,6 +27,8 @@ MODE_LABELS = {
     "long": "Reajustes",
     "configurations": "Configuraciones",
     "scheduled": "Configuraciones",
+    "marco": "Experimento 3M",
+    "experimento_3m": "Experimento 3M",
 }
 
 
@@ -66,6 +68,21 @@ def _as_float(value: str) -> float:
         return math.nan
 
 
+def _as_ref_pulse(value: object) -> float:
+    bpm = _as_float(str(value if value is not None else ""))
+    if np.isfinite(bpm) and bpm > 0:
+        return bpm
+    return math.nan
+
+
+def _mean_ref_pulse(*values: object) -> tuple[float, int]:
+    valid = [_as_ref_pulse(value) for value in values]
+    valid = [value for value in valid if np.isfinite(value)]
+    if not valid:
+        return math.nan, 0
+    return float(np.mean(valid)), len(valid)
+
+
 def _strip_prefix(name: str, prefixes: Iterable[str]) -> str:
     stem = Path(name).stem
     for prefix in prefixes:
@@ -97,6 +114,12 @@ def _cap_first(cap: "CaptureRecord", *keys: str) -> str:
         if value:
             return value
     return ""
+
+
+def _select_first_row(table: QtWidgets.QTableView):
+    model = table.model()
+    if model is not None and model.rowCount() > 0:
+        table.selectRow(0)
 
 
 @dataclass
@@ -149,6 +172,10 @@ class DictTableModel(QtCore.QAbstractTableModel):
                 return QtGui.QBrush(QtGui.QColor("#fff3bf"))
             if state == "Dudosa":
                 return QtGui.QBrush(QtGui.QColor("#ffd6d6"))
+        if role == QtCore.Qt.ItemDataRole.ForegroundRole and key == "Estado":
+            state = row.get(key, "")
+            if state in {"Buena", "Aceptable", "Dudosa"}:
+                return QtGui.QBrush(QtGui.QColor("#17202a"))
         return None
 
     def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
@@ -170,11 +197,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Configuracion", "Estado", "BPM medio", "BPM picos",
-        "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
+        "Hora", "Animal", "Modo", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
+        "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
         "Resp/min (experimental)", "Calidad resp.", "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
         "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
-        "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final",
+        "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final pulsio", "Pulso final fonendo",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
 
@@ -435,6 +462,42 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 normalized_kind = "blocks" if str(kind) == "bpm_blocks_10s" else str(kind)
                 cap.files.setdefault(normalized_kind, path_obj)
 
+    def _resolve_file_from_row(self, row: dict[str, str], key: str, default_dir: Path) -> Path | None:
+        value = row.get(key, "")
+        if not value:
+            return None
+        direct = Path(value)
+        candidates = [direct]
+        if not direct.is_absolute():
+            candidates.append(default_dir / direct.name)
+            for root in self.search_roots:
+                candidates.append(root / direct.name)
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        for root in self.search_roots:
+            for candidate in root.rglob(direct.name):
+                if candidate.exists():
+                    return candidate
+        return None
+
+    def _attach_files_from_row(self, cap: CaptureRecord):
+        row_files = {
+            "raw": ("raw", RAW_DIR),
+            "processed": ("processed", PROCESSED_DIR),
+            "plot": ("plot", FIGURES_DIR),
+            "screenshot": ("screenshot", SCREENSHOT_DIR),
+            "summary": ("summary", REPORT_DIR),
+            "config": ("config", CONFIG_DIR),
+            "blocks": ("blocks_10s_file", REPORT_DIR),
+        }
+        for kind, (row_key, default_dir) in row_files.items():
+            if kind in cap.files:
+                continue
+            path = self._resolve_file_from_row(cap.row, row_key, default_dir)
+            if path:
+                cap.files[kind] = path
+
     def _discover_sessions(self) -> list[SessionGroup]:
         files_by_base = self._find_files()
         groups: list[SessionGroup] = []
@@ -452,6 +515,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     if base and base in files_by_base:
                         cap.files.update(files_by_base[base])
                         attached_bases.add(base)
+                    self._attach_files_from_row(cap)
                     self._enrich_capture_from_summary(cap)
                     group.captures.append(cap)
                 if group.captures:
@@ -460,13 +524,17 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         for base, files in files_by_base.items():
             if base in attached_bases:
                 continue
-            if "summary" not in files and "processed" not in files:
+            if "summary" not in files and "processed" not in files and "raw" not in files:
                 continue
+            raw_row = {}
+            if "raw" in files:
+                raw_rows = _read_csv(files["raw"], limit=1)
+                raw_row = raw_rows[0] if raw_rows else {}
             cap = CaptureRecord(
                 session_key=orphan.key,
                 capture_id=base,
                 base_name=base,
-                row={"session_id": base, "base_name": base},
+                row={"session_id": base, "base_name": base, **raw_row},
                 files=files.copy(),
             )
             self._enrich_capture_from_summary(cap)
@@ -508,7 +576,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_table.resizeColumnsToContents()
         self.sessions_label.setText(f"{len(filtered)} sesiones | {sum(len(s.captures) for s in filtered)} tomas visibles")
         if filtered:
-            self.sessions_table.selectRow(0)
+            _select_first_row(self.sessions_table)
         else:
             self.set_session(None)
 
@@ -550,12 +618,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_model.set_rows(self.capture_headers, [self._capture_row(cap) for cap in session.captures])
         self.captures_table.resizeColumnsToContents()
         if session.captures:
-            self.captures_table.selectRow(0)
+            _select_first_row(self.captures_table)
         else:
             self.set_capture(None)
 
     def _capture_row(self, cap: CaptureRecord) -> dict[str, str]:
         quality = _as_float(cap.value("calidad"))
+        bpm = _as_float(cap.value("bpm"))
+        ref_avg, _ref_count = _mean_ref_pulse(
+            cap.value("pulso_previo"),
+            cap.value("pulso_final_pulsio"),
+            cap.value("pulso_final_fonendo"),
+        )
+        diff_ref = abs(bpm - ref_avg) if np.isfinite(bpm) and np.isfinite(ref_avg) else math.nan
         if np.isfinite(quality) and quality >= 70:
             state = "Buena"
         elif np.isfinite(quality) and quality >= 45:
@@ -568,7 +643,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Modo": _mode_label(cap.value("modo")),
             "Configuracion": cap.value("config_label"),
             "Estado": state,
-            "BPM medio": fmt(_as_float(cap.value("bpm")), 0, ""),
+            "Pulso ref.": fmt(ref_avg, 1, ""),
+            "Dif. BPM-ref": fmt(diff_ref, 1, ""),
+            "BPM medio": fmt(bpm, 0, ""),
             "BPM picos": fmt(_as_float(cap.value("bpm_peak")), 0, ""),
             "BPM FFT": fmt(_as_float(cap.value("bpm_fft")), 0, ""),
             "BPM autocorr": fmt(_as_float(cap.value("bpm_autocorr")), 0, ""),
@@ -596,7 +673,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Hz": fmt(_as_float(cap.value("hz_real")), 1, ""),
             "Muestras": cap.value("muestras"),
             "Pulso previo": cap.value("pulso_previo"),
-            "Pulso final": cap.value("pulso_final_pulsio"),
+            "Pulso final pulsio": cap.value("pulso_final_pulsio"),
+            "Pulso final fonendo": cap.value("pulso_final_fonendo"),
         }
 
     def select_capture(self):
@@ -681,6 +759,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         pi_ir = _as_float(cap.value("pi_ir_pct"))
         artifacts = _as_float(cap.value("artefactos_ir_pct"))
         saturation = _as_float(cap.value("saturation_pct"))
+        ref_avg, ref_count = _mean_ref_pulse(
+            cap.value("pulso_previo"),
+            cap.value("pulso_final_pulsio"),
+            cap.value("pulso_final_fonendo"),
+        )
+        diff_ref = abs(bpm - ref_avg) if np.isfinite(bpm) and np.isfinite(ref_avg) else math.nan
         warnings: list[str] = []
         if not np.isfinite(bpm):
             warnings.append("BPM no fiable o no estimable en esta toma.")
@@ -696,6 +780,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             warnings.append("Oxigeno calculado de forma no calibrada; usar como orientacion tecnica, no como valor clinico.")
         if np.isfinite(resp):
             warnings.append("Respiraciones calculadas de forma experimental desde modulaciones lentas de PPG; validar con referencia externa.")
+        if np.isfinite(diff_ref) and diff_ref > 12:
+            warnings.append(f"La BPM media queda a {diff_ref:.1f} BPM de la referencia manual; revisar contacto/configuracion o la anotacion manual.")
 
         if not warnings:
             warnings.append("Sin avisos tecnicos destacados en las metricas guardadas.")
@@ -710,6 +796,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Configuracion", cap.value("config_label") or "-"),
             ("Descripcion configuracion", cap.value("config_description") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
+            ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
+            ("Pulso previo / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
+            ("Diferencia BPM medio - ref.", f"{fmt(diff_ref, 1, '-')} BPM"),
             ("BPM medio", fmt(bpm, 1, "-")),
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
             ("Oxigeno medio", f"{fmt(spo2, 1, '-')} %"),
@@ -722,7 +811,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
             ("Temperatura media / ultima", f"{fmt(_as_float(cap.value('temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
-            ("Pulso manual previo / final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
         ]

@@ -82,8 +82,9 @@ El menu inicial permite elegir:
 - Solo temperatura: registro NTC sin PPG.
 - Reajustes: medicion larga con controles completos, diagnostico Arduino y snapshots.
 - Configuraciones: tabla editable para crear, pegar y ejecutar bloques de configuracion del sensor.
+- Experimento 3M: optimizacion adaptativa para encontrar una configuracion real del sensor en menos de 20 minutos. Entre tramos pide pulsioximetro/fonendo cuando necesita referencia, ignora lecturas 0 o vacias y cambia RED/IR/AVG/ADC segun cercania a BPM manual, pulso PPG, SpO2 usable, PI, artefactos y saturacion. En pantalla muestra la razon de cada decision y al finalizar guarda un JSON tecnico y un PDF final con resumen, ranking, decisiones y mejor candidata.
 - Estadisticas: explorador de sesiones, raws, procesados, resumenes, graficas y capturas.
-- Analisis experimental de Fourier + Hilbert: comparacion de raws para razonar que configuracion separa mejor el pulso y mantiene una envolvente/fase mas estable. Permite exportar un informe PDF con fecha, ranking, explicacion metodologica y graficas para documentacion o tesis.
+- Analisis experimental de Fourier + Hilbert: comparacion de raws para razonar que configuracion separa mejor el pulso. La lectura principal es `Pulso ref.` frente a BPM estimadas; Fourier, autocorrelacion e Hilbert quedan como apoyo tecnico. Permite exportar un informe PDF con fecha, ranking, procedimiento comparativo, graficas y anexo metodologico.
 
 El menu tambien incluye `Ultimas actualizaciones`, que abre el archivo mas reciente de:
 
@@ -105,11 +106,15 @@ Carpetas principales:
 - `resultados/processed/`: datos procesados.
 - `resultados/sessions/`: resumen global de sesiones.
 - `resultados/reports/`: resumenes JSON y bloques de BPM.
-- `resultados/reports/informe_fourier_hilbert_*.pdf`: informes exportados del analisis experimental.
+- `resultados/documentos_generados/`: PDFs generados para revisar o adjuntar.
+- `resultados/documentos_generados/informe_fourier_hilbert_*.pdf`: informes exportados del analisis comparativo.
+- `resultados/documentos_generados/informe_experimento_3m_*.pdf`: informe final del Experimento 3M.
 - `resultados/figures/`: graficas.
 - `resultados/screenshots/`: capturas.
 - `resultados/configs/`: configuraciones aplicadas.
 - `resultados/logs/`: logs de ejecucion.
+
+Los raw nuevos incluyen tambien las referencias manuales (`pulso_previo`, `pulso_final_pulsio`, `pulso_final_fonendo`) para que `Analisis experimental de Fourier` pueda comparar BPM aunque se copie solo el CSV raw.
 
 Los raws incluyen informacion como:
 
@@ -209,7 +214,7 @@ ppg_suite/
     test_window.py              # modo test de campo
     temperature_window.py       # modo solo temperatura
     reajustes_window.py         # modo reajustes/larga duracion
-    scheduled_window.py         # modo configuraciones
+    scheduled_window.py         # modos configuraciones y Experimento 3M
     relations_window.py         # estadisticas y relacion entre archivos
     fourier_window.py           # analisis experimental de Fourier + Hilbert
 preparar_ejecutable/

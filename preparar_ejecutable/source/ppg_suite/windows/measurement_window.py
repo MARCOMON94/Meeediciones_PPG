@@ -387,6 +387,62 @@ class PPGSuite(QtWidgets.QMainWindow):
             return self.condition_edit.text().strip()
         return ""
 
+    def ensure_initial_pulse_or_confirm(self) -> str | None:
+        current = safe_float_text(self.prev_pulse_edit.text())
+        try:
+            bpm = float(current.replace(",", "."))
+        except ValueError:
+            bpm = math.nan
+        if math.isfinite(bpm) and bpm > 0:
+            return current
+
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Pulso inicial no indicado")
+        layout = QtWidgets.QVBoxLayout(dialog)
+        info = QtWidgets.QLabel(
+            "No has puesto pulso inicial.\n\n"
+            "Ahora se usa para comparar las BPM del sensor con la referencia manual. "
+            "Puedes introducirlo ahora, iniciar igualmente sin BPM o cancelar."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        pulse_edit = QtWidgets.QLineEdit()
+        pulse_edit.setPlaceholderText("Ej.: 72")
+        form = QtWidgets.QFormLayout()
+        form.addRow("BPM inicial:", pulse_edit)
+        layout.addLayout(form)
+        buttons = QtWidgets.QDialogButtonBox()
+        start_with_bpm = buttons.addButton("Iniciar con BPM", QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        start_without_bpm = buttons.addButton("Iniciar sin BPM", QtWidgets.QDialogButtonBox.ButtonRole.DestructiveRole)
+        cancel_btn = buttons.addButton("Cancelar", QtWidgets.QDialogButtonBox.ButtonRole.RejectRole)
+        layout.addWidget(buttons)
+
+        chosen: dict[str, object] = {"button": None}
+
+        def choose(button: QtWidgets.QAbstractButton):
+            chosen["button"] = button
+            dialog.accept()
+
+        buttons.clicked.connect(choose)
+        pulse_edit.returnPressed.connect(lambda: choose(start_with_bpm))
+        dialog.exec()
+
+        button = chosen.get("button")
+        if button is cancel_btn or button is None:
+            return None
+        if button is start_without_bpm:
+            return ""
+        value = safe_float_text(pulse_edit.text())
+        try:
+            bpm = float(value.replace(",", "."))
+        except ValueError:
+            bpm = math.nan
+        if not (math.isfinite(bpm) and bpm > 0):
+            QtWidgets.QMessageBox.warning(self, "Pulso inicial", "Introduce un BPM inicial valido o inicia sin BPM.")
+            return self.ensure_initial_pulse_or_confirm()
+        self.prev_pulse_edit.setText(value)
+        return value
+
     def read_serial(self):
         if not self.serial_port or not self.serial_port.is_open:
             return
@@ -540,6 +596,9 @@ class PPGSuite(QtWidgets.QMainWindow):
                     cfg.adc,
                     cfg.skip,
                     1 if cfg.debug else 0,
+                    st.pulse_prev,
+                    st.pulse_final_pulsio,
+                    st.pulse_final_fonendo,
                     self.last_config_ack,
                     datetime.now().isoformat(timespec="milliseconds")
                 ])
@@ -571,6 +630,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
             "red_raw", "ir_raw", "temp_c", "temp_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
+            "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
             "cfg_confirmacion", "system_time"
         ])
         st.raw_handle.flush()
@@ -586,7 +646,10 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.mode = "normal"
         st.requested_duration_s = float(self.duration_spin.value())
         st.crotal_id = sanitize_id(self.crotal_edit.text())
-        st.pulse_prev = safe_float_text(self.prev_pulse_edit.text())
+        pulse_prev = self.ensure_initial_pulse_or_confirm()
+        if pulse_prev is None:
+            return
+        st.pulse_prev = pulse_prev
         st.measurement_condition = self.current_condition_text()
         st.config_label = "manual"
         st.base_name = f"{st.crotal_id}_{now_stamp()}"
@@ -618,7 +681,10 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.mode = "long"
         st.requested_duration_s = math.inf
         st.crotal_id = sanitize_id(self.crotal_edit.text())
-        st.pulse_prev = safe_float_text(self.prev_pulse_edit.text())
+        pulse_prev = self.ensure_initial_pulse_or_confirm()
+        if pulse_prev is None:
+            return
+        st.pulse_prev = pulse_prev
         st.measurement_condition = self.current_condition_text()
         st.config_label = "larga_manual"
         st.base_name = f"LONG_{st.crotal_id}_{now_stamp()}"
@@ -744,8 +810,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.metrics = score_and_merge_metrics(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config())
             st.bpm_blocks = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=2)
             st.bpm_blocks_10s = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=10)
-        if st.mode == "normal":
+        if st.mode in ("normal", "long"):
             self.ask_final_reference()
+        self.update_raw_manual_reference()
         self.save_processed()
         self.save_blocks_file()
         self.save_images()
@@ -767,6 +834,36 @@ class PPGSuite(QtWidgets.QMainWindow):
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             st.pulse_final_pulsio = safe_float_text(pulsio.text())
             st.pulse_final_fonendo = safe_float_text(fonendo.text())
+
+    def update_raw_manual_reference(self):
+        st = self.state
+        path = st.raw_file
+        if path is None or not path.exists():
+            return
+        try:
+            with open(path, "r", newline="", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f, delimiter=";")
+                rows = [{str(k or "").strip(): str(v or "").strip() for k, v in row.items()} for row in reader]
+        except OSError as exc:
+            log.warning("No se pudo leer raw para actualizar pulso manual %s: %s", path, exc)
+            return
+        if not rows:
+            return
+        fieldnames = list(rows[0].keys())
+        for field in ("pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo"):
+            if field not in fieldnames:
+                fieldnames.append(field)
+        for row in rows:
+            row["pulso_previo"] = st.pulse_prev
+            row["pulso_final_pulsio"] = st.pulse_final_pulsio
+            row["pulso_final_fonendo"] = st.pulse_final_fonendo
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";", extrasaction="ignore")
+                writer.writeheader()
+                writer.writerows(rows)
+        except OSError as exc:
+            log.warning("No se pudo actualizar pulso manual en raw %s: %s", path, exc)
 
     def save_current_config_json(self, prefix: str):
         data = {"sensor": asdict(self.sensor_widget.get_config()), "analysis": asdict(self.analysis_widget.get_config()), "base_dir": str(BASE_DIR), "results_dir": str(RESULTS_DIR), "created": datetime.now().isoformat()}
@@ -875,6 +972,11 @@ class PPGSuite(QtWidgets.QMainWindow):
                 "status": self.last_config_ack,
                 "command": self.last_config_command,
                 "arduino_cfg_line": self.last_config_line,
+            },
+            "manual_reference": {
+                "pulso_previo": st.pulse_prev,
+                "pulso_final_pulsio": st.pulse_final_pulsio,
+                "pulso_final_fonendo": st.pulse_final_fonendo,
             },
             "files": {
                 "raw": str(st.raw_file) if st.raw_file else "",

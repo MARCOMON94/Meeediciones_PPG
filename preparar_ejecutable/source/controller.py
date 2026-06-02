@@ -6,7 +6,7 @@ from ppg_suite.menu import ModeSelectDialog
 from ppg_suite.windows.real_window import RealWindow
 from ppg_suite.windows.test_window import TestWindow
 from ppg_suite.windows.reajustes_window import ReajustesWindow
-from ppg_suite.windows.scheduled_window import ConfigurationsWindow
+from ppg_suite.windows.scheduled_window import ConfigurationsWindow, Experiment3MWindow
 from ppg_suite.windows.temperature_window import TemperatureWindow
 from ppg_suite.windows.relations_window import RelationExplorerWindow
 from ppg_suite.windows.fourier_window import FourierAnalysisWindow
@@ -43,6 +43,8 @@ class AppController(QtCore.QObject):
             self.show_reajustes()
         elif dialog.selected_mode == "configurations":
             self.show_configurations()
+        elif dialog.selected_mode == "experimento_3m":
+            self.show_experiment_3m()
         elif dialog.selected_mode == "temp":
             self.show_temperature()
         elif dialog.selected_mode == "relations":
@@ -77,6 +79,13 @@ class AppController(QtCore.QObject):
     def show_configurations(self):
         self.close_current_window()
         win = ConfigurationsWindow()
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.show()
+
+    def show_experiment_3m(self):
+        self.close_current_window()
+        win = Experiment3MWindow()
         self._wire_common_signals(win)
         self.current_window = win
         win.show()

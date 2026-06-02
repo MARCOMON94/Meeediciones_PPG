@@ -38,3 +38,9 @@ En la version empaquetada, los resultados se guardan en:
 ```txt
 %USERPROFILE%\Documents\mtestv2\resultados
 ```
+
+Los PDFs exportables se guardan en:
+
+```txt
+%USERPROFILE%\Documents\mtestv2\resultados\documentos_generados
+```

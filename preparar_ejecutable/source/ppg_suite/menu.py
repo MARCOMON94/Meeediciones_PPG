@@ -5,10 +5,10 @@ from typing import Literal
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from .paths import APP_ROOT
+from .paths import BASE_DIR
 
 
-AppMode = Literal["reajustes", "test", "real", "configurations", "temp", "relations", "fourier"]
+AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "temp", "relations", "fourier"]
 
 
 class ModeSelectDialog(QtWidgets.QDialog):
@@ -44,24 +44,27 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_temp = QtWidgets.QPushButton("Solo temperatura")
         self.btn_reajustes = QtWidgets.QPushButton("Reajustes")
         self.btn_configurations = QtWidgets.QPushButton("Configuraciones")
+        self.btn_3m = QtWidgets.QPushButton("Experimento 3M")
         self.btn_relations = QtWidgets.QPushButton("Estadisticas")
         self.btn_fourier = QtWidgets.QPushButton("Analisis experimental de Fourier")
 
-        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_relations, self.btn_fourier]:
+        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_relations, self.btn_fourier]:
             button.setMinimumHeight(38)
 
         grid.addWidget(self.btn_test, 0, 0)
         grid.addWidget(self.btn_temp, 0, 1)
         grid.addWidget(self.btn_reajustes, 1, 0)
         grid.addWidget(self.btn_configurations, 1, 1)
-        grid.addWidget(self.btn_relations, 2, 0, 1, 2)
-        grid.addWidget(self.btn_fourier, 3, 0, 1, 2)
+        grid.addWidget(self.btn_3m, 2, 0, 1, 2)
+        grid.addWidget(self.btn_relations, 3, 0, 1, 2)
+        grid.addWidget(self.btn_fourier, 4, 0, 1, 2)
 
         info = QtWidgets.QLabel(
             "Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.\n"
             "Solo temperatura: registro NTC sin PPG.\n"
             "Reajustes: calibracion larga con controles completos.\n"
             "Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor.\n"
+            "Experimento 3M: optimizacion adaptativa del sensor usando BPM manual, pulso PPG, SpO2, ruido, PI y saturacion.\n"
             "Estadisticas: sesiones, resultados, configuraciones y graficas comparativas.\n"
             "Fourier experimental: compara varios raw y razona que configuracion separa mejor el pulso."
         )
@@ -84,6 +87,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_temp.clicked.connect(lambda: self.choose("temp"))
         self.btn_reajustes.clicked.connect(lambda: self.choose("reajustes"))
         self.btn_configurations.clicked.connect(lambda: self.choose("configurations"))
+        self.btn_3m.clicked.connect(lambda: self.choose("experimento_3m"))
         self.btn_relations.clicked.connect(lambda: self.choose("relations"))
         self.btn_fourier.clicked.connect(lambda: self.choose("fourier"))
         self.btn_updates.clicked.connect(self.show_latest_updates)
@@ -93,7 +97,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.accept()
 
     def show_latest_updates(self):
-        update_dir = APP_ROOT / "actualizaciones"
+        update_dir = BASE_DIR / "actualizaciones"
         files = sorted(update_dir.glob("ACTUALIZACIONES_*.txt"), key=self.update_file_date)
         if not files:
             QtWidgets.QMessageBox.information(self, "Ultimas actualizaciones", "No hay archivo de actualizaciones.")

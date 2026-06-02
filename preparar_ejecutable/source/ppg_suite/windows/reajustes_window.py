@@ -139,9 +139,11 @@ class ReajustesWindow(PPGSuite):
         st = self.state
         if not st.base_name:
             base = f"long_snapshot_{now_stamp()}"
+            folder = SCREENSHOT_DIR
         else:
             base = f"long_snapshot_{st.base_name}_{now_stamp()}"
-        path = SCREENSHOT_DIR / f"{base}.png"
+            folder = SCREENSHOT_DIR
+        path = folder / f"{base}.png"
         self.grab().save(str(path), "PNG")
         QtWidgets.QMessageBox.information(self, "Snapshot", f"Guardado:\n{path}")
 
