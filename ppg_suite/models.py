@@ -61,6 +61,9 @@ class Metrics:
     bpm_autocorr: float = math.nan
     spo2: float = math.nan
     ratio_r: float = math.nan
+    resp_rate_rpm: float = math.nan
+    resp_quality: float = 0.0
+    resp_reason: str = ""
     quality: float = 0.0
     quality_label: str = "sin datos"
     artifact_ir_pct: float = math.nan

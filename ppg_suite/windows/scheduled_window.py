@@ -32,6 +32,9 @@ class ScheduledSegment:
     index: int
     start_sample: int
     end_sample: int | None = None
+    pulse_prev: str = ""
+    pulse_final_pulsio: str = ""
+    pulse_final_fonendo: str = ""
 
 
 def build_64_config_steps() -> list[ScheduledStep]:
@@ -209,32 +212,92 @@ class ScheduledConfigWindow(PPGSuite):
             st.capturing = False
             return
         self.open_raw_file()
-        self.scheduled_segments.append(ScheduledSegment(first_step, 0, 0))
+        self.scheduled_segments.append(ScheduledSegment(first_step, 0, 0, pulse_prev=st.pulse_prev))
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
+
+    def ask_transition_reference(self, previous_step: ScheduledStep, next_step: ScheduledStep) -> str:
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Pulso entre configuraciones")
+        form = QtWidgets.QFormLayout(dialog)
+        info = QtWidgets.QLabel(
+            f"Terminada:\n{previous_step.label}\n\n"
+            f"Siguiente:\n{next_step.label}\n\n"
+            "Introduce la lectura del pulsioximetro. Este mismo valor se guardara como "
+            "pulso final de la configuracion anterior y pulso previo de la siguiente."
+        )
+        info.setWordWrap(True)
+        pulsio = QtWidgets.QLineEdit()
+        pulsio.setPlaceholderText("Ej.: 72")
+        form.addRow(info)
+        form.addRow("Pulsioximetro:", pulsio)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            return safe_float_text(pulsio.text())
+        return ""
+
+    def ask_last_segment_reference(self) -> str:
+        if not self.scheduled_segments:
+            return ""
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Pulso final de la ultima configuracion")
+        form = QtWidgets.QFormLayout(dialog)
+        step = self.scheduled_segments[-1].step
+        info = QtWidgets.QLabel(
+            f"Terminada:\n{step.label}\n\n"
+            "Introduce la lectura final del pulsioximetro para esta ultima configuracion."
+        )
+        info.setWordWrap(True)
+        pulsio = QtWidgets.QLineEdit(self.scheduled_segments[-1].pulse_final_pulsio)
+        pulsio.setPlaceholderText("Ej.: 72")
+        form.addRow(info)
+        form.addRow("Pulsioximetro final:", pulsio)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            return safe_float_text(pulsio.text())
+        return ""
 
     def apply_scheduled_step(self, index: int):
         if self.scheduled_segments and self.scheduled_segments[-1].end_sample is None:
             self.scheduled_segments[-1].end_sample = len(self.state.t)
         step = self.scheduled_steps[index]
+        previous = self.scheduled_segments[-1].step if self.scheduled_segments else None
+        if previous is not None:
+            self.state.capturing = False
+            self.send_command("STOP")
+            if self.state.raw_handle:
+                self.state.raw_handle.flush()
+            QtWidgets.QApplication.processEvents()
+            pulse_between = self.ask_transition_reference(previous, step)
+            self.scheduled_segments[-1].pulse_final_pulsio = pulse_between
+            self.state.pulse_prev = pulse_between
+            self.prev_pulse_edit.setText(pulse_between)
         self.scheduled_step_index = index
         self.scheduled_step_start_wall = time.time()
         self.state.config_label = step.label
         self.sensor_widget.set_config(step.config)
         self.apply_sensor_config(step.config)
-        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t)))
+        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t), pulse_prev=self.state.pulse_prev))
+        self.state.capturing = True
+        self.send_command("START_CONTINUOUS")
 
     def check_auto_stop(self):
         st = self.state
         if not st.capturing:
             return
-        elapsed = time.time() - st.capture_start_wall
-        if elapsed >= self.scheduled_total_duration_s:
+        step_elapsed = time.time() - self.scheduled_step_start_wall
+        if step_elapsed < self.scheduled_step_duration_s:
+            return
+        if self.scheduled_step_index >= len(self.scheduled_steps) - 1:
             self.stop_capture("BLOQUE_COMPLETADO")
             return
-        next_index = min(int(elapsed // self.scheduled_step_duration_s), len(self.scheduled_steps) - 1)
-        if next_index != self.scheduled_step_index:
-            self.apply_scheduled_step(next_index)
+        self.apply_scheduled_step(self.scheduled_step_index + 1)
 
     def finalize_capture(self, reason: str):
         if self.scheduled_segments and self.scheduled_segments[-1].end_sample is None:
@@ -242,6 +305,8 @@ class ScheduledConfigWindow(PPGSuite):
         if not self.scheduled_segments:
             super().finalize_capture(reason)
             return
+        if not self.scheduled_segments[-1].pulse_final_pulsio:
+            self.scheduled_segments[-1].pulse_final_pulsio = self.ask_last_segment_reference()
         written = 0
         for segment in self.scheduled_segments:
             if self.save_segment_capture(segment, reason):
@@ -371,6 +436,11 @@ class ScheduledConfigWindow(PPGSuite):
                     "plot": str(plot_file),
                     "bpm_blocks_10s": str(blocks_file),
                 },
+                "manual_reference": {
+                    "pulso_previo": segment.pulse_prev,
+                    "pulso_final_pulsio": segment.pulse_final_pulsio,
+                    "pulso_final_fonendo": segment.pulse_final_fonendo,
+                },
                 "created": datetime.now().isoformat(),
             }, f, indent=2, ensure_ascii=False)
 
@@ -381,10 +451,11 @@ class ScheduledConfigWindow(PPGSuite):
             int(t.size), fmt(metrics.duration_s, 3, ""), fmt(metrics.hz, 2, ""), fmt(metrics.bpm, 1, ""),
             fmt(metrics.bpm_peak, 1, ""), fmt(metrics.bpm_fft, 1, ""), fmt(metrics.bpm_autocorr, 1, ""),
             fmt(metrics.quality, 1, ""), metrics.quality_label, fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
+            fmt(metrics.resp_rate_rpm, 1, ""), fmt(metrics.resp_quality, 0, ""), metrics.resp_reason,
             fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),
             fmt(metrics.pi_ir_pct, 4, ""), fmt(metrics.pi_red_pct, 4, ""), fmt(metrics.artifact_ir_pct, 1, ""),
-            fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, st.pulse_prev,
-            st.pulse_final_pulsio, st.pulse_final_fonendo, raw_file.name, processed_file.name, plot_file.name,
+            fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, segment.pulse_prev,
+            segment.pulse_final_pulsio, segment.pulse_final_fonendo, raw_file.name, processed_file.name, plot_file.name,
             "", summary_file.name, st.config_file.name if st.config_file else "", json.dumps(blocks, ensure_ascii=False),
             blocks_file.name,
         ])
@@ -412,8 +483,10 @@ class ScheduledConfigWindow(PPGSuite):
         m = st.metrics
         temp = self.temperature_summary()
         elapsed = time.time() - st.capture_start_wall if st.capturing else 0.0
+        step_elapsed = time.time() - self.scheduled_step_start_wall if st.capturing else 0.0
         step = self.scheduled_steps[self.scheduled_step_index]
-        remaining = max(0.0, self.scheduled_total_duration_s - elapsed)
+        remaining = max(0.0, self.scheduled_step_duration_s - step_elapsed)
+        pulse_prev = self.scheduled_segments[-1].pulse_prev if self.scheduled_segments else st.pulse_prev
         self.info.setText(
             f"{self.scheduled_title}\n"
             f"Puerto: {self.port_name}\n"
@@ -422,10 +495,12 @@ class ScheduledConfigWindow(PPGSuite):
             f"Bloque: {self.scheduled_step_index + 1}/{len(self.scheduled_steps)}\n"
             f"{step.label}\n"
             f"{step.description}\n"
-            f"Tiempo: {elapsed:.1f}s | quedan {remaining:.1f}s\n"
+            f"Tiempo config: {step_elapsed:.1f}s | quedan {remaining:.1f}s\n"
+            f"Tiempo bloque: {elapsed:.1f}s | pulso ref. inicial: {pulse_prev or '-'}\n"
             f"Config Arduino: {self.last_config_ack} | {self.last_config_line[:80]}\n\n"
             f"Muestras: {len(st.t)} | descartadas: {st.discarded_lines}\n"
             f"BPM: {fmt(m.bpm,0)} | calidad {fmt(m.quality,0)} ({m.quality_label})\n"
+            f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
             f"Temp: {fmt(temp['temp_c_last'],1)} °C | raw {fmt(temp['temp_raw_last'],0)}\n"
             f"Contacto: {m.contact_label}\n"
             f"Raw: {st.raw_file.name if st.raw_file else '-'}\n"

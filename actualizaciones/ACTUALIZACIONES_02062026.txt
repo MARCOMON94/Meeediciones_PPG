@@ -116,6 +116,28 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 - Explica que hace la ventana, que formulas usa, como se calcula la puntuacion y como interpretar resultados.
 - Incluye bibliografia tecnica sobre FFT, PPG, MAX30102 y pulsioximetria.
 
+10. Pausa entre configuraciones con pulso manual
+- En el modo `Configuraciones`, al terminar una configuracion se pausa la captura antes de pasar a la siguiente.
+- Aparece una ventana para introducir la lectura del pulsioximetro.
+- Ese mismo valor se guarda como:
+  - pulso final de la configuracion que acaba
+  - pulso previo de la configuracion siguiente
+- El tiempo que se tarda en rellenar esa ventana no consume tiempo de la siguiente configuracion.
+- Al terminar la ultima configuracion tambien se pregunta el pulso final.
+- En `Estadisticas` se anaden columnas para ver pulso previo y pulso final de cada raw/toma.
+
+11. Unificacion de SpO2 y respiraciones experimentales
+- Se unifica el criterio de saturacion usado por Estadisticas, Fourier, Medicion de campo, Reajustes y Configuraciones.
+- La saturacion ADC se calcula ahora siempre contra el techo digital bruto de 18 bits del MAX3010x, usando como aviso el 98 % de 262143.
+- Esto evita que una misma muestra se juzgue con criterios distintos segun el rango ADC elegido en la configuracion.
+- Se centraliza la estimacion de respiraciones en una funcion comun.
+- Las tomas nuevas guardan:
+  - respiraciones por minuto experimentales
+  - calidad de respiracion experimental
+  - razon tecnica del calculo
+- En las pantallas se muestra como `Respiraciones (experimental)` para dejar claro que todavia requiere validacion externa.
+- Fourier y Estadisticas leen el mismo calculo, de forma que ya no hablan idiomas distintos para respiracion.
+
 Recomendacion de uso
 --------------------
 
@@ -124,4 +146,5 @@ Recomendacion de uso
 - Usar doble click para abrir el raw o el resumen original cuando haga falta.
 - Para comparar configuraciones, usar `Analisis experimental de Fourier`.
 - Para respiracion, hacer tomas mas largas. Con tomas cortas puede salir como no estimable.
+- En `Configuraciones`, tomar la lectura del pulsioximetro en cada pausa entre configuraciones.
 - Recordar que SpO2 y respiracion son experimentales y deben validarse con referencia externa antes de usarlos como criterio definitivo.

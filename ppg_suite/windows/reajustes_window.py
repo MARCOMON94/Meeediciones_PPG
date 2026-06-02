@@ -186,6 +186,7 @@ class ReajustesWindow(PPGSuite):
             f"BPM picos: {fmt(met.bpm_peak, 0)} | FFT: {fmt(met.bpm_fft, 0)} | autocorr: {fmt(met.bpm_autocorr, 0)}\n"
             f"Picos: {met.peaks_count} | polaridad: {met.polarity}\n"
             f"SpO2 estimada: {fmt(met.spo2, 1)} % | R={fmt(met.ratio_r, 4)}\n"
+            f"Respiraciones (experimental): {fmt(met.resp_rate_rpm, 1)} resp/min | calidad {fmt(met.resp_quality, 0)}\n"
             f"Temp: {fmt(temp['temp_c_last'], 1)} °C | media {fmt(temp['temp_c_mean'], 1)} °C | raw {fmt(temp['temp_raw_last'], 0)}\n"
             f"AC/DC IR: {fmt(met.ac_ir, 2)} / {fmt(met.dc_ir, 0)} | PI IR={fmt(met.pi_ir_pct, 3)} %\n"
             f"AC/DC RED: {fmt(met.ac_red, 2)} / {fmt(met.dc_red, 0)} | PI RED={fmt(met.pi_red_pct, 3)} %\n"

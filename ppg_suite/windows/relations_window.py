@@ -91,6 +91,14 @@ def _base_from_row(row: dict[str, str]) -> str:
     return ""
 
 
+def _cap_first(cap: "CaptureRecord", *keys: str) -> str:
+    for key in keys:
+        value = cap.value(key)
+        if value:
+            return value
+    return ""
+
+
 @dataclass
 class CaptureRecord:
     session_key: str
@@ -164,9 +172,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     capture_headers = [
         "Hora", "Animal", "Modo", "Configuracion", "Estado", "BPM medio", "BPM picos",
         "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
-        "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
+        "Resp/min (experimental)", "Calidad resp.", "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
         "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
-        "Duracion", "Hz", "Muestras",
+        "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
 
@@ -368,6 +376,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         temp = data.get("temperature") or {}
         sensor = data.get("sensor_config") or {}
         analysis = data.get("analysis_config") or {}
+        manual = data.get("manual_reference") or {}
         values = {
             "duracion_real_s": metrics.get("duration_s"),
             "hz_real": metrics.get("hz"),
@@ -379,6 +388,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "calidad_label": metrics.get("quality_label"),
             "spo2_pct": metrics.get("spo2"),
             "ratio_r": metrics.get("ratio_r"),
+            "resp_rate_rpm": metrics.get("resp_rate_rpm"),
+            "resp_quality": metrics.get("resp_quality"),
+            "resp_reason": metrics.get("resp_reason"),
             "temp_c_media": temp.get("temp_c_mean"),
             "temp_c_ultima": temp.get("temp_c_last"),
             "temp_c_min": temp.get("temp_c_min"),
@@ -410,6 +422,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "analysis_smooth_seconds": analysis.get("smooth_seconds"),
             "analysis_ignore_initial_seconds": analysis.get("ignore_initial_seconds"),
             "analysis_spo2_formula": analysis.get("spo2_formula"),
+            "pulso_previo": manual.get("pulso_previo"),
+            "pulso_final_pulsio": manual.get("pulso_final_pulsio"),
+            "pulso_final_fonendo": manual.get("pulso_final_fonendo"),
         }
         for key, value in values.items():
             if value is not None and not cap.row.get(key):
@@ -559,6 +574,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "BPM autocorr": fmt(_as_float(cap.value("bpm_autocorr")), 0, ""),
             "Oxigeno medio": fmt(_as_float(cap.value("spo2_pct")), 1, ""),
             "Ratio R": fmt(_as_float(cap.value("ratio_r")), 4, ""),
+            "Resp/min (experimental)": fmt(_as_float(_cap_first(cap, "resp_rate_rpm", "resp_min_exp")), 1, ""),
+            "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
             "Temp media": fmt(_as_float(cap.value("temp_c_media")), 1, ""),
             "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
             "Temp raw": fmt(_as_float(cap.value("temp_raw_ultima")), 0, ""),
@@ -578,6 +595,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Duracion": fmt(_as_float(cap.value("duracion_real_s")), 1, ""),
             "Hz": fmt(_as_float(cap.value("hz_real")), 1, ""),
             "Muestras": cap.value("muestras"),
+            "Pulso previo": cap.value("pulso_previo"),
+            "Pulso final": cap.value("pulso_final_pulsio"),
         }
 
     def select_capture(self):
@@ -657,6 +676,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         quality = _as_float(cap.value("calidad"))
         bpm = _as_float(cap.value("bpm"))
         spo2 = _as_float(cap.value("spo2_pct"))
+        resp = _as_float(_cap_first(cap, "resp_rate_rpm", "resp_min_exp"))
+        resp_quality = _as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp"))
         pi_ir = _as_float(cap.value("pi_ir_pct"))
         artifacts = _as_float(cap.value("artefactos_ir_pct"))
         saturation = _as_float(cap.value("saturation_pct"))
@@ -673,6 +694,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             warnings.append("Hay muestras saturadas: revisar potencia LED/rango ADC.")
         if np.isfinite(spo2):
             warnings.append("Oxigeno calculado de forma no calibrada; usar como orientacion tecnica, no como valor clinico.")
+        if np.isfinite(resp):
+            warnings.append("Respiraciones calculadas de forma experimental desde modulaciones lentas de PPG; validar con referencia externa.")
 
         if not warnings:
             warnings.append("Sin avisos tecnicos destacados en las metricas guardadas.")
@@ -691,6 +714,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
             ("Oxigeno medio", f"{fmt(spo2, 1, '-')} %"),
             ("Ratio R", fmt(_as_float(cap.value("ratio_r")), 5, "-")),
+            ("Respiraciones (experimental)", f"{fmt(resp, 1, '-')} resp/min | calidad {fmt(resp_quality, 0, '-')}"),
             ("Calidad", f"{fmt(quality, 1, '-')} | {cap.value('calidad_label') or '-'}"),
             ("Contacto", cap.value("contacto") or "-"),
             ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
@@ -698,12 +722,14 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
             ("Temperatura media / ultima", f"{fmt(_as_float(cap.value('temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
+            ("Pulso manual previo / final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
         ]
         rows = "".join(row(name, value) for name, value in fields)
         warning_items = "".join(f"<li>{html.escape(item)}</li>" for item in warnings)
         reason = cap.value("metrics_reason") or "-"
+        resp_reason = _cap_first(cap, "resp_reason", "resp_razon_exp") or "-"
         return f"""
         <h2>Toma seleccionada</h2>
         <p><b>Lectura rapida:</b> esta vista resume como fue la toma, que estimadores coincidieron, si hubo contacto util y que limitaciones tecnicas debe tener presentes quien revise los datos.</p>
@@ -711,6 +737,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         <h3>Avisos de interpretacion</h3>
         <ul>{warning_items}</ul>
         <p><b>Razon interna del calculo:</b> {html.escape(reason)}</p>
+        <p><b>Razon respiracion (experimental):</b> {html.escape(resp_reason)}</p>
         """
 
     def _params_html(self, cap: CaptureRecord) -> str:

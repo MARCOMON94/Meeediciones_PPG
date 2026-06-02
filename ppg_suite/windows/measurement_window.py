@@ -890,13 +890,13 @@ class PPGSuite(QtWidgets.QMainWindow):
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     def write_session_header(self):
-        header = ["session_id", "id", "base_name", "fecha", "hora", "modo", "condiciones_medida", "config_label", "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real", "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label", "spo2_pct", "ratio_r", "temp_c_media", "temp_c_ultima", "temp_raw_ultima", "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto", "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file"]
+        header = ["session_id", "id", "base_name", "fecha", "hora", "modo", "condiciones_medida", "config_label", "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real", "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label", "spo2_pct", "ratio_r", "resp_min_exp", "resp_calidad_exp", "resp_razon_exp", "temp_c_media", "temp_c_ultima", "temp_raw_ultima", "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto", "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file"]
         self.session_writer.writerow(header); self.session_handle.flush()
 
     def write_session_row(self, reason: str):
         st = self.state; m = st.metrics; now = datetime.now()
         temp = self.temperature_summary()
-        row = [st.session_id or st.base_name, st.crotal_id, st.base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.mode, st.measurement_condition, st.config_label, reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""), fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""), fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""), fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""), m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo, st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "", st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "", st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "", json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else ""]
+        row = [st.session_id or st.base_name, st.crotal_id, st.base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.mode, st.measurement_condition, st.config_label, reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""), fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""), fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""), fmt(m.resp_rate_rpm, 1, ""), fmt(m.resp_quality, 0, ""), m.resp_reason, fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""), fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""), m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo, st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "", st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "", st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "", json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else ""]
         self.session_writer.writerow(row); self.session_handle.flush()
 
     def tick(self):
@@ -942,6 +942,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"BPM: {fmt(m.bpm,0)}\n"
                 f"Calidad: {fmt(m.quality,0)} ({m.quality_label})\n"
                 f"SpO2 estimada: {fmt(m.spo2,1)} %\n"
+                f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
                 f"Temp: {fmt(temp['temp_c_last'],1)} °C\n"
                 f"Hz real: {fmt(m.hz,2)}\n"
                 f"Contacto: {m.contact_label}\n\n"
@@ -961,6 +962,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"BPM: {fmt(m.bpm,0)} | calidad {fmt(m.quality,0)} ({m.quality_label})\n"
                 f"  picos {fmt(m.bpm_peak,0)} | FFT {fmt(m.bpm_fft,0)} | autocorr {fmt(m.bpm_autocorr,0)}\n"
                 f"SpO2 estimada: {fmt(m.spo2,1)} % | R={fmt(m.ratio_r,4)}\n"
+                f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
                 f"Temp: {fmt(temp['temp_c_last'],1)} °C | media {fmt(temp['temp_c_mean'],1)} °C | raw {fmt(temp['temp_raw_last'],0)}\n"
                 f"Hz real: {fmt(m.hz,2)} | duración señal {fmt(m.duration_s,3)} s\n"
                 f"PI IR/RED: {fmt(m.pi_ir_pct,3)} / {fmt(m.pi_red_pct,3)} %\n"

@@ -8,6 +8,9 @@ import numpy as np
 from .models import AnalysisConfig, Metrics, SensorConfig
 
 
+RAW_DIGITAL_CEILING = 262143.0
+
+
 def estimate_hz(t: np.ndarray) -> float:
     if t.size < 2:
         return math.nan
@@ -286,12 +289,69 @@ def estimate_spo2(t: np.ndarray, red: np.ndarray, ir: np.ndarray, cfg: AnalysisC
     return spo2, float(ratio), "estimada no calibrada", ac_red, dc_red, ac_ir, dc_ir, pi_red, pi_ir
 
 
-def saturation_percent(red: np.ndarray, ir: np.ndarray, adc_range: int) -> float:
-    if red.size == 0 or ir.size == 0 or adc_range <= 0:
+def saturation_percent(red: np.ndarray, ir: np.ndarray, adc_range: int | None = None) -> float:
+    if red.size == 0 or ir.size == 0:
         return math.nan
-    limit = float(adc_range) * 0.98
+    limit = RAW_DIGITAL_CEILING * 0.98
     vals = np.concatenate([replace_nan_with_last(red), replace_nan_with_last(ir)])
     return float(np.mean(vals >= limit) * 100.0)
+
+
+def estimate_respiration(t: np.ndarray, ir: np.ndarray, hz: float | None = None) -> tuple[float, float, str]:
+    if t.size < 80:
+        return math.nan, 0.0, "respiracion experimental no estimable: pocas muestras"
+    hz_value = estimate_hz(t) if hz is None or not np.isfinite(hz) or hz <= 0 else float(hz)
+    if not np.isfinite(hz_value) or hz_value <= 0:
+        return math.nan, 0.0, "respiracion experimental no estimable: Hz invalido"
+    duration = float(t[-1] - t[0]) if t.size > 1 else math.nan
+    if not np.isfinite(duration) or duration < 20.0:
+        return math.nan, 0.0, "respiracion experimental no estimable: toma menor de 20 s"
+
+    yy = replace_nan_with_last(ir)
+    _tt, yy, hz_u = uniform_resample(t, yy, hz_value)
+    if yy.size < max(200, int(20 * hz_u)):
+        return math.nan, 0.0, "respiracion experimental no estimable: ventana corta tras remuestreo"
+
+    short_win = max(3, int(round(0.75 * hz_u)))
+    long_win = max(short_win + 2, int(round(8.0 * hz_u)))
+    envelope = moving_average_edge(yy, short_win)
+    baseline = moving_average_edge(envelope, long_win)
+    resp_sig = envelope - baseline
+    resp_sig = resp_sig - float(np.mean(resp_sig))
+    sd = float(np.std(resp_sig))
+    if sd <= 1e-9:
+        return math.nan, 0.0, "respiracion experimental no estimable: modulacion lenta plana"
+
+    win = np.hanning(resp_sig.size)
+    spectrum = np.abs(np.fft.rfft(resp_sig * win))
+    freqs = np.fft.rfftfreq(resp_sig.size, d=1.0 / hz_u)
+    resp_band = (freqs >= 0.10) & (freqs <= 1.00)
+    useful = (freqs >= 0.05) & (freqs <= 1.50)
+    if not np.any(resp_band):
+        return math.nan, 0.0, "respiracion experimental no estimable: sin banda respiratoria"
+    band = spectrum[resp_band]
+    fband = freqs[resp_band]
+    if band.size < 3 or float(np.max(band)) <= 0:
+        return math.nan, 0.0, "respiracion experimental no estimable: sin pico lento"
+
+    idx = int(np.argmax(band))
+    rpm = float(fband[idx] * 60.0)
+    sorted_band = np.sort(band)
+    peak = float(sorted_band[-1])
+    second = float(sorted_band[-2]) if sorted_band.size > 1 else 0.0
+    dominance = peak / (second + 1e-9)
+    band_power = float(np.sum(band**2))
+    useful_power = float(np.sum(spectrum[useful] ** 2)) if np.any(useful) else band_power
+    band_ratio = band_power / (useful_power + 1e-9)
+    cycles = duration * (rpm / 60.0)
+    quality = (
+        20.0 * min(dominance, 3.0) / 3.0
+        + 35.0 * band_ratio
+        + 25.0 * np.clip((cycles - 2.0) / 6.0, 0.0, 1.0)
+        + 20.0 * np.clip(duration / 45.0, 0.0, 1.0)
+    )
+    reason = f"experimental: pico lento {rpm:.1f} resp/min; dominancia={dominance:.2f}; banda={band_ratio:.2f}; ciclos~{cycles:.1f}"
+    return rpm, float(np.clip(quality, 0.0, 100.0)), reason
 
 
 def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sensor_cfg: SensorConfig, cfg: AnalysisConfig) -> Metrics:
@@ -363,6 +423,7 @@ def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sens
     m.pi_red_pct = pi_red
     m.pi_ir_pct = pi_ir
     m.saturation_pct = saturation_percent(rr, ii, sensor_cfg.adc)
+    m.resp_rate_rpm, m.resp_quality, m.resp_reason = estimate_respiration(tt, ii, m.hz)
 
     if not np.isfinite(m.dc_ir) or m.dc_ir <= 0:
         m.contact_label = "sin contacto"
