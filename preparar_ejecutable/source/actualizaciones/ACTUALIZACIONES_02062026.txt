@@ -1,0 +1,150 @@
+ACTUALIZACIONES 02062026
+========================
+
+Esta actualizacion mejora la revision de resultados guardados. Se centra en dos zonas: la pantalla `Estadisticas` y el nuevo analisis experimental de Fourier.
+
+1. Estadisticas mas clara
+- La pantalla `Estadisticas` mantiene la busqueda por sesiones y filtros.
+- Los modos ahora aparecen con nombres en espanol, igual que en el menu inicial:
+  - Medicion de campo
+  - Test de campo
+  - Solo temperatura
+  - Reajustes
+  - Configuraciones
+- En la tabla de sesiones se quitan `Buenas` y `BPM medio`.
+- Se anade `Animales`, que cuenta cuantos crotales/animales distintos hay en la sesion.
+- Se mantiene `Calidad media` para tener una referencia general de la sesion.
+
+2. Doble click para abrir archivos originales
+- Doble click en una sesion: abre el CSV original de la sesion.
+- Doble click en un raw/toma: abre el archivo raw original si existe.
+- Doble click en la pestana `Archivos`: abre exactamente el archivo seleccionado.
+- Desde `Archivos` se pueden abrir raw, procesado, resumen JSON, grafica, bloques y CSV de sesion.
+
+3. Raws / tomas con mas informacion
+- La segunda tabla pasa a verse como `Raws / tomas`.
+- Se amplian las columnas para mostrar mas medias y metricas guardadas:
+  - BPM medio
+  - BPM por picos
+  - BPM por FFT
+  - BPM por autocorrelacion
+  - oxigeno medio
+  - ratio R
+  - temperatura media, ultima y raw
+  - calidad
+  - contacto
+  - PI IR y PI RED
+  - artefactos IR y RED
+  - saturacion
+  - RED, IR, AVG, RATE, WIDTH y ADC
+  - duracion real, Hz real y muestras
+
+4. Resumen orientado a revision veterinaria
+- El resumen de la toma ya no muestra solo una lista basica.
+- Ahora incluye una lectura rapida de como fue la toma.
+- Se muestran estimadores de BPM, oxigeno, ratio R, calidad, contacto, PI, artefactos, saturacion, temperatura, duracion y Hz real.
+- Se anaden avisos de interpretacion:
+  - BPM no fiable
+  - calidad baja
+  - PI bajo
+  - artefactos altos
+  - saturacion
+  - oxigeno calculado de forma no calibrada
+- Tambien aparece la razon interna del calculo guardada en el resumen.
+
+5. Nueva pestana Parametros dispositivo
+- Debajo de resumen y graficas se anade `Parametros dispositivo`.
+- Muestra la configuracion exacta usada en el raw seleccionado:
+  - etiqueta de configuracion
+  - descripcion
+  - RED
+  - IR
+  - AVG
+  - RATE
+  - WIDTH
+  - ADC
+  - SKIP
+  - DEBUG
+  - confirmacion Arduino
+- Tambien muestra parametros de analisis:
+  - BPM minimo y maximo
+  - detrend
+  - suavizado
+  - segundos iniciales ignorados
+  - formula SpO2
+
+6. Archivos simplificado
+- La antigua pestana `Datos tecnicos` se sustituye por `Archivos`.
+- Se quitan las tablas internas de raw, procesado y bloques para evitar saturar la pantalla.
+- La grafica sigue usando esos archivos internamente.
+- Para ver los datos completos, basta con abrir el archivo original con doble click.
+
+7. Analisis experimental de Fourier
+- Se anade en el menu inicial el boton `Analisis experimental de Fourier`.
+- Permite seleccionar varios raw guardados y compararlos por configuracion.
+- Analiza cada configuracion con Fourier para ver cual separa mejor el pulso.
+- Muestra:
+  - puntuacion experimental
+  - veredicto
+  - BPM FFT IR
+  - BPM FFT RED
+  - BPM por autocorrelacion
+  - dominancia del pico
+  - energia en banda cardiaca
+  - SNR
+  - PI
+  - artefactos
+  - saturacion
+  - jitter
+- El detalle explica por que una configuracion puntua mejor o peor.
+
+8. SpO2 y respiracion en Fourier
+- En el analisis de Fourier se anade `SpO2 est.` y `Calidad SpO2`.
+- SpO2 se estima de forma experimental a partir del ratio RED/IR.
+- La calidad SpO2 tiene en cuenta:
+  - ratio R
+  - PI RED/IR
+  - artefactos
+  - saturacion
+  - duracion de la toma
+- Tambien se anade `Resp/min` y `Calidad Resp.`.
+- La respiracion se estima desde modulaciones lentas de la PPG.
+- La respiracion queda marcada como experimental y necesita tomas mas largas y pruebas con referencia.
+
+9. Documento para Julian
+- Se crea un documento explicativo para entender el analisis experimental de Fourier.
+- Explica que hace la ventana, que formulas usa, como se calcula la puntuacion y como interpretar resultados.
+- Incluye bibliografia tecnica sobre FFT, PPG, MAX30102 y pulsioximetria.
+
+10. Pausa entre configuraciones con pulso manual
+- En el modo `Configuraciones`, al terminar una configuracion se pausa la captura antes de pasar a la siguiente.
+- Aparece una ventana para introducir la lectura del pulsioximetro.
+- Ese mismo valor se guarda como:
+  - pulso final de la configuracion que acaba
+  - pulso previo de la configuracion siguiente
+- El tiempo que se tarda en rellenar esa ventana no consume tiempo de la siguiente configuracion.
+- Al terminar la ultima configuracion tambien se pregunta el pulso final.
+- En `Estadisticas` se anaden columnas para ver pulso previo y pulso final de cada raw/toma.
+
+11. Unificacion de SpO2 y respiraciones experimentales
+- Se unifica el criterio de saturacion usado por Estadisticas, Fourier, Medicion de campo, Reajustes y Configuraciones.
+- La saturacion ADC se calcula ahora siempre contra el techo digital bruto de 18 bits del MAX3010x, usando como aviso el 98 % de 262143.
+- Esto evita que una misma muestra se juzgue con criterios distintos segun el rango ADC elegido en la configuracion.
+- Se centraliza la estimacion de respiraciones en una funcion comun.
+- Las tomas nuevas guardan:
+  - respiraciones por minuto experimentales
+  - calidad de respiracion experimental
+  - razon tecnica del calculo
+- En las pantallas se muestra como `Respiraciones (experimental)` para dejar claro que todavia requiere validacion externa.
+- Fourier y Estadisticas leen el mismo calculo, de forma que ya no hablan idiomas distintos para respiracion.
+
+Recomendacion de uso
+--------------------
+
+- Para revisar una sesion, empezar en `Estadisticas`.
+- Mirar primero la calidad, contacto, PI, artefactos, saturacion y duracion.
+- Usar doble click para abrir el raw o el resumen original cuando haga falta.
+- Para comparar configuraciones, usar `Analisis experimental de Fourier`.
+- Para respiracion, hacer tomas mas largas. Con tomas cortas puede salir como no estimable.
+- En `Configuraciones`, tomar la lectura del pulsioximetro en cada pausa entre configuraciones.
+- Recordar que SpO2 y respiracion son experimentales y deben validarse con referencia externa antes de usarlos como criterio definitivo.

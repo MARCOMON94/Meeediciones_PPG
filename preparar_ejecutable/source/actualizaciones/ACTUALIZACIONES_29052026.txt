@@ -1,0 +1,110 @@
+ACTUALIZACIONES 29052026
+========================
+
+Esta actualizacion deja el programa mas preparado para trabajo de campo y para pruebas de configuracion sin tener que tocar archivos ni abrir Git manualmente.
+
+1. Arranque del programa
+- El programa se sigue abriendo desde `ARRANCAR_PPG.cmd`.
+- Al arrancar, intenta actualizarse desde Git automaticamente.
+- Si no puede actualizarse, avisa y abre la version que ya esta en el ordenador.
+- Tambien revisa si faltan librerias de Python y las instala si hace falta.
+
+2. Menu inicial mas simple
+- Ahora el boton principal es `Medicion de campo`.
+- Ese modo es el recomendado para una toma normal y rapida.
+- Debajo aparecen botones mas pequenos para modos especiales:
+  - `Test de campo`
+  - `Solo temperatura`
+  - `Reajustes`
+  - `Configuraciones`
+- Se anade un boton pequeno de `Ultimas actualizaciones`.
+- Ese boton lee el ultimo archivo `ACTUALIZACIONES_*.txt` dentro de la carpeta `actualizaciones`.
+
+3. Medicion de campo
+- Es el modo sencillo para tomar datos normales.
+- Muestra lo importante: BPM, calidad, temperatura, contacto y archivo raw.
+- Tiene menos botones visibles para evitar tocar cosas por error.
+
+4. Test de campo
+- Es parecido a Medicion de campo, pero con mas opciones.
+- Sirve para probar parametros, ver graficas y anadir notas sobre la toma.
+- La configuracion avanzada queda plegada para que no moleste.
+
+5. Solo temperatura
+- Modo para registrar solo la temperatura del NTC.
+- No muestra controles de PPG innecesarios.
+- Guarda temperatura calculada y lectura raw del NTC.
+
+6. Reajustes
+- Modo avanzado para calibrar y revisar la senal con mas detalle.
+- Sirve para tocar LEDs, promediado, ADC, ventanas de calculo y diagnostico.
+- Se quito el boton duplicado de solo temperatura para no mezclar modos.
+
+7. Configuraciones
+- Se fusionan los modos de 12 y 64 configuraciones en un unico modo.
+- Al abrirlo aparece una tabla editable tipo Excel.
+- Permite elegir cuantas configuraciones usar y crear la cuadricula automaticamente.
+- Permite copiar y pegar datos desde Excel.
+- Incluye boton para cargar plantilla de 12 configuraciones recomendadas.
+- Incluye boton para cargar plantilla de 64 configuraciones.
+- Cada fila de la tabla es una configuracion.
+- Columnas disponibles:
+  - `label`
+  - `red`
+  - `ir`
+  - `avg`
+  - `rate`
+  - `width`
+  - `adc`
+  - `skip`
+  - `debug`
+  - `descripcion`
+- Al iniciar, el programa recorre las filas de la tabla.
+- Cada dato guardado indica que configuracion estaba activa en ese momento.
+- Sirve para crear pruebas personalizadas sin tocar codigo.
+
+8. Aviso de configuracion Arduino
+- Antes de empezar una toma, el programa comprueba si Arduino ha confirmado la configuracion.
+- Si la configuracion que tiene Arduino no coincide con la que aparece en pantalla, salta un aviso.
+- En ese aviso se puede aplicar la configuracion correcta antes de continuar.
+- Esto ayuda a evitar tomas hechas con una configuracion distinta a la esperada.
+
+9. Puerto Arduino
+- El programa intenta detectar y conectar automaticamente el Arduino.
+- Se mejoro para que no elija puertos Bluetooth por error.
+- Si aun asi no conecta, sigue estando el boton `Conectar` para hacerlo manualmente.
+
+10. Rueda del raton
+- Se bloqueo la rueda del raton en varios desplegables y campos numericos.
+- Esto evita cambiar parametros sin querer al hacer scroll.
+
+11. Datos guardados
+- Los resultados nuevos se guardan dentro de una carpeta unica: `resultados`.
+- El boton `Abrir resultados` abre esa carpeta, no la carpeta del codigo.
+- Los raw ahora guardan mas informacion:
+  - crotal
+  - modo de medicion
+  - condiciones de medida
+  - configuracion activa
+  - RED e IR raw
+  - temperatura
+  - parametros del sensor
+  - si Arduino confirmo la configuracion
+- Esto facilita revisar despues que se hizo exactamente en cada toma.
+
+12. Botones comunes
+- Los modos mantienen botones comunes para:
+  - iniciar
+  - parar
+  - abrir resultados
+  - volver al menu inicial
+- Se quitaron botones de navegacion entre modos dentro de las ventanas.
+- Para cambiar de modo, se vuelve al menu principal.
+
+Recomendacion de uso
+--------------------
+
+- Para una toma normal: `Medicion de campo`.
+- Para probar y ajustar: `Test de campo` o `Reajustes`.
+- Para temperatura solamente: `Solo temperatura`.
+- Para comparar o crear pruebas de configuracion: `Configuraciones`.

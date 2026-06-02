@@ -31,19 +31,6 @@ build/
 *.bin
 *.eep
 
-# Empaquetado Windows
-dist/
-*.spec
-*.exe
-*.zip
-!preparar_ejecutable/source/*.spec
-mtestv2_packaging/
-preparar_ejecutable/.build_venv/
-preparar_ejecutable/source/build/
-preparar_ejecutable/source/dist/
-preparar_ejecutable/entrega/
-preparar_ejecutable/*.zip
-
 # Sistema
 .DS_Store
 Thumbs.db
