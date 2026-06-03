@@ -100,6 +100,7 @@ if not exist ".env" (
     > ".env" echo PROJECT_DIR=%CD%
     >> ".env" echo PYTHON_REL=.venv\Scripts\python.exe
     >> ".env" echo MAIN_FILE=main.py
+    >> ".env" echo AUTO_UPDATE_GIT=1
 
     echo [OK] .env creado.
 ) else (

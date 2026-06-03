@@ -355,6 +355,18 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 - Ahora AVG2 se prueba antes como suavizado intermedio cuando ya hay una candidata razonable pero SpO2/PI siguen sin ser fiables.
 - AVG4 queda reservado para ruido o artefactos mas claros, porque puede suavizar demasiado y reducir dinamica util.
 
+22. Arrancador Git no interactivo
+- Se ajusta `ARRANCAR_PPG.cmd` para que la actualizacion por Git no bloquee el arranque con preguntas de tipo `y/n`.
+- Antes el lanzador ejecutaba `git pull --ff-only` directamente.
+- En algunos Windows, si Git encontraba archivos bloqueados, cambios locales, objetos pendientes de mantenimiento o una situacion no limpia, podia quedarse preguntando en consola.
+- Ahora el lanzador:
+  - permite desactivar la actualizacion poniendo `AUTO_UPDATE_GIT=0` en `.env`
+  - desactiva preguntas interactivas de Git
+  - evita mantenimiento automatico de objetos durante el arranque
+  - comprueba si hay cambios locales antes de actualizar
+  - si no puede actualizar limpio, omite Git y abre el programa con la version local
+- Esto esta pensado para que el ordenador de Julian no se quede atrapado en mensajes repetidos del actualizador.
+
 Recomendacion de uso
 --------------------
 

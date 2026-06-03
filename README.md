@@ -47,6 +47,7 @@ Ejemplo de `.env`:
 PROJECT_DIR=C:\Users\lol32\Documents\GitHub\mtestv2
 PYTHON_REL=.venv\Scripts\python.exe
 MAIN_FILE=main.py
+AUTO_UPDATE_GIT=1
 ```
 
 ## Arranque recomendado
@@ -62,10 +63,11 @@ El lanzador:
 - Lee `.env` para localizar el proyecto, Python y archivo principal.
 - Entra en `PROJECT_DIR`.
 - Intenta actualizar el repositorio con `git pull --ff-only` si Git esta disponible.
+- La actualizacion se puede desactivar poniendo `AUTO_UPDATE_GIT=0` en `.env`.
 - Comprueba dependencias y las instala si faltan.
 - Ejecuta `main.py`.
 
-`git pull --ff-only` no borra cambios locales. Si Git no puede actualizar de forma limpia, muestra aviso y continua con la version local.
+`git pull --ff-only` no borra cambios locales. Si Git no puede actualizar de forma limpia, muestra aviso y continua con la version local. El lanzador evita preguntas interactivas de Git para no quedarse bloqueado en mensajes `y/n`.
 
 Tambien se puede arrancar manualmente:
 

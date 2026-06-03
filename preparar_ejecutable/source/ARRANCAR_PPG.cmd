@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 
 REM =====================================================
@@ -19,6 +19,7 @@ REM Valores por defecto
 set "PROJECT_DIR="
 set "PYTHON_REL=.venv\Scripts\python.exe"
 set "MAIN_FILE=main.py"
+set "AUTO_UPDATE_GIT=1"
 
 REM Comprobar que existe .env
 if not exist "%ENV_FILE%" (
@@ -32,6 +33,7 @@ if not exist "%ENV_FILE%" (
     echo PROJECT_DIR=C:\RUTA\A\mtestv2
     echo PYTHON_REL=.venv\Scripts\python.exe
     echo MAIN_FILE=main.py
+    echo AUTO_UPDATE_GIT=0
     echo.
     goto FIN
 )
@@ -41,6 +43,7 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%ENV_FILE%") do (
     if /I "%%A"=="PROJECT_DIR" set "PROJECT_DIR=%%B"
     if /I "%%A"=="PYTHON_REL" set "PYTHON_REL=%%B"
     if /I "%%A"=="MAIN_FILE" set "MAIN_FILE=%%B"
+    if /I "%%A"=="AUTO_UPDATE_GIT" set "AUTO_UPDATE_GIT=%%B"
 )
 
 REM Validar PROJECT_DIR
@@ -51,6 +54,7 @@ if "%PROJECT_DIR%"=="" (
     echo PROJECT_DIR=C:\RUTA\A\mtestv2
     echo PYTHON_REL=.venv\Scripts\python.exe
     echo MAIN_FILE=main.py
+    echo AUTO_UPDATE_GIT=0
     echo.
     goto FIN
 )
@@ -59,6 +63,7 @@ REM Quitar posibles comillas si alguien las puso en el .env
 set "PROJECT_DIR=%PROJECT_DIR:"=%"
 set "PYTHON_REL=%PYTHON_REL:"=%"
 set "MAIN_FILE=%MAIN_FILE:"=%"
+set "AUTO_UPDATE_GIT=%AUTO_UPDATE_GIT:"=%"
 
 REM Comprobar carpeta del proyecto
 if not exist "%PROJECT_DIR%" (
@@ -78,6 +83,9 @@ set "REQUIREMENTS_PATH=%PROJECT_DIR%\requirements.txt"
 
 REM Asegurar UTF-8 tambien dentro de Python
 set "PYTHONUTF8=1"
+REM Evitar que Git haga preguntas interactivas y bloquee el arranque.
+set "GIT_TERMINAL_PROMPT=0"
+set "GIT_ASKPASS=echo"
 
 REM Comprobar Python del entorno virtual
 if not exist "%PYTHON_EXE%" (
@@ -106,20 +114,43 @@ if not exist "%MAIN_PATH%" (
 )
 
 REM Actualizar repositorio si Git esta disponible
-if exist "%PROJECT_DIR%\.git" (
+if /I "%AUTO_UPDATE_GIT%"=="0" (
+    echo [INFO] Actualizacion por Git desactivada en .env ^(AUTO_UPDATE_GIT=0^).
+    echo.
+) else if exist "%PROJECT_DIR%\.git" (
     where git >nul 2>nul
     if not errorlevel 1 (
-        echo [INFO] Actualizando repositorio con git pull --ff-only...
-        git pull --ff-only
-        if errorlevel 1 (
+        echo [INFO] Comprobando si hay cambios locales antes de actualizar...
+        git -c gc.auto=0 -c maintenance.auto=false diff --quiet >nul 2>nul
+        set "GIT_DIRTY_WORKTREE=!errorlevel!"
+        git -c gc.auto=0 -c maintenance.auto=false diff --cached --quiet >nul 2>nul
+        set "GIT_DIRTY_INDEX=!errorlevel!"
+
+        if not "!GIT_DIRTY_WORKTREE!"=="0" (
             echo.
-            echo [WARN] No se pudo actualizar automaticamente con Git.
-            echo [WARN] El programa continuara con la version local.
-            echo [WARN] git pull --ff-only no borra cambios locales; si una actualizacion no es limpia, Git se detiene.
+            echo [WARN] Hay cambios locales en el repositorio. Se omite actualizacion automatica.
+            echo [WARN] El programa arrancara con la version local para no tocar archivos de este ordenador.
             echo.
         ) else (
-            echo [OK] Repositorio actualizado.
-            echo.
+            if not "!GIT_DIRTY_INDEX!"=="0" (
+                echo.
+                echo [WARN] Hay cambios preparados en Git. Se omite actualizacion automatica.
+                echo [WARN] El programa arrancara con la version local.
+                echo.
+            ) else (
+                echo [INFO] Actualizando repositorio sin preguntas interactivas...
+                git -c gc.auto=0 -c maintenance.auto=false pull --ff-only --no-edit <nul
+                if errorlevel 1 (
+                    echo.
+                    echo [WARN] No se pudo actualizar automaticamente con Git.
+                    echo [WARN] El programa continuara con la version local.
+                    echo [WARN] Si Git tenia una pregunta de y/n, queda evitada para no bloquear el arranque.
+                    echo.
+                ) else (
+                    echo [OK] Repositorio actualizado.
+                    echo.
+                )
+            )
         )
     ) else (
         echo [WARN] Git no esta disponible en PATH. Se omite actualizacion automatica.
