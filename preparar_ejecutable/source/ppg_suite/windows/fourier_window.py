@@ -526,14 +526,17 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
             )
             if np.isfinite(diff_fft_ref):
                 if diff_fft_ref <= 5:
-                    score += 22
-                    reasons.append(f"FFT IR coincide con referencia: diferencia {diff_fft_ref:.1f} BPM")
+                    bonus = max(13.0, 28.0 - 3.0 * diff_fft_ref)
+                    score += bonus
+                    reasons.append(f"FFT IR coincide con referencia: diferencia {diff_fft_ref:.1f} BPM; bonus cercania {bonus:.1f}")
                 elif diff_fft_ref <= 10:
-                    score += 12
-                    reasons.append(f"FFT IR cerca de referencia: diferencia {diff_fft_ref:.1f} BPM")
+                    bonus = max(7.0, 13.0 - 1.2 * (diff_fft_ref - 5.0))
+                    score += bonus
+                    reasons.append(f"FFT IR cerca de referencia: diferencia {diff_fft_ref:.1f} BPM; bonus cercania {bonus:.1f}")
                 elif diff_fft_ref <= 18:
-                    score += 2
-                    reasons.append(f"FFT IR algo separada de referencia: diferencia {diff_fft_ref:.1f} BPM")
+                    bonus = max(0.0, 5.0 - 0.6 * (diff_fft_ref - 10.0))
+                    score += bonus
+                    reasons.append(f"FFT IR algo separada de referencia: diferencia {diff_fft_ref:.1f} BPM; bonus cercania {bonus:.1f}")
                 else:
                     score -= min(28.0, diff_fft_ref * 0.9)
                     reasons.append(f"FFT IR lejos de referencia: diferencia {diff_fft_ref:.1f} BPM")

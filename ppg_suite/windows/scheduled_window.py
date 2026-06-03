@@ -656,6 +656,9 @@ class ScheduledConfigWindow(PPGSuite):
             f"Config Arduino: {self.last_config_ack} | {self.last_config_line[:80]}\n\n"
             f"Muestras: {len(st.t)} | descartadas: {st.discarded_lines}\n"
             f"BPM: {fmt(m.bpm,0)} | calidad {fmt(m.quality,0)} ({m.quality_label})\n"
+            f"SpO2 estimada: {fmt(m.spo2,1)} % | R={fmt(m.ratio_r,4)}\n"
+            f"PI IR/RED: {fmt(m.pi_ir_pct,3)} / {fmt(m.pi_red_pct,3)} %\n"
+            f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} % | Saturacion ADC: {fmt(m.saturation_pct,1)} %\n"
             f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
             f"Temp: {fmt(temp['temp_c_last'],1)} °C | raw {fmt(temp['temp_raw_last'],0)}\n"
             f"Contacto: {m.contact_label}\n"
@@ -973,17 +976,33 @@ class Experiment3MWindow(ScheduledConfigWindow):
     def _should_stop_experiment(self) -> bool:
         if len(self.experiment_history) < 4:
             return False
-        best = max(self.experiment_history, key=lambda item: float(item.get("score", 0.0)))
+        best = max(self.experiment_history, key=self._experiment_rank_key)
         diff = float(best.get("diff", math.nan))
         quality = float(best.get("quality", 0.0))
         spo2_ready = bool(best.get("spo2_ready", 0))
         saturation = float(best.get("saturation", math.nan))
         return math.isfinite(diff) and diff <= 5.0 and quality >= 55.0 and spo2_ready and (not math.isfinite(saturation) or saturation <= 0.5)
 
+    def _experiment_rank_key(self, item: dict[str, float | str | int]) -> tuple[float, float, float, float, float, float]:
+        score = float(item.get("score", 0.0))
+        diff = float(item.get("diff", math.nan))
+        quality = float(item.get("quality", 0.0))
+        pi_ir = float(item.get("pi_ir", math.nan))
+        pi_red = float(item.get("pi_red", math.nan))
+        saturation = float(item.get("saturation", math.nan))
+        return (
+            score,
+            -diff if math.isfinite(diff) else -999.0,
+            quality,
+            pi_ir if math.isfinite(pi_ir) else -1.0,
+            pi_red if math.isfinite(pi_red) else -1.0,
+            -saturation if math.isfinite(saturation) else 0.0,
+        )
+
     def _best_experiment_result(self) -> dict[str, float | str | int] | None:
         if not self.experiment_history:
             return None
-        return max(self.experiment_history, key=lambda item: float(item.get("score", 0.0)))
+        return max(self.experiment_history, key=self._experiment_rank_key)
 
     def _config_key(self, cfg: SensorConfig) -> tuple[int, int, int, int]:
         return cfg.red, cfg.ir, cfg.avg, cfg.adc
@@ -1234,7 +1253,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
 
             draw_text("Historial de tramos", 15, True)
             rows = []
-            history = sorted(self.experiment_history, key=lambda item: float(item.get("score", 0.0)), reverse=True)
+            history = sorted(self.experiment_history, key=self._experiment_rank_key, reverse=True)
             for idx, item in enumerate(history, start=1):
                 rows.append([
                     str(idx),

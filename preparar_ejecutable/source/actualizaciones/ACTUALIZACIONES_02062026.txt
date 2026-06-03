@@ -327,6 +327,30 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
   - cancelar la toma
 - Esto evita olvidos, porque el pulso manual ahora pesa en la comparacion con el sensor.
 
+21. Revision de SpO2 en Experimento 3M
+- Se confirma que Experimento 3M calculaba SpO2 y ratio R en los resumenes guardados.
+- Se corrige la pantalla viva de `Configuraciones` y `Experimento 3M` para que muestre tambien:
+  - SpO2 estimada
+  - ratio R
+  - PI IR/RED
+  - artefactos IR/RED
+  - saturacion ADC
+- Esto permite distinguir durante la medicion entre:
+  - SpO2 no calculada
+  - SpO2 calculada pero no fiable por PI bajo
+  - saturacion ADC del sensor
+- El criterio de Experimento 3M sigue considerando la SpO2 como experimental y solo la marca como usable cuando RED e IR tienen suficiente componente pulsatil.
+- Cuando varias configuraciones empatan en puntuacion, la mejor candidata ya no se elige solo por orden de aparicion.
+- El desempate usa, por este orden:
+  - menor diferencia frente a pulso manual
+  - mayor calidad de senal
+  - mayor PI IR/RED
+  - menor saturacion ADC
+- Se ajusta tambien `Analisis experimental de Fourier` para que la cercania al pulso manual sea gradual.
+- Antes, todas las configuraciones dentro de 5 BPM de diferencia recibian casi el mismo bonus.
+- Ahora una diferencia de 0-1 BPM pesa mas que una diferencia de 3-5 BPM, porque el pulsioximetro/fonendo es la referencia externa principal.
+- Esto evita que una configuracion con una FFT ligeramente mas bonita gane a otra que clava mucho mejor el pulso manual.
+
 Recomendacion de uso
 --------------------
 
