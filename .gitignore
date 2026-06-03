@@ -11,17 +11,7 @@ logs/
 *.log
 
 # Resultados generados
-resultados/
-raw/
-processed/
-sessions/
-figures/
-screenshots/
-reports/
-configs/
-*.csv
-*.png
-*.json
+
 
 # Arduino / VS Code
 .vscode/
