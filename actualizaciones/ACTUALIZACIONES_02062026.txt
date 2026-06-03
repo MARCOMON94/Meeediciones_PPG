@@ -350,6 +350,10 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 - Antes, todas las configuraciones dentro de 5 BPM de diferencia recibian casi el mismo bonus.
 - Ahora una diferencia de 0-1 BPM pesa mas que una diferencia de 3-5 BPM, porque el pulsioximetro/fonendo es la referencia externa principal.
 - Esto evita que una configuracion con una FFT ligeramente mas bonita gane a otra que clava mucho mejor el pulso manual.
+- Se ajusta la exploracion de AVG en `Experimento 3M`.
+- Antes AVG tendia a quedarse en 1 salvo que hubiese artefactos altos; como en varias pruebas los artefactos salian a 0 %, AVG2 se probaba tarde o casi por agotamiento del espacio de busqueda.
+- Ahora AVG2 se prueba antes como suavizado intermedio cuando ya hay una candidata razonable pero SpO2/PI siguen sin ser fiables.
+- AVG4 queda reservado para ruido o artefactos mas claros, porque puede suavizar demasiado y reducir dinamica util.
 
 Recomendacion de uso
 --------------------

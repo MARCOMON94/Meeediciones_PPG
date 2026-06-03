@@ -1020,6 +1020,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
             return make_3m_step(index + 1, cfg, "primera configuracion adaptativa"), "Primera configuracion del protocolo 3M."
         last = self.experiment_history[-1]
         best = self._best_experiment_result() or last
+        tried_avgs = {int(item.get("avg", 0)) for item in self.experiment_history}
         target_brightness = None
         target_avg = None
         target_adc = None
@@ -1049,6 +1050,9 @@ class Experiment3MWindow(ScheduledConfigWindow):
         if math.isfinite(artifact) and artifact > 8:
             target_avg = 4
             reason_bits.append("usa AVG4 porque hay artefactos/ruido")
+        elif not spo2_ready and len(self.experiment_history) >= 3 and 2 not in tried_avgs and float(best.get("score", 0.0)) >= 65:
+            target_avg = 2
+            reason_bits.append("prueba AVG2 como suavizado intermedio sin perder tanta dinamica como AVG4")
         elif float(best.get("score", 0.0)) >= 55:
             target_avg = int(best.get("avg", 1))
             reason_bits.append("mantiene el AVG de la mejor candidata provisional")
