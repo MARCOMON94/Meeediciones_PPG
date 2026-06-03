@@ -22,10 +22,46 @@ from ..processing import (
     estimate_hz,
     processed_ppg,
     replace_nan_with_last,
+    robust_quality_screen,
     saturation_percent,
     uniform_resample,
 )
 from ..utils import fmt, now_stamp, open_folder
+
+HEADER_TOOLTIPS = {
+    "Usar": "Marca este raw para incluirlo en el analisis comparativo.",
+    "Animal": "Identificador del animal o sujeto guardado en el raw.",
+    "Fecha": "Fecha detectada a partir del nombre o metadatos del raw.",
+    "Filas": "Numero de filas o muestras aproximadas del archivo raw.",
+    "Configuraciones": "Resumen de las configuraciones presentes en el raw.",
+    "Archivo": "Nombre del archivo raw analizado.",
+    "Puntuacion": "Puntuacion comparativa interna de 0 a 100. Combina cercania a referencia, Fourier, acuerdo entre estimadores, cribado, PI y artefactos.",
+    "Veredicto": "Lectura rapida de la puntuacion: mejor candidata, buena, usable con cautela o no recomendable.",
+    "Configuracion": "Etiqueta de configuracion del sensor usada en ese tramo.",
+    "BPM ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
+    "Dif FFT-ref": "Diferencia absoluta entre BPM por Fourier IR y BPM de referencia manual.",
+    "BPM FFT IR": "BPM estimado por transformada de Fourier sobre la senal IR tras cribado robusto.",
+    "BPM autocorr": "BPM estimado por autocorrelacion; sirve como comprobacion temporal de repeticion del pulso.",
+    "BPM Hilbert": "BPM estimado por fase instantanea de Hilbert. Es apoyo temporal, no veredicto unico.",
+    "BPM FFT RED": "BPM estimado por Fourier sobre canal RED para comprobar coherencia con IR.",
+    "Hilbert env. CV %": "Coeficiente de variacion de la envolvente Hilbert. Menor suele indicar amplitud de pulso mas estable.",
+    "Hilbert calidad": "Calidad interna de Hilbert, 0-100, basada en envolvente y fase instantanea.",
+    "Dominancia": "Relacion entre el pico principal y el segundo pico en banda cardiaca. Mayor indica pico mas claro.",
+    "Banda": "Proporcion de energia util concentrada en la banda cardiaca esperada.",
+    "SNR dB": "Relacion senal-ruido del pico Fourier IR en decibelios.",
+    "PI IR %": "Indice de perfusion IR: AC/DC. Indica cuanto pulso visible hay respecto al nivel de luz recibido.",
+    "Artefactos %": "Porcentaje de muestras IR marcadas como artefacto por el cribado.",
+    "Retenido %": "Porcentaje de muestras que entran al calculo tras estabilizacion inicial y descarte robusto.",
+    "Descartado %": "Porcentaje de muestras descartadas por outliers, saltos o valores invalidos.",
+    "SpO2 est.": "SpO2 experimental estimada desde RED/IR. No esta calibrada clinicamente.",
+    "Calidad SpO2": "Confianza interna de la SpO2 experimental, 0-100; no equivale a validacion clinica.",
+    "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG.",
+    "Calidad Resp.": "Confianza interna de la estimacion respiratoria experimental.",
+    "Saturacion %": "Porcentaje de muestras cerca del techo digital ADC.",
+    "Jitter %": "Variabilidad relativa del intervalo entre muestras. Alto jitter puede distorsionar FFT/Hilbert.",
+    "Duracion": "Duracion del tramo efectivamente analizado.",
+    "Muestras": "Numero de muestras efectivamente analizadas.",
+}
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -72,6 +108,15 @@ def _as_int(value: str) -> int:
 
 def _esc(value: object) -> str:
     return html.escape(str(value if value is not None else ""))
+
+
+def _apply_header_tooltips(table: QtWidgets.QTableWidget, tooltips: dict[str, str]):
+    for col in range(table.columnCount()):
+        item = table.horizontalHeaderItem(col)
+        if item is None:
+            continue
+        header = item.text()
+        item.setToolTip(tooltips.get(header, header))
 
 
 def _load_manual_refs(path: Path, row0: dict[str, str]) -> tuple[float, float, float, float, int]:
@@ -163,6 +208,8 @@ class SpectrumResult:
     pi_red_pct: float
     artifact_ir_pct: float
     artifact_red_pct: float
+    retained_pct: float
+    discarded_pct: float
     saturation_pct: float
     agreement_bpm: float
     score: float
@@ -440,6 +487,9 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         if t.size < 40:
             continue
         row0 = group[0]
+        t, red, ir, retained_pct, discarded_pct, screen_reason = robust_quality_screen(t, red, ir, min_samples=100)
+        if t.size < 40:
+            continue
         hz = estimate_hz(t)
         duration = float(t[-1] - t[0]) if t.size > 1 else math.nan
         diffs = np.diff(t)
@@ -487,9 +537,14 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         hilbert_quality = float(hilbert_ir.get("quality", 0.0))
         envelope_cv = float(hilbert_ir.get("envelope_cv_pct", math.nan))
         phase_iqr = float(hilbert_ir.get("phase_iqr_bpm", math.nan))
-        candidates = [v for v in [bpm_ir, bpm_red] if np.isfinite(v)]
-        ac_reliable = np.isfinite(bpm_ac) and cfg.bpm_min <= bpm_ac <= cfg.bpm_max and q_ac >= 20.0
-        hilbert_reliable = np.isfinite(bpm_hilbert) and hilbert_quality >= 35.0
+        candidates = [bpm_ir] if np.isfinite(bpm_ir) else []
+        red_ref_ok = not np.isfinite(pulse_ref_avg) or _ref_diff(bpm_red, pulse_ref_avg) <= 18.0
+        ac_ref_ok = not np.isfinite(pulse_ref_avg) or _ref_diff(bpm_ac, pulse_ref_avg) <= 18.0
+        hilbert_ref_ok = not np.isfinite(pulse_ref_avg) or _ref_diff(bpm_hilbert, pulse_ref_avg) <= 18.0
+        if np.isfinite(bpm_red) and red_ref_ok:
+            candidates.append(bpm_red)
+        ac_reliable = np.isfinite(bpm_ac) and cfg.bpm_min <= bpm_ac <= cfg.bpm_max and q_ac >= 20.0 and ac_ref_ok
+        hilbert_reliable = np.isfinite(bpm_hilbert) and hilbert_quality >= 35.0 and hilbert_ref_ok
         if ac_reliable:
             candidates.append(bpm_ac)
         if hilbert_reliable:
@@ -502,12 +557,16 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
             reasons.append(leading_gap_reason)
         if chunk_reason:
             reasons.append(chunk_reason)
+        if screen_reason:
+            reasons.append(screen_reason)
         if np.isfinite(bpm_ir):
             reasons.append(f"FFT IR detecta {bpm_ir:.1f} BPM")
         else:
             reasons.append(str(fft_ir.get("reason", "FFT IR no valido")))
         if np.isfinite(bpm_red):
             reasons.append(f"FFT RED detecta {bpm_red:.1f} BPM")
+            if not red_ref_ok:
+                reasons.append(f"FFT RED se excluye del acuerdo por alejarse de la referencia ({_ref_diff(bpm_red, pulse_ref_avg):.1f} BPM)")
         if ac_reliable:
             reasons.append(f"autocorrelacion IR {bpm_ac:.1f} BPM ({reason_ac})")
         elif np.isfinite(bpm_ac):
@@ -526,11 +585,11 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
             )
             if np.isfinite(diff_fft_ref):
                 if diff_fft_ref <= 5:
-                    bonus = max(13.0, 28.0 - 3.0 * diff_fft_ref)
+                    bonus = max(22.0, 35.0 - 2.0 * diff_fft_ref)
                     score += bonus
                     reasons.append(f"FFT IR coincide con referencia: diferencia {diff_fft_ref:.1f} BPM; bonus cercania {bonus:.1f}")
                 elif diff_fft_ref <= 10:
-                    bonus = max(7.0, 13.0 - 1.2 * (diff_fft_ref - 5.0))
+                    bonus = max(10.0, 20.0 - 1.6 * (diff_fft_ref - 5.0))
                     score += bonus
                     reasons.append(f"FFT IR cerca de referencia: diferencia {diff_fft_ref:.1f} BPM; bonus cercania {bonus:.1f}")
                 elif diff_fft_ref <= 18:
@@ -551,7 +610,7 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                 score += 4
                 reasons.append(f"acuerdo moderado entre estimadores: diferencia {agreement:.1f} BPM")
             else:
-                score -= 18
+                score -= 24
                 reasons.append(f"estimadores discrepantes: diferencia {agreement:.1f} BPM")
 
         if np.isfinite(pi_ir):
@@ -562,7 +621,7 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                 score += 2
                 reasons.append(f"PI IR bajo pero aprovechable ({pi_ir:.3f} %)")
             else:
-                score -= 12
+                score -= 5
                 reasons.append(f"PI IR muy bajo ({pi_ir:.3f} %): pulso poco visible")
 
         if hilbert_quality >= 70:
@@ -572,13 +631,23 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
             score += 2
             reasons.append(f"Hilbert aceptable ({hilbert_quality:.0f}/100): util como apoyo, no como veredicto unico")
         else:
-            score -= 6
+            score -= 3
             reasons.append(f"Hilbert debil ({hilbert_quality:.0f}/100): envolvente/fase inestable")
 
         artifact = artifact_ir
         if np.isfinite(artifact):
             score -= min(25.0, artifact * 1.8)
             reasons.append(f"artefactos IR {artifact:.1f} %")
+        if np.isfinite(discarded_pct):
+            if discarded_pct <= 5.0:
+                score += 4
+                reasons.append(f"cribado estable: retenido {retained_pct:.1f} %")
+            elif discarded_pct <= 20.0:
+                score -= min(8.0, discarded_pct * 0.25)
+                reasons.append(f"cribado descarta {discarded_pct:.1f} %: posible movimiento/contacto variable")
+            else:
+                score -= min(22.0, discarded_pct * 0.45)
+                reasons.append(f"cribado muy alto ({discarded_pct:.1f} %): lectura poco robusta")
         if np.isfinite(saturation) and saturation > 0:
             score -= min(35.0, saturation * 2.0)
             reasons.append(f"saturacion cerca del techo digital raw {saturation:.1f} %")
@@ -590,8 +659,8 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                 score += 2
                 reasons.append(f"calidad SpO2 aceptable ({spo2_quality:.0f}/100)")
             else:
-                score -= 10
-                reasons.append(f"calidad SpO2 baja ({spo2_quality:.0f}/100): revisar RED/IR")
+                score -= 3
+                reasons.append(f"calidad SpO2 baja ({spo2_quality:.0f}/100): se informa, pero no se usa como veto sin calibracion")
         if np.isfinite(hz_jitter):
             if hz_jitter <= 10:
                 score += 5
@@ -602,7 +671,6 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         if np.isfinite(duration) and duration < 8:
             score -= 15
             reasons.append(f"duracion corta ({duration:.1f} s): peor resolucion en frecuencia")
-
         score = float(np.clip(score, 0.0, 100.0))
         if score >= 75:
             verdict = "mejor candidata"
@@ -659,6 +727,8 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
             pi_red_pct=pi_red,
             artifact_ir_pct=artifact,
             artifact_red_pct=artifact_red,
+            retained_pct=retained_pct,
+            discarded_pct=discarded_pct,
             saturation_pct=saturation,
             agreement_bpm=agreement,
             score=score,
@@ -676,7 +746,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     result_headers = [
         "Puntuacion", "Veredicto", "Animal", "Configuracion", "BPM ref.", "Dif FFT-ref",
         "BPM FFT IR", "BPM autocorr", "BPM Hilbert", "BPM FFT RED", "Hilbert env. CV %", "Hilbert calidad",
-        "Dominancia", "Banda", "SNR dB", "PI IR %", "Artefactos %",
+        "Dominancia", "Banda", "SNR dB", "PI IR %", "Artefactos %", "Retenido %", "Descartado %",
         "SpO2 est.", "Calidad SpO2", "Resp/min (experimental)", "Calidad Resp.", "Saturacion %",
         "Jitter %", "Duracion", "Muestras", "Archivo",
     ]
@@ -743,6 +813,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
 
         self.raw_table = QtWidgets.QTableWidget(0, 6)
         self.raw_table.setHorizontalHeaderLabels(["Usar", "Animal", "Fecha", "Filas", "Configuraciones", "Archivo"])
+        _apply_header_tooltips(self.raw_table, HEADER_TOOLTIPS)
         self.raw_table.verticalHeader().setVisible(False)
         self.raw_table.setAlternatingRowColors(True)
         self.raw_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -754,6 +825,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         results_layout = QtWidgets.QVBoxLayout(results_page)
         self.results_table = QtWidgets.QTableWidget(0, len(self.result_headers))
         self.results_table.setHorizontalHeaderLabels(self.result_headers)
+        _apply_header_tooltips(self.results_table, HEADER_TOOLTIPS)
         self.results_table.verticalHeader().setVisible(False)
         self.results_table.setAlternatingRowColors(True)
         self.results_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -901,6 +973,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 fmt(result.hilbert_envelope_cv_pct, 1, ""), fmt(result.hilbert_quality, 0, ""),
                 fmt(result.dominance_ir, 2, ""), fmt(result.band_ratio_ir, 3, ""), fmt(result.peak_snr_db, 1, ""),
                 fmt(result.pi_ir_pct, 3, ""), fmt(result.artifact_ir_pct, 1, ""),
+                fmt(result.retained_pct, 1, ""), fmt(result.discarded_pct, 1, ""),
                 fmt(result.spo2_est_pct, 1, ""), fmt(result.spo2_quality, 0, ""),
                 fmt(result.resp_rate_rpm, 1, ""), fmt(result.resp_quality, 0, ""),
                 fmt(result.saturation_pct, 1, ""),
@@ -967,6 +1040,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         <tr><td><b>Animal</b></td><td>{html.escape(result.animal)}</td></tr>
         <tr><td><b>Sensor</b></td><td>RED {result.cfg_red} | IR {result.cfg_ir} | AVG {result.cfg_avg} | RATE {result.cfg_rate} | WIDTH {result.cfg_width} | ADC {result.cfg_adc}</td></tr>
         <tr><td><b>Muestras</b></td><td>{result.n} en {fmt(result.duration_s, 2, '-')} s; Hz real {fmt(result.hz, 2, '-')}</td></tr>
+        <tr><td><b>Cribado robusto</b></td><td>retenido {fmt(result.retained_pct, 1, '-')} % | descartado {fmt(result.discarded_pct, 1, '-')} %. El raw no se borra; solo se decide que tramo entra en el calculo.</td></tr>
         <tr><td><b>Referencia manual</b></td><td>media {fmt(result.pulse_ref_avg, 1, '-')} BPM ({result.pulse_ref_count} lectura(s) validas; 0/vacio se ignora). Previo {fmt(result.pulse_prev_ref, 1, '-')} | pulsio final {fmt(result.pulse_final_pulsio_ref, 1, '-')} | fonendo final {fmt(result.pulse_final_fonendo_ref, 1, '-')}</td></tr>
         <tr><td><b>Diferencia vs referencia</b></td><td>FFT IR {fmt(result.diff_fft_ref_bpm, 1, '-')} BPM | autocorrelacion {fmt(result.diff_autocorr_ref_bpm, 1, '-')} BPM | Hilbert {fmt(result.diff_hilbert_ref_bpm, 1, '-')} BPM</td></tr>
         <tr><td><b>Fourier IR</b></td><td>{fmt(result.bpm_fft_ir, 1, '-')} BPM; dominancia {fmt(result.dominance_ir, 2, '-')}; banda cardiaca {fmt(result.band_ratio_ir, 3, '-')}; SNR {fmt(result.peak_snr_db, 1, '-')} dB; entropia {fmt(result.entropy_ir, 3, '-')}</td></tr>
@@ -1218,6 +1292,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                     ["Autocorrelacion", f"{fmt(result.bpm_autocorr, 1, '-')} BPM", f"Diferencia maxima estimadores {fmt(result.agreement_bpm, 1, '-')} BPM"],
                     ["Hilbert", f"{fmt(result.bpm_hilbert_ir, 1, '-')} BPM", f"Envolvente CV {fmt(result.hilbert_envelope_cv_pct, 1, '-')} % | calidad {fmt(result.hilbert_quality, 0, '-')}"],
                     ["Senal", f"PI IR {fmt(result.pi_ir_pct, 3, '-')} %", f"Artefactos {fmt(result.artifact_ir_pct, 1, '-')} % | saturacion {fmt(result.saturation_pct, 1, '-')} %"],
+                    ["Cribado", f"Retenido {fmt(result.retained_pct, 1, '-')} %", f"Descartado {fmt(result.discarded_pct, 1, '-')} %"],
                 ],
                 [112, 120, width - 232],
                 row_h=34,
@@ -1230,6 +1305,8 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         explanations = [
             ("Referencia manual",
              "La referencia manual es la media de las pulsaciones anotadas antes y al final de la toma con pulsioximetro/fonendo. Si una lectura esta a 0 o vacia no se usa en la media. Esta referencia es el criterio externo mas defendible del informe y se usa para penalizar configuraciones que estiman BPM muy alejadas."),
+            ("Cribado robusto",
+             "El analisis conserva siempre el raw completo, pero para calcular BPM descarta el periodo inicial de estabilizacion y muestras con saltos/outliers simultaneos en RED o IR. Esto imita la logica de un pulsioximetro comercial: espera estabilidad antes de mostrar un numero y evita que movimiento, mal contacto o presion variable generen BPM irreales."),
             ("Fourier",
              "La transformada de Fourier descompone la senal PPG en frecuencias. En este proyecto se mira si hay un pico claro dentro de la banda cardiaca esperada. Un pico dominante, con buena energia de banda y buen SNR, indica que la configuracion esta separando bien una periodicidad compatible con pulso. Fourier responde sobre todo a: que frecuencia domina en esta toma."),
             ("Autocorrelacion",
@@ -1268,6 +1345,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 ["Calidad Hilbert", "0-100", "Mas alto indica envolvente mas regular y fase mas coherente. Usar como apoyo, no como criterio unico."],
                 ["Calidad SpO2", "0-100", "Confianza interna en el calculo experimental RED/IR. No equivale a validacion clinica."],
                 ["Calidad Resp.", "0-100", "Confianza interna en la respiracion estimada desde modulaciones lentas. Requiere tomas largas."],
+                ["Retenido", "%", "Porcentaje de muestras que entran al calculo tras estabilizacion inicial y descarte robusto de outliers."],
                 ["BPM", "latidos/min", "Estimacion de frecuencia cardiaca por FFT, autocorrelacion o Hilbert."],
                 ["Dominancia", "ratio", "Relacion entre pico principal y segundo pico en banda cardiaca. Mayor suele indicar pico mas claro."],
                 ["Banda cardiaca", "0-1", "Proporcion de energia util concentrada en la banda fisiologica esperada."],

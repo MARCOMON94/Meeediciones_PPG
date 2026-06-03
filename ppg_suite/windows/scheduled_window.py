@@ -11,7 +11,7 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from ..models import SensorConfig
-from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics
+from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR
@@ -533,8 +533,8 @@ class ScheduledConfigWindow(PPGSuite):
         hz = estimate_hz(t)
         red_proc = processed_for_plot(red, hz, analysis_cfg)
         ir_proc = processed_for_plot(ir, hz, analysis_cfg)
-        art_red = detect_artifacts(red)
-        art_ir = detect_artifacts(ir)
+        art_red = detect_artifacts(red, strict=True)
+        art_ir = detect_artifacts(ir, strict=True)
         peak_flags = np.zeros(t.size, dtype=int)
         _, _, _, _, peaks, peak_t = estimate_bpm_peaks(t, ir, analysis_cfg)
         if peaks.size and peak_t.size:
@@ -638,6 +638,8 @@ class ScheduledConfigWindow(PPGSuite):
         st = self.state
         m = st.metrics
         temp = self.temperature_summary()
+        spo2_warning = spo2_support_message(m)
+        spo2_warning_line = f"{spo2_warning}\n" if spo2_warning else ""
         elapsed = time.time() - st.capture_start_wall if st.capturing else 0.0
         step_elapsed = time.time() - self.scheduled_step_start_wall if st.capturing else 0.0
         step = self.scheduled_steps[self.scheduled_step_index]
@@ -657,6 +659,7 @@ class ScheduledConfigWindow(PPGSuite):
             f"Muestras: {len(st.t)} | descartadas: {st.discarded_lines}\n"
             f"BPM: {fmt(m.bpm,0)} | calidad {fmt(m.quality,0)} ({m.quality_label})\n"
             f"SpO2 estimada: {fmt(m.spo2,1)} % | R={fmt(m.ratio_r,4)}\n"
+            f"{spo2_warning_line}"
             f"PI IR/RED: {fmt(m.pi_ir_pct,3)} / {fmt(m.pi_red_pct,3)} %\n"
             f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} % | Saturacion ADC: {fmt(m.saturation_pct,1)} %\n"
             f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"

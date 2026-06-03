@@ -31,6 +31,57 @@ MODE_LABELS = {
     "experimento_3m": "Experimento 3M",
 }
 
+HEADER_TOOLTIPS = {
+    "Sesion": "Archivo o grupo de tomas al que pertenece la medicion.",
+    "Fecha": "Fecha registrada para la sesion o toma.",
+    "Inicio": "Hora inicial registrada para la sesion.",
+    "Modos": "Tipos de medicion incluidos en la sesion.",
+    "Tomas": "Numero de capturas o raws visibles en esta sesion.",
+    "Animales": "Numero de identificadores de animal distintos dentro de la sesion.",
+    "Calidad media": "Media de la calidad guardada en las tomas visibles. Es orientativa y depende del cribado aplicado.",
+    "Hora": "Hora registrada para la toma.",
+    "Animal": "Identificador introducido para el animal o sujeto de la toma.",
+    "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
+    "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
+    "Estado": "Lectura rapida de calidad: Buena, Aceptable o Dudosa segun la calidad calculada.",
+    "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
+    "Dif. BPM-ref": "Diferencia absoluta entre el BPM calculado por el sistema y el BPM de referencia manual.",
+    "BPM medio": "Estimacion final de frecuencia cardiaca tras combinar estimadores validos y aplicar cribado.",
+    "BPM picos": "BPM estimado detectando picos locales en la senal PPG procesada.",
+    "BPM FFT": "BPM estimado con transformada de Fourier sobre la senal IR procesada.",
+    "BPM autocorr": "BPM estimado con autocorrelacion: repeticion temporal del patron de pulso.",
+    "Oxigeno medio": "SpO2 estimada experimentalmente desde RED/IR. No esta calibrada clinicamente.",
+    "Ratio R": "Ratio AC/DC de RED dividido por AC/DC de IR usado para estimar SpO2.",
+    "Temp media": "Temperatura media registrada durante la toma.",
+    "Temp ult.": "Ultima temperatura registrada en la toma.",
+    "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG. Requiere validacion externa.",
+    "Calidad resp.": "Confianza interna de la respiracion experimental, de 0 a 100.",
+    "Temp raw": "Valor bruto del ADC de temperatura.",
+    "Calidad": "Puntuacion global interna de la toma tras BPM, PI, artefactos, saturacion y cribado.",
+    "Contacto": "Etiqueta de contacto/perfusion derivada del nivel DC e indice de perfusion IR.",
+    "PI IR %": "Indice de perfusion IR: componente pulsatile AC respecto al nivel DC. Cuanto mayor, mas visible es el pulso.",
+    "PI RED %": "Indice de perfusion RED: componente pulsatile AC respecto al nivel DC.",
+    "Artef. IR %": "Porcentaje de muestras IR marcadas como artefacto o descartadas por cribado robusto.",
+    "Artef. RED %": "Porcentaje de muestras RED marcadas como artefacto por cribado robusto.",
+    "Sat. %": "Porcentaje de muestras cerca del techo digital del ADC. Si sube, hay riesgo de perder informacion.",
+    "RED": "Amplitud LED roja configurada en el MAX3010x, valor de registro 0-255.",
+    "IR": "Amplitud LED infrarroja configurada en el MAX3010x, valor de registro 0-255.",
+    "AVG": "Promedio FIFO configurado en el sensor. Valores mayores suavizan y retrasan mas.",
+    "RATE": "Frecuencia de muestreo configurada en el sensor.",
+    "WIDTH": "Ancho de pulso LED configurado; influye en resolucion y energia de cada muestra.",
+    "ADC": "Rango ADC configurado para el sensor.",
+    "Duracion": "Duracion real analizada tras descartes iniciales o de gaps.",
+    "Hz": "Frecuencia real estimada a partir de los tiempos guardados.",
+    "Muestras": "Numero de muestras disponibles o analizadas.",
+    "Pulso previo": "BPM manual anotado antes de la toma.",
+    "Pulso final pulsio": "BPM manual anotado al final con pulsioximetro.",
+    "Pulso final fonendo": "BPM manual anotado al final con fonendo.",
+    "tipo": "Tipo de archivo asociado a la toma: raw, processed, summary, plot, etc.",
+    "archivo": "Nombre del archivo asociado.",
+    "filas": "Numero de filas si el archivo asociado es CSV.",
+    "ruta": "Ruta completa del archivo asociado.",
+}
+
 
 def _mode_label(mode: str) -> str:
     return MODE_LABELS.get((mode or "").strip(), mode or "")
@@ -179,10 +230,15 @@ class DictTableModel(QtCore.QAbstractTableModel):
         return None
 
     def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
+        if orientation == QtCore.Qt.Orientation.Horizontal:
+            header = self.headers[section]
+            if role == QtCore.Qt.ItemDataRole.DisplayRole:
+                return header
+            if role == QtCore.Qt.ItemDataRole.ToolTipRole:
+                return HEADER_TOOLTIPS.get(header, header)
+            return None
         if role != QtCore.Qt.ItemDataRole.DisplayRole:
             return None
-        if orientation == QtCore.Qt.Orientation.Horizontal:
-            return self.headers[section]
         return str(section + 1)
 
     def set_rows(self, headers: list[str], rows: list[dict[str, str]]):
@@ -782,6 +838,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             warnings.append("Respiraciones calculadas de forma experimental desde modulaciones lentas de PPG; validar con referencia externa.")
         if np.isfinite(diff_ref) and diff_ref > 12:
             warnings.append(f"La BPM media queda a {diff_ref:.1f} BPM de la referencia manual; revisar contacto/configuracion o la anotacion manual.")
+        reason_text = cap.value("metrics_reason") or ""
+        if "cribado robusto" in reason_text.lower():
+            warnings.append("El calculo ya aplica cribado robusto: el raw se conserva completo, pero las muestras inestables no pesan en la estimacion.")
 
         if not warnings:
             warnings.append("Sin avisos tecnicos destacados en las metricas guardadas.")

@@ -89,7 +89,7 @@ def processed_for_plot(y: np.ndarray, hz: float, cfg: AnalysisConfig) -> np.ndar
     return np.clip(robust_normalize(processed_ppg(y, hz, cfg)), -3.5, 3.5)
 
 
-def detect_artifacts(y: np.ndarray) -> np.ndarray:
+def detect_artifacts(y: np.ndarray, strict: bool = False) -> np.ndarray:
     y = replace_nan_with_last(y)
     n = y.size
     out = np.zeros(n, dtype=bool)
@@ -105,17 +105,94 @@ def detect_artifacts(y: np.ndarray) -> np.ndarray:
     mad_d = max(mad_d, 1.0)
     z_val = np.abs(y - med_y) / (1.4826 * mad_y)
     z_jump = np.abs(dif - med_d) / (1.4826 * mad_d)
-    out[(z_val > 8.0) | (z_jump > 10.0)] = True
+    value_limit = 5.0 if strict else 8.0
+    jump_limit = 6.0 if strict else 10.0
+    expand = 3 if strict else 2
+    out[(z_val > value_limit) | (z_jump > jump_limit)] = True
     expanded = out.copy()
     for idx in np.where(out)[0]:
-        a = max(0, idx - 2)
-        b = min(n, idx + 3)
+        a = max(0, idx - expand)
+        b = min(n, idx + expand + 1)
         expanded[a:b] = True
     return expanded
 
 
 def percent_true(mask: np.ndarray) -> float:
     return float(np.mean(mask) * 100.0) if mask.size else math.nan
+
+
+def robust_quality_screen(
+    t: np.ndarray,
+    red: np.ndarray,
+    ir: np.ndarray,
+    *,
+    settle_seconds: float = 2.0,
+    min_samples: int = 100,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, float, str]:
+    """Return arrays after a conservative PPG screen, without mutating raw data."""
+    t, red, ir = finite_arrays(t, red, ir)
+    if t.size == 0:
+        return t, red, ir, math.nan, math.nan, "cribado robusto: sin muestras"
+
+    reasons: list[str] = []
+    if settle_seconds > 0 and t.size > 0:
+        settle_mask = t >= (t[0] + settle_seconds)
+        if int(np.sum(settle_mask)) >= min_samples:
+            dropped = int(t.size - np.sum(settle_mask))
+            t, red, ir = t[settle_mask] - t[settle_mask][0], red[settle_mask], ir[settle_mask]
+            if dropped > 0:
+                reasons.append(f"primeros {settle_seconds:.1f} s ignorados")
+
+    if t.size < 10:
+        return t, red, ir, 100.0, 0.0, "; ".join(reasons)
+
+    art_ir = detect_artifacts(ir, strict=True)
+    art_red = detect_artifacts(red, strict=True) if np.any(np.isfinite(red)) else np.zeros_like(art_ir)
+    discard = art_ir | art_red | ~np.isfinite(t) | ~np.isfinite(ir)
+    if red.size == discard.size:
+        discard = discard | ~np.isfinite(red)
+    clean = ~discard
+    retained_pct = float(np.mean(clean) * 100.0) if clean.size else math.nan
+    discard_pct = float(np.mean(discard) * 100.0) if discard.size else math.nan
+
+    if int(np.sum(clean)) >= min_samples:
+        reasons.append(f"cribado robusto descarta {discard_pct:.1f} %")
+        t2 = t[clean] - t[clean][0]
+        red2 = red[clean] if red.size == clean.size else red
+        ir2 = ir[clean]
+        return t2, red2, ir2, retained_pct, discard_pct, "; ".join(reasons)
+
+    reasons.append(f"cribado robusto insuficiente ({int(np.sum(clean))} muestras limpias); se conserva tramo")
+    return t, red, ir, retained_pct, discard_pct, "; ".join(reasons)
+
+
+def spo2_support_message(m: Metrics) -> str:
+    """Short live warning for SpO2 reliability, while keeping BPM usable."""
+    if m.n < 100:
+        return ""
+
+    low_ir = np.isfinite(m.pi_ir_pct) and m.pi_ir_pct < 0.15
+    low_red = np.isfinite(m.pi_red_pct) and m.pi_red_pct < 0.08
+    artifacts = np.isfinite(m.artifact_ir_pct) and m.artifact_ir_pct >= 12.0
+    saturation = np.isfinite(m.saturation_pct) and m.saturation_pct >= 1.0
+    ratio_bad = np.isfinite(m.ratio_r) and not (0.35 <= m.ratio_r <= 1.8)
+    missing_spo2 = not (np.isfinite(m.spo2) and np.isfinite(m.ratio_r))
+
+    if saturation:
+        return "Aviso SpO2: saturacion ADC; baja brillo o amplia rango para oxigeno fiable."
+    if low_ir and low_red:
+        return "Aviso SpO2: poco apoyo/contacto; PI IR y RED bajos. BPM puede seguir siendo util."
+    if low_red:
+        return "Aviso SpO2: senal RED pulsatile baja; oxigeno poco fiable."
+    if low_ir:
+        return "Aviso SpO2: senal IR pulsatile baja; revisa apoyo estable del sensor."
+    if artifacts:
+        return "Aviso SpO2: movimiento/contacto irregular; oxigeno poco fiable."
+    if ratio_bad:
+        return "Aviso SpO2: ratio RED/IR fuera de rango; revisa apoyo y luz ambiente."
+    if missing_spo2 and np.isfinite(m.dc_ir) and m.dc_ir > 1000:
+        return "Aviso SpO2: falta senal RED/IR suficiente para calcular oxigeno."
+    return ""
 
 
 def uniform_resample(t: np.ndarray, y: np.ndarray, hz: Optional[float] = None) -> tuple[np.ndarray, np.ndarray, float]:
@@ -360,6 +437,15 @@ def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sens
         mask = t >= (t[0] + cfg.ignore_initial_seconds)
         if int(np.sum(mask)) >= 100:
             t, red, ir = t[mask] - t[mask][0], red[mask], ir[mask]
+    screen_t, screen_red, screen_ir, retained_pct, discard_pct, screen_reason = robust_quality_screen(
+        t,
+        red,
+        ir,
+        settle_seconds=max(0.0, 2.0 - max(0.0, float(cfg.ignore_initial_seconds))),
+        min_samples=100,
+    )
+    if screen_t.size >= 100:
+        t, red, ir = screen_t, screen_red, screen_ir
     n = t.size
     m = Metrics(n=int(n))
     if n < 20:
@@ -367,12 +453,12 @@ def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sens
         return m
     m.hz = estimate_hz(t)
     m.duration_s = float(t[-1] - t[0]) if n > 1 else math.nan
-    art_ir = detect_artifacts(ir)
-    art_red = detect_artifacts(red) if np.any(np.isfinite(red)) else np.zeros_like(art_ir)
-    m.artifact_ir_pct = percent_true(art_ir)
+    art_ir = detect_artifacts(ir, strict=True)
+    art_red = detect_artifacts(red, strict=True) if np.any(np.isfinite(red)) else np.zeros_like(art_ir)
+    m.artifact_ir_pct = discard_pct if np.isfinite(discard_pct) else percent_true(art_ir)
     m.artifact_red_pct = percent_true(art_red)
 
-    clean = ~art_ir & np.isfinite(ir)
+    clean = ~art_ir & ~art_red & np.isfinite(ir)
     if int(np.sum(clean)) >= 100:
         tt = t[clean]
         rr = red[clean] if red.size == clean.size else red
@@ -390,7 +476,7 @@ def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sens
         if np.isfinite(value) and cfg.bpm_min <= value <= cfg.bpm_max and q > 10:
             candidates.append((float(value), float(q), name))
 
-    reasons = [r_peak, r_fft, r_acorr]
+    reasons = [screen_reason, r_peak, r_fft, r_acorr]
     if not candidates:
         m.bpm = math.nan
         bpm_quality = 0.0
@@ -408,9 +494,9 @@ def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sens
             bpm_quality = float(np.clip(np.mean(weights) + max(0.0, 20.0 - spread), 0.0, 100.0))
             reasons.append(f"estimadores coherentes spread={spread:.1f}")
         else:
-            best = max(candidates, key=lambda c: c[1])
+            best = max(candidates, key=lambda c: (c[1] + (8.0 if c[2] == "FFT" else 0.0)))
             m.bpm = best[0]
-            bpm_quality = float(np.clip(best[1] * 0.65, 0.0, 70.0))
+            bpm_quality = float(np.clip(best[1] * 0.50, 0.0, 55.0))
             reasons.append(f"estimadores discrepantes; se usa {best[2]} spread={spread:.1f}")
 
     spo2, r, spo2_reason, ac_red, dc_red, ac_ir, dc_ir, pi_red, pi_ir = estimate_spo2(tt, rr, ii, cfg)

@@ -87,6 +87,7 @@ El menu inicial permite elegir:
 - Experimento 3M: optimizacion adaptativa para encontrar una configuracion real del sensor en menos de 20 minutos. Entre tramos pide pulsioximetro/fonendo cuando necesita referencia, ignora lecturas 0 o vacias y cambia RED/IR/AVG/ADC segun cercania a BPM manual, pulso PPG, SpO2 usable, PI, artefactos y saturacion. En pantalla muestra la razon de cada decision y al finalizar guarda un JSON tecnico y un PDF final con resumen, ranking, decisiones y mejor candidata.
 - Estadisticas: explorador de sesiones, raws, procesados, resumenes, graficas y capturas.
 - Analisis experimental de Fourier + Hilbert: comparacion de raws para razonar que configuracion separa mejor el pulso. La lectura principal es `Pulso ref.` frente a BPM estimadas; Fourier, autocorrelacion e Hilbert quedan como apoyo tecnico. Permite exportar un informe PDF con fecha, ranking, procedimiento comparativo, graficas y anexo metodologico.
+- El analisis aplica cribado robusto: conserva el raw completo, pero ignora estabilizacion inicial y outliers/saltos RED/IR para que muestras irreales no dominen BPM, Fourier o Hilbert.
 
 El menu tambien incluye `Ultimas actualizaciones`, que abre el archivo mas reciente de:
 

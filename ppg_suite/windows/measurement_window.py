@@ -19,7 +19,7 @@ from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
 from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR, log
 from ..processing import (
     block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, find_local_peaks,
-    processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, uniform_resample,
+    processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, uniform_resample,
 )
 from ..utils import fmt, now_stamp, open_folder, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
@@ -883,7 +883,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         hz = estimate_hz(t)
         red_proc = processed_for_plot(red, hz, cfg)
         ir_proc = processed_for_plot(ir, hz, cfg)
-        art_red = detect_artifacts(red); art_ir = detect_artifacts(ir)
+        art_red = detect_artifacts(red, strict=True); art_ir = detect_artifacts(ir, strict=True)
         bpm_rolling = np.full(t.size, np.nan)
         spo2_rolling = np.full(t.size, np.nan)
         ratio_rolling = np.full(t.size, np.nan)
@@ -1021,6 +1021,8 @@ class PPGSuite(QtWidgets.QMainWindow):
     def update_info(self):
         st = self.state; m = st.metrics
         temp = self.temperature_summary()
+        spo2_warning = spo2_support_message(m)
+        spo2_warning_line = f"{spo2_warning}\n" if spo2_warning else ""
         if st.capturing:
             elapsed = time.time() - st.capture_start_wall
             status = f"capturando {st.mode}... {elapsed:.1f} s"
@@ -1044,6 +1046,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"BPM: {fmt(m.bpm,0)}\n"
                 f"Calidad: {fmt(m.quality,0)} ({m.quality_label})\n"
                 f"SpO2 estimada: {fmt(m.spo2,1)} %\n"
+                f"{spo2_warning_line}"
                 f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
                 f"Temp: {fmt(temp['temp_c_last'],1)} °C\n"
                 f"Hz real: {fmt(m.hz,2)}\n"
@@ -1064,6 +1067,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"BPM: {fmt(m.bpm,0)} | calidad {fmt(m.quality,0)} ({m.quality_label})\n"
                 f"  picos {fmt(m.bpm_peak,0)} | FFT {fmt(m.bpm_fft,0)} | autocorr {fmt(m.bpm_autocorr,0)}\n"
                 f"SpO2 estimada: {fmt(m.spo2,1)} % | R={fmt(m.ratio_r,4)}\n"
+                f"{spo2_warning_line}"
                 f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
                 f"Temp: {fmt(temp['temp_c_last'],1)} °C | media {fmt(temp['temp_c_mean'],1)} °C | raw {fmt(temp['temp_raw_last'],0)}\n"
                 f"Hz real: {fmt(m.hz,2)} | duración señal {fmt(m.duration_s,3)} s\n"
