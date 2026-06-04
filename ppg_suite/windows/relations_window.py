@@ -404,11 +404,28 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_table.setMinimumWidth(520)
         self.temporal_table.selectionModel().selectionChanged.connect(self.update_selected_temporal_plot)
         temporal_layout.addWidget(self.temporal_table, stretch=0)
+        temporal_right = QtWidgets.QVBoxLayout()
+        temporal_layout.addLayout(temporal_right, stretch=1)
+        temporal_controls = QtWidgets.QHBoxLayout()
+        temporal_right.addLayout(temporal_controls)
+        self.chk_temporal_signal = QtWidgets.QCheckBox("IR/RED")
+        self.chk_temporal_signal.setChecked(True)
+        self.chk_temporal_bpm = QtWidgets.QCheckBox("BPM")
+        self.chk_temporal_bpm.setChecked(True)
+        self.chk_temporal_spo2 = QtWidgets.QCheckBox("Oxigeno")
+        self.chk_temporal_spo2.setChecked(True)
+        self.chk_temporal_temp = QtWidgets.QCheckBox("Temperatura")
+        self.chk_temporal_temp.setChecked(True)
+        self.chk_temporal_blocks = QtWidgets.QCheckBox("Bloques BPM")
+        for chk in [self.chk_temporal_signal, self.chk_temporal_bpm, self.chk_temporal_spo2, self.chk_temporal_temp, self.chk_temporal_blocks]:
+            chk.toggled.connect(self.update_selected_temporal_plot)
+            temporal_controls.addWidget(chk)
+        temporal_controls.addStretch(1)
         self.plot_temporal_signal = pg.PlotWidget(title="Senal del tramo seleccionado")
         self.plot_temporal_signal.setBackground("w")
         self.plot_temporal_signal.showGrid(x=True, y=True, alpha=0.25)
         self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
-        temporal_layout.addWidget(self.plot_temporal_signal, stretch=1)
+        temporal_right.addWidget(self.plot_temporal_signal, stretch=1)
         self.detail_tabs.addTab(temporal_page, "Temporalizacion")
 
         self.params = QtWidgets.QTextEdit()
@@ -1116,16 +1133,29 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return
         tt = rel_t[mask]
         self.plot_temporal_signal.setTitle(f"Tramo {row.get('Tramo', '')}: {fmt(start, 1, '')}-{fmt(end, 1, '')} s")
-        ir = np.asarray([_as_float(r.get("ir_proc_norm") or r.get("ir_raw", "")) for r in rows], dtype=float)
-        red = np.asarray([_as_float(r.get("red_proc_norm") or r.get("red_raw", "")) for r in rows], dtype=float)
-        bpm = np.asarray([_as_float(r.get("bpm_rolling_5s", "")) for r in rows], dtype=float)
-        spo2 = np.asarray([_as_float(r.get("spo2_rolling_5s", "")) for r in rows], dtype=float)
-        temp = np.asarray([_as_float(r.get("temp_c", "")) for r in rows], dtype=float)
-        self._plot_temporal_segment_series(tt, ir[mask], (0, 80, 220), "IR")
-        self._plot_temporal_segment_series(tt, red[mask], (220, 40, 35), "RED")
-        self._plot_temporal_segment_series(tt, bpm[mask], (40, 140, 50), "BPM")
-        self._plot_temporal_segment_series(tt, spo2[mask], (150, 70, 160), "SpO2")
-        self._plot_temporal_segment_series(tt, temp[mask], (220, 120, 30), "Temp")
+        if self.chk_temporal_signal.isChecked():
+            ir = np.asarray([_as_float(r.get("ir_proc_norm") or r.get("ir_raw", "")) for r in rows], dtype=float)
+            red = np.asarray([_as_float(r.get("red_proc_norm") or r.get("red_raw", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, ir[mask], (0, 80, 220), "IR")
+            self._plot_temporal_segment_series(tt, red[mask], (220, 40, 35), "RED")
+        if self.chk_temporal_bpm.isChecked():
+            bpm = np.asarray([_as_float(r.get("bpm_rolling_5s", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, bpm[mask], (40, 140, 50), "BPM")
+        if self.chk_temporal_spo2.isChecked():
+            spo2 = np.asarray([_as_float(r.get("spo2_rolling_5s", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, spo2[mask], (150, 70, 160), "SpO2")
+        if self.chk_temporal_temp.isChecked():
+            temp = np.asarray([_as_float(r.get("temp_c", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, temp[mask], (220, 120, 30), "Temp")
+        if self.chk_temporal_blocks.isChecked():
+            bpm_10s = _as_float(row.get("BPM 10s", ""))
+            if np.isfinite(bpm_10s):
+                self.plot_temporal_signal.plot(
+                    [float(start), float(end)],
+                    [bpm_10s, bpm_10s],
+                    pen=pg.mkPen((20, 120, 110), width=2, style=QtCore.Qt.PenStyle.DashLine),
+                    name="BPM 10s",
+                )
         self.plot_temporal_signal.setXRange(float(start), max(float(end), float(start) + 1.0), padding=0.01)
         self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
 

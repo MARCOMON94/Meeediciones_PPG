@@ -49,6 +49,8 @@ class VacuumExperimentWindow(PPGSuite):
         self.audio_frames: list[np.ndarray] = []
         self.audio_lock = threading.Lock()
         self.audio_samplerate = 44100
+        self.audio_device_index: int | None = None
+        self.audio_device_name = ""
         self.audio_path: Path | None = None
         self.audio_status = "audio no iniciado"
         self.audio_start_perf = math.nan
@@ -66,11 +68,92 @@ class VacuumExperimentWindow(PPGSuite):
         self.btn_start.setText("Iniciar experimento con vacio")
         self.btn_open_base.clicked.disconnect()
         self.btn_open_base.clicked.connect(lambda: self.open_results_dir())
+        self.refresh_audio_devices()
+
+    def build_ui(self):
+        super().build_ui()
+        central = self.centralWidget()
+        root_layout = central.layout() if central is not None else None
+        if root_layout is None or root_layout.count() == 0:
+            return
+        left_scroll = root_layout.itemAt(0).widget()
+        left_widget = left_scroll.widget() if hasattr(left_scroll, "widget") else None
+        left_layout = left_widget.layout() if left_widget is not None else None
+        if left_layout is None:
+            return
+
+        audio_group = QtWidgets.QGroupBox("Microfono")
+        audio_layout = QtWidgets.QGridLayout(audio_group)
+        self.audio_device_combo = QtWidgets.QComboBox()
+        self.btn_refresh_audio = QtWidgets.QPushButton("Refrescar")
+        self.audio_status_label = QtWidgets.QLabel("Microfono no comprobado")
+        self.audio_status_label.setWordWrap(True)
+        audio_layout.addWidget(self.audio_device_combo, 0, 0, 1, 2)
+        audio_layout.addWidget(self.btn_refresh_audio, 1, 0, 1, 2)
+        audio_layout.addWidget(self.audio_status_label, 2, 0, 1, 2)
+        self.btn_refresh_audio.clicked.connect(self.refresh_audio_devices)
+        self.audio_device_combo.currentIndexChanged.connect(self.select_audio_device)
+        left_layout.insertWidget(1, audio_group)
 
     def open_results_dir(self):
         from ..utils import open_folder
 
         open_folder(self.results_dir)
+
+    def refresh_audio_devices(self):
+        if not hasattr(self, "audio_device_combo"):
+            return
+        self.audio_device_combo.blockSignals(True)
+        self.audio_device_combo.clear()
+        self.audio_device_index = None
+        self.audio_device_name = ""
+        try:
+            import sounddevice as sd
+
+            devices = sd.query_devices()
+            default_input = sd.default.device[0] if sd.default.device else None
+            first_input_row = -1
+            for idx, dev in enumerate(devices):
+                max_inputs = int(dev.get("max_input_channels", 0))
+                if max_inputs <= 0:
+                    continue
+                name = " ".join(str(dev.get("name", f"Microfono {idx}")).split())
+                rate = int(float(dev.get("default_samplerate", self.audio_samplerate) or self.audio_samplerate))
+                label = f"{idx} | {name} ({max_inputs} canal/es, {rate} Hz)"
+                self.audio_device_combo.addItem(label, {"index": idx, "samplerate": rate, "name": name})
+                if first_input_row < 0:
+                    first_input_row = self.audio_device_combo.count() - 1
+                if default_input == idx:
+                    self.audio_device_combo.setCurrentIndex(self.audio_device_combo.count() - 1)
+            if self.audio_device_combo.count() == 0:
+                self.audio_device_combo.addItem("Sin microfonos de entrada", None)
+                self.audio_status_label.setText("No se han encontrado microfonos de entrada.")
+            elif self.audio_device_combo.currentIndex() < 0 and first_input_row >= 0:
+                self.audio_device_combo.setCurrentIndex(first_input_row)
+                self.audio_status_label.setText("Microfono listo.")
+            else:
+                self.audio_status_label.setText("Microfono listo.")
+        except Exception as exc:
+            self.audio_device_combo.addItem("Audio no disponible", None)
+            self.audio_status_label.setText(f"No se pudo listar microfonos: {exc}")
+            self.audio_status = f"audio no disponible: {exc}"
+            log.warning("No se pudieron listar microfonos: %s", exc)
+        finally:
+            self.audio_device_combo.blockSignals(False)
+            self.select_audio_device()
+
+    def select_audio_device(self):
+        if not hasattr(self, "audio_device_combo"):
+            return
+        data = self.audio_device_combo.currentData()
+        if isinstance(data, dict):
+            self.audio_device_index = int(data.get("index")) if data.get("index") is not None else None
+            self.audio_samplerate = int(data.get("samplerate") or 44100)
+            self.audio_device_name = str(data.get("name") or self.audio_device_combo.currentText())
+        else:
+            self.audio_device_index = None
+            self.audio_samplerate = 44100
+            self.audio_device_name = ""
 
     def _audio_callback(self, indata, frames, time_info, status):
         del frames, time_info
@@ -92,14 +175,20 @@ class VacuumExperimentWindow(PPGSuite):
                 samplerate=self.audio_samplerate,
                 channels=1,
                 dtype="float32",
+                device=self.audio_device_index,
                 callback=self._audio_callback,
             )
             self.audio_stream.start()
             self.audio_start_perf = time.perf_counter()
-            self.audio_status = "audio grabando"
+            device_text = self.audio_device_name or "microfono predeterminado"
+            self.audio_status = f"audio grabando: {device_text}"
+            if hasattr(self, "audio_status_label"):
+                self.audio_status_label.setText(self.audio_status)
         except Exception as exc:
             self.audio_stream = None
             self.audio_status = f"audio no disponible: {exc}"
+            if hasattr(self, "audio_status_label"):
+                self.audio_status_label.setText(self.audio_status)
             log.warning("No se pudo iniciar audio en experimento con vacio: %s", exc)
 
     def stop_audio_recording(self):
@@ -136,6 +225,8 @@ class VacuumExperimentWindow(PPGSuite):
             wf.setframerate(self.audio_samplerate)
             wf.writeframes(pcm.tobytes())
         self.audio_status = f"audio guardado ({samples.size / self.audio_samplerate:.1f} s)"
+        if hasattr(self, "audio_status_label"):
+            self.audio_status_label.setText(self.audio_status)
 
     def start_normal_capture(self):
         if not self.serial_port or not self.serial_port.is_open:
@@ -365,6 +456,11 @@ class VacuumExperimentWindow(PPGSuite):
             "reason": reason,
             "sync": self._sync_metadata(),
             "audio": audio_analysis,
+            "audio_device": {
+                "index": self.audio_device_index,
+                "name": self.audio_device_name,
+                "samplerate": self.audio_samplerate,
+            },
             "ppg_notch": ppg_analysis,
             "metrics": self._metrics_dict(st.metrics),
             "files": {
@@ -402,6 +498,7 @@ class VacuumExperimentWindow(PPGSuite):
 
     def _report_html(self, payload: dict) -> str:
         audio = payload["audio"]
+        audio_device = payload.get("audio_device") or {}
         ppg = payload["ppg_notch"]
         sync = payload["sync"]
         metrics = payload["metrics"]
@@ -412,6 +509,7 @@ class VacuumExperimentWindow(PPGSuite):
             ("Calidad PPG", f"{fmt(metrics.get('quality'), 1, '-')} ({html.escape(str(metrics.get('quality_label', '-')))})"),
             ("SpO2", fmt(metrics.get("spo2"), 1, "-")),
             ("Frecuencia vacio audio", f"{fmt(audio.get('vacuum_bpm'), 1, '-')} ciclos/min"),
+            ("Microfono", str(audio_device.get("name") or "-")),
             ("Dominancia audio", fmt(audio.get("dominance"), 2, "-")),
             ("FFT PPG antes de notch", fmt(ppg.get("ppg_fft_bpm_before_notch"), 1, "-")),
             ("FFT PPG excluyendo pico audio", fmt(ppg.get("ppg_fft_bpm_excluding_audio_peak"), 1, "-")),
@@ -481,4 +579,3 @@ p, li {{ font-size: 12px; line-height: 1.45; }}
             document.print(writer)
         except Exception as exc:
             log.warning("No se pudo generar PDF experimento con vacio %s: %s", path, exc)
-
