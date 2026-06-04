@@ -282,6 +282,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.filtered_sessions: list[SessionGroup] = []
         self.current_session: SessionGroup | None = None
         self.current_capture: CaptureRecord | None = None
+        self.temporal_source_rows: list[dict[str, str]] = []
+        self.temporal_rel_t = np.asarray([], dtype=float)
         self._build_ui()
         self.reload_data()
 
@@ -400,20 +402,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_table.setAlternatingRowColors(True)
         self.temporal_table.verticalHeader().setVisible(False)
         self.temporal_table.setMinimumWidth(520)
+        self.temporal_table.selectionModel().selectionChanged.connect(self.update_selected_temporal_plot)
         temporal_layout.addWidget(self.temporal_table, stretch=0)
-        temporal_plots = QtWidgets.QVBoxLayout()
-        temporal_layout.addLayout(temporal_plots, stretch=1)
-        self.plot_temporal_metrics = pg.PlotWidget(title="Temporalizacion por tramos")
-        self.plot_temporal_metrics.setBackground("w")
-        self.plot_temporal_metrics.showGrid(x=True, y=True, alpha=0.25)
-        self.plot_temporal_metrics.setLabel("bottom", "Tiempo relativo", units="s")
-        self.plot_temporal_metrics.addLegend()
-        temporal_plots.addWidget(self.plot_temporal_metrics, stretch=1)
-        self.plot_temporal_samples = pg.PlotWidget(title="Muestras por tramo")
-        self.plot_temporal_samples.setBackground("w")
-        self.plot_temporal_samples.showGrid(x=True, y=True, alpha=0.25)
-        self.plot_temporal_samples.setLabel("bottom", "Tiempo relativo", units="s")
-        temporal_plots.addWidget(self.plot_temporal_samples, stretch=1)
+        self.plot_temporal_signal = pg.PlotWidget(title="Senal del tramo seleccionado")
+        self.plot_temporal_signal.setBackground("w")
+        self.plot_temporal_signal.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
+        temporal_layout.addWidget(self.plot_temporal_signal, stretch=1)
         self.detail_tabs.addTab(temporal_page, "Temporalizacion")
 
         self.params = QtWidgets.QTextEdit()
@@ -794,8 +789,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.files_model.set_rows(self.files_headers, [])
             self.plot_capture.clear()
             self.temporal_model.set_rows(self.temporal_headers, [])
-            self.plot_temporal_metrics.clear()
-            self.plot_temporal_samples.clear()
+            self.temporal_source_rows = []
+            self.temporal_rel_t = np.asarray([], dtype=float)
+            self.plot_temporal_signal.clear()
             return
         self.summary.setHtml(self._summary_html(cap))
         self.params.setHtml(self._params_html(cap))
@@ -1003,8 +999,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     def update_temporalization(self, cap: CaptureRecord, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]], block_rows: list[dict[str, str]]):
         rows = proc_rows or raw_rows
-        self.plot_temporal_metrics.clear()
-        self.plot_temporal_samples.clear()
+        self.plot_temporal_signal.clear()
+        self.temporal_source_rows = rows
+        self.temporal_rel_t = np.asarray([], dtype=float)
         if not rows and not block_rows:
             self.temporal_model.set_rows(self.temporal_headers, [])
             return
@@ -1016,6 +1013,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             finite_t = t[np.isfinite(t)]
             if finite_t.size:
                 rel_t = t - float(finite_t[0])
+        self.temporal_rel_t = rel_t
         duration = self._temporal_duration(cap, rel_t, block_rows)
         if not np.isfinite(duration) or duration <= 0:
             self.temporal_model.set_rows(self.temporal_headers, [])
@@ -1091,16 +1089,45 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
         self.temporal_model.set_rows(self.temporal_headers, table_rows)
         self.temporal_table.resizeColumnsToContents()
-        x = np.asarray(centers, dtype=float)
-        self._plot_temporal_line(x, bpm_block_values, (20, 120, 110), "BPM 10s")
-        self._plot_temporal_line(x, bpm_tramo_values, (40, 140, 50), "BPM tramo")
-        self._plot_temporal_line(x, spo2_values, (150, 70, 160), "SpO2")
-        self._plot_temporal_line(x, quality_values, (220, 120, 30), "Calidad")
-        self._plot_temporal_line(x, temp_plot_values, (80, 80, 80), "Temp")
-        samples = np.asarray(sample_values, dtype=float)
-        mask_samples = np.isfinite(x) & np.isfinite(samples)
-        if np.any(mask_samples):
-            self.plot_temporal_samples.plot(x[mask_samples], samples[mask_samples], pen=pg.mkPen((30, 90, 180), width=2), symbol="o")
+        if table_rows:
+            self.temporal_table.selectRow(0)
+        else:
+            self.plot_temporal_signal.clear()
+
+    def update_selected_temporal_plot(self):
+        indexes = self.temporal_table.selectionModel().selectedRows()
+        if not indexes:
+            self.plot_temporal_signal.clear()
+            return
+        row_index = indexes[0].row()
+        if not (0 <= row_index < len(self.temporal_model.rows)):
+            self.plot_temporal_signal.clear()
+            return
+        row = self.temporal_model.rows[row_index]
+        start = _as_float(row.get("Inicio s", ""))
+        end = _as_float(row.get("Fin s", ""))
+        self.plot_temporal_signal.clear()
+        rows = self.temporal_source_rows
+        rel_t = self.temporal_rel_t
+        if not rows or not rel_t.size or not np.isfinite(start) or not np.isfinite(end):
+            return
+        mask = np.isfinite(rel_t) & (rel_t >= start) & (rel_t <= end)
+        if not np.any(mask):
+            return
+        tt = rel_t[mask]
+        self.plot_temporal_signal.setTitle(f"Tramo {row.get('Tramo', '')}: {fmt(start, 1, '')}-{fmt(end, 1, '')} s")
+        ir = np.asarray([_as_float(r.get("ir_proc_norm") or r.get("ir_raw", "")) for r in rows], dtype=float)
+        red = np.asarray([_as_float(r.get("red_proc_norm") or r.get("red_raw", "")) for r in rows], dtype=float)
+        bpm = np.asarray([_as_float(r.get("bpm_rolling_5s", "")) for r in rows], dtype=float)
+        spo2 = np.asarray([_as_float(r.get("spo2_rolling_5s", "")) for r in rows], dtype=float)
+        temp = np.asarray([_as_float(r.get("temp_c", "")) for r in rows], dtype=float)
+        self._plot_temporal_segment_series(tt, ir[mask], (0, 80, 220), "IR")
+        self._plot_temporal_segment_series(tt, red[mask], (220, 40, 35), "RED")
+        self._plot_temporal_segment_series(tt, bpm[mask], (40, 140, 50), "BPM")
+        self._plot_temporal_segment_series(tt, spo2[mask], (150, 70, 160), "SpO2")
+        self._plot_temporal_segment_series(tt, temp[mask], (220, 120, 30), "Temp")
+        self.plot_temporal_signal.setXRange(float(start), max(float(end), float(start) + 1.0), padding=0.01)
+        self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
 
     def _temporal_duration(self, cap: CaptureRecord, rel_t: np.ndarray, block_rows: list[dict[str, str]]) -> float:
         if rel_t.size:
@@ -1182,11 +1209,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         value = _as_float(cap.value(key))
         return float(value) if np.isfinite(value) else float(default)
 
-    def _plot_temporal_line(self, x: np.ndarray, values: list[float], color: tuple[int, int, int], name: str):
-        y = np.asarray(values, dtype=float)
+    def _plot_temporal_segment_series(self, x: np.ndarray, y: np.ndarray, color: tuple[int, int, int], name: str):
         mask = np.isfinite(x) & np.isfinite(y)
         if np.any(mask):
-            self.plot_temporal_metrics.plot(x[mask], y[mask], pen=pg.mkPen(color, width=2), symbol="o", name=name)
+            self.plot_temporal_signal.plot(x[mask], y[mask], pen=pg.mkPen(color, width=1 if name in {"IR", "RED"} else 2), name=name)
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         event.accept()

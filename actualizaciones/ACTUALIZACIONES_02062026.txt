@@ -367,6 +367,24 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
   - si no puede actualizar limpio, omite Git y abre el programa con la version local
 - Esto esta pensado para que el ordenador de Julian no se quede atrapado en mensajes repetidos del actualizador.
 
+23. Temporalizacion en Estadisticas
+- En `Estadisticas` se anade la pestana `Temporalizacion`, situada entre `Graficas` y `Parametros dispositivo`.
+- La tabla de la izquierda resume la toma por tramos de 10 segundos:
+  - inicio y fin del tramo
+  - BPM del bloque
+  - BPM recalculado del tramo
+  - SpO2 recalculada del tramo
+  - calidad del tramo
+  - temperatura media
+  - numero de muestras del tramo
+- El primer dato disponible de la toma se considera segundo 0 para que la lectura sea clara.
+- El ultimo tramo se corta con el tiempo real disponible. Por ejemplo, si la toma termina en 57.3 s, el tramo final queda como 50.0-57.3 s.
+- La SpO2 del tramo se recalcula desde el raw completo usando RED/IR cuando no hay dato rolling guardado, porque en Estadisticas ya se dispone de los datos completos.
+- La grafica de la derecha ya no muestra puntos agregados de todos los tramos.
+- Ahora, al seleccionar una fila de la tabla, la grafica cambia y muestra la senal de ese tramo concreto, con un comportamiento parecido a la pestana `Graficas`.
+- Se muestran IR/RED y, si existen, BPM, SpO2 y temperatura rolling dentro del intervalo seleccionado.
+- Esto permite revisar si una media de 10 segundos sale de una senal estable o de un tramo con ruido, movimiento o mala colocacion.
+
 Recomendacion de uso
 --------------------
 
