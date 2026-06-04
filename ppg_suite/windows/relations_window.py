@@ -12,7 +12,9 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
+from ..models import AnalysisConfig, SensorConfig
 from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
+from ..processing import score_and_merge_metrics
 from ..utils import fmt
 
 
@@ -80,6 +82,15 @@ HEADER_TOOLTIPS = {
     "archivo": "Nombre del archivo asociado.",
     "filas": "Numero de filas si el archivo asociado es CSV.",
     "ruta": "Ruta completa del archivo asociado.",
+    "Tramo": "Intervalo temporal relativo a la toma seleccionada. Se fuerza el primer dato disponible como segundo 0.",
+    "Inicio s": "Inicio del tramo usando tiempo relativo: el primer dato disponible se considera 0 s.",
+    "Fin s": "Final real del tramo. En el ultimo tramo puede cortar antes de 10 s si la toma termina antes.",
+    "BPM 10s": "BPM medio guardado para ese bloque de 10 s.",
+    "BPM tramo": "BPM recalculado para el tramo desde raw RED/IR; si existe BPM rolling se usa como apoyo.",
+    "SpO2 tramo": "SpO2 recalculada para el tramo desde raw RED/IR cuando no exista rolling; experimental y no calibrada.",
+    "Calidad tramo": "Calidad recalculada para el tramo desde raw RED/IR cuando no exista rolling.",
+    "Temp tramo": "Temperatura media disponible dentro del tramo.",
+    "Muestras tramo": "Numero de muestras dentro del tramo temporal.",
 }
 
 
@@ -260,6 +271,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final pulsio", "Pulso final fonendo",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
+    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp tramo", "Muestras tramo"]
 
     def __init__(self):
         super().__init__()
@@ -377,6 +389,32 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.plot_capture.showGrid(x=True, y=True, alpha=0.25)
         graph_layout.addWidget(self.plot_capture, stretch=1)
         self.detail_tabs.addTab(graph_page, "Graficas")
+
+        temporal_page = QtWidgets.QWidget()
+        temporal_layout = QtWidgets.QHBoxLayout(temporal_page)
+        self.temporal_model = DictTableModel(self.temporal_headers)
+        self.temporal_table = QtWidgets.QTableView()
+        self.temporal_table.setModel(self.temporal_model)
+        self.temporal_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.temporal_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.temporal_table.setAlternatingRowColors(True)
+        self.temporal_table.verticalHeader().setVisible(False)
+        self.temporal_table.setMinimumWidth(520)
+        temporal_layout.addWidget(self.temporal_table, stretch=0)
+        temporal_plots = QtWidgets.QVBoxLayout()
+        temporal_layout.addLayout(temporal_plots, stretch=1)
+        self.plot_temporal_metrics = pg.PlotWidget(title="Temporalizacion por tramos")
+        self.plot_temporal_metrics.setBackground("w")
+        self.plot_temporal_metrics.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_temporal_metrics.setLabel("bottom", "Tiempo relativo", units="s")
+        self.plot_temporal_metrics.addLegend()
+        temporal_plots.addWidget(self.plot_temporal_metrics, stretch=1)
+        self.plot_temporal_samples = pg.PlotWidget(title="Muestras por tramo")
+        self.plot_temporal_samples.setBackground("w")
+        self.plot_temporal_samples.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_temporal_samples.setLabel("bottom", "Tiempo relativo", units="s")
+        temporal_plots.addWidget(self.plot_temporal_samples, stretch=1)
+        self.detail_tabs.addTab(temporal_page, "Temporalizacion")
 
         self.params = QtWidgets.QTextEdit()
         self.params.setReadOnly(True)
@@ -755,6 +793,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.params.clear()
             self.files_model.set_rows(self.files_headers, [])
             self.plot_capture.clear()
+            self.temporal_model.set_rows(self.temporal_headers, [])
+            self.plot_temporal_metrics.clear()
+            self.plot_temporal_samples.clear()
             return
         self.summary.setHtml(self._summary_html(cap))
         self.params.setHtml(self._params_html(cap))
@@ -769,9 +810,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.files_model.set_rows(self.files_headers, file_rows)
         raw_rows = _read_csv(cap.files["raw"], limit=5000) if "raw" in cap.files else []
         proc_rows = _read_csv(cap.files["processed"], limit=5000) if "processed" in cap.files else []
+        raw_rows_full = _read_csv(cap.files["raw"]) if "raw" in cap.files else []
+        proc_rows_full = _read_csv(cap.files["processed"]) if "processed" in cap.files else []
         block_rows = _read_csv(cap.files["blocks"], limit=5000) if "blocks" in cap.files else []
         self.files_table.resizeColumnsToContents()
         self.update_capture_plot(raw_rows, proc_rows, block_rows)
+        self.update_temporalization(cap, raw_rows_full, proc_rows_full, block_rows)
 
     def open_path(self, path: Path | None):
         if path is None:
@@ -956,6 +1000,193 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             if np.any(mask):
                 self.plot_capture.plot(x[mask] + 5, y[mask], pen=pg.mkPen((20, 120, 110), width=2), symbol="o", name="Bloques BPM")
         self.plot_capture.setLabel("bottom", "Tiempo", units="s")
+
+    def update_temporalization(self, cap: CaptureRecord, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]], block_rows: list[dict[str, str]]):
+        rows = proc_rows or raw_rows
+        self.plot_temporal_metrics.clear()
+        self.plot_temporal_samples.clear()
+        if not rows and not block_rows:
+            self.temporal_model.set_rows(self.temporal_headers, [])
+            return
+
+        source_rows = rows
+        rel_t = np.asarray([], dtype=float)
+        if source_rows:
+            t = np.asarray([_as_float(r.get("tiempo_s", "")) for r in source_rows], dtype=float)
+            finite_t = t[np.isfinite(t)]
+            if finite_t.size:
+                rel_t = t - float(finite_t[0])
+        duration = self._temporal_duration(cap, rel_t, block_rows)
+        if not np.isfinite(duration) or duration <= 0:
+            self.temporal_model.set_rows(self.temporal_headers, [])
+            return
+
+        block_bpm = [_as_float(row.get("bpm_medio_10s", "")) for row in block_rows]
+        interval_count = max(int(math.ceil(duration / 10.0)), len(block_bpm), 1)
+        sensor_cfg = self._sensor_config_from_capture(cap)
+        analysis_cfg = self._analysis_config_from_capture(cap)
+        red_values = self._temporal_series(source_rows, "red_raw")
+        ir_values = self._temporal_series(source_rows, "ir_raw")
+        bpm_rolling = self._temporal_series(source_rows, "bpm_rolling_5s")
+        spo2_rolling = self._temporal_series(source_rows, "spo2_rolling_5s")
+        quality_rolling = self._temporal_series(source_rows, "quality_rolling_5s")
+        temp_values = self._temporal_series(source_rows, "temp_c")
+
+        table_rows: list[dict[str, str]] = []
+        centers: list[float] = []
+        bpm_block_values: list[float] = []
+        bpm_tramo_values: list[float] = []
+        spo2_values: list[float] = []
+        quality_values: list[float] = []
+        temp_plot_values: list[float] = []
+        sample_values: list[float] = []
+
+        for idx in range(interval_count):
+            start = idx * 10.0
+            end = min(duration, start + 10.0)
+            if end <= start:
+                continue
+            if rel_t.size:
+                if idx == interval_count - 1:
+                    mask = np.isfinite(rel_t) & (rel_t >= start) & (rel_t <= end)
+                else:
+                    mask = np.isfinite(rel_t) & (rel_t >= start) & (rel_t < end)
+                samples = int(np.sum(mask))
+                bpm_roll = self._masked_mean(bpm_rolling, mask)
+                spo2 = self._masked_mean(spo2_rolling, mask)
+                quality = self._masked_mean(quality_rolling, mask)
+                temp = self._masked_mean(temp_values, mask)
+                metrics = self._metrics_for_temporal_mask(rel_t, red_values, ir_values, mask, sensor_cfg, analysis_cfg)
+                bpm_tramo = metrics.bpm if np.isfinite(metrics.bpm) else bpm_roll
+                spo2 = metrics.spo2 if np.isfinite(metrics.spo2) else spo2
+                quality = metrics.quality if np.isfinite(metrics.quality) and metrics.n else quality
+            else:
+                samples = 0
+                bpm_tramo = math.nan
+                spo2 = math.nan
+                quality = math.nan
+                temp = math.nan
+            bpm_10s = block_bpm[idx] if idx < len(block_bpm) else math.nan
+            if not np.isfinite(bpm_10s) and np.isfinite(bpm_tramo):
+                bpm_10s = bpm_tramo
+            center = (start + end) / 2.0
+            centers.append(center)
+            bpm_block_values.append(bpm_10s)
+            bpm_tramo_values.append(bpm_tramo)
+            spo2_values.append(spo2)
+            quality_values.append(quality)
+            temp_plot_values.append(temp)
+            sample_values.append(float(samples))
+            table_rows.append({
+                "Tramo": f"{idx + 1}",
+                "Inicio s": fmt(start, 1, ""),
+                "Fin s": fmt(end, 1, ""),
+                "BPM 10s": fmt(bpm_10s, 1, ""),
+                "BPM tramo": fmt(bpm_tramo, 1, ""),
+                "SpO2 tramo": fmt(spo2, 1, ""),
+                "Calidad tramo": fmt(quality, 1, ""),
+                "Temp tramo": fmt(temp, 2, ""),
+                "Muestras tramo": str(samples),
+            })
+
+        self.temporal_model.set_rows(self.temporal_headers, table_rows)
+        self.temporal_table.resizeColumnsToContents()
+        x = np.asarray(centers, dtype=float)
+        self._plot_temporal_line(x, bpm_block_values, (20, 120, 110), "BPM 10s")
+        self._plot_temporal_line(x, bpm_tramo_values, (40, 140, 50), "BPM tramo")
+        self._plot_temporal_line(x, spo2_values, (150, 70, 160), "SpO2")
+        self._plot_temporal_line(x, quality_values, (220, 120, 30), "Calidad")
+        self._plot_temporal_line(x, temp_plot_values, (80, 80, 80), "Temp")
+        samples = np.asarray(sample_values, dtype=float)
+        mask_samples = np.isfinite(x) & np.isfinite(samples)
+        if np.any(mask_samples):
+            self.plot_temporal_samples.plot(x[mask_samples], samples[mask_samples], pen=pg.mkPen((30, 90, 180), width=2), symbol="o")
+
+    def _temporal_duration(self, cap: CaptureRecord, rel_t: np.ndarray, block_rows: list[dict[str, str]]) -> float:
+        if rel_t.size:
+            finite_t = rel_t[np.isfinite(rel_t)]
+            if finite_t.size:
+                return float(np.max(finite_t))
+        duration = _as_float(cap.value("duracion_real_s"))
+        if np.isfinite(duration) and duration > 0:
+            return duration
+        ends = [_as_float(row.get("fin_s", "")) for row in block_rows]
+        ends = [value for value in ends if np.isfinite(value)]
+        return max(ends) if ends else math.nan
+
+    def _temporal_series(self, rows: list[dict[str, str]], key: str) -> np.ndarray:
+        if not rows:
+            return np.asarray([], dtype=float)
+        return np.asarray([_as_float(row.get(key, "")) for row in rows], dtype=float)
+
+    def _masked_mean(self, values: np.ndarray, mask: np.ndarray) -> float:
+        if values.size != mask.size:
+            return math.nan
+        selected = values[mask]
+        selected = selected[np.isfinite(selected)]
+        if not selected.size:
+            return math.nan
+        return float(np.mean(selected))
+
+    def _metrics_for_temporal_mask(
+        self,
+        rel_t: np.ndarray,
+        red_values: np.ndarray,
+        ir_values: np.ndarray,
+        mask: np.ndarray,
+        sensor_cfg: SensorConfig,
+        analysis_cfg: AnalysisConfig,
+    ):
+        if rel_t.size != mask.size or red_values.size != mask.size or ir_values.size != mask.size:
+            return self._empty_temporal_metrics()
+        valid = mask & np.isfinite(rel_t) & np.isfinite(red_values) & np.isfinite(ir_values)
+        if int(np.sum(valid)) < 80:
+            return self._empty_temporal_metrics()
+        t = rel_t[valid]
+        return score_and_merge_metrics(t - float(t[0]), red_values[valid], ir_values[valid], sensor_cfg, analysis_cfg)
+
+    def _empty_temporal_metrics(self):
+        from ..models import Metrics
+
+        return Metrics()
+
+    def _sensor_config_from_capture(self, cap: CaptureRecord) -> SensorConfig:
+        return SensorConfig(
+            red=self._int_cap(cap, "cfg_red", 31),
+            ir=self._int_cap(cap, "cfg_ir", 31),
+            avg=self._int_cap(cap, "cfg_avg", 1),
+            rate=self._int_cap(cap, "cfg_rate", 100),
+            width=self._int_cap(cap, "cfg_width", 411),
+            adc=self._int_cap(cap, "cfg_adc", 16384),
+            skip=self._int_cap(cap, "cfg_skip", 50),
+            debug=str(cap.value("cfg_debug")).strip().lower() in {"1", "true", "si", "yes"},
+        ).clean()
+
+    def _analysis_config_from_capture(self, cap: CaptureRecord) -> AnalysisConfig:
+        cfg = AnalysisConfig()
+        cfg.bpm_min = self._int_cap(cap, "analysis_bpm_min", cfg.bpm_min)
+        cfg.bpm_max = self._int_cap(cap, "analysis_bpm_max", cfg.bpm_max)
+        cfg.detrend_seconds = self._float_cap(cap, "analysis_detrend_seconds", cfg.detrend_seconds)
+        cfg.smooth_seconds = self._float_cap(cap, "analysis_smooth_seconds", cfg.smooth_seconds)
+        cfg.ignore_initial_seconds = self._float_cap(cap, "analysis_ignore_initial_seconds", cfg.ignore_initial_seconds)
+        formula = cap.value("analysis_spo2_formula")
+        if formula:
+            cfg.spo2_formula = formula
+        return cfg
+
+    def _int_cap(self, cap: CaptureRecord, key: str, default: int) -> int:
+        value = _as_float(cap.value(key))
+        return int(value) if np.isfinite(value) else int(default)
+
+    def _float_cap(self, cap: CaptureRecord, key: str, default: float) -> float:
+        value = _as_float(cap.value(key))
+        return float(value) if np.isfinite(value) else float(default)
+
+    def _plot_temporal_line(self, x: np.ndarray, values: list[float], color: tuple[int, int, int], name: str):
+        y = np.asarray(values, dtype=float)
+        mask = np.isfinite(x) & np.isfinite(y)
+        if np.any(mask):
+            self.plot_temporal_metrics.plot(x[mask], y[mask], pen=pg.mkPen(color, width=2), symbol="o", name=name)
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         event.accept()
