@@ -1,0 +1,1 @@
+session_id;id;base_name;modo;condiciones_medida;config_label;sample_index;tiempo_s;red_raw;ir_raw;temp_c;temp_raw;cfg_red;cfg_ir;cfg_avg;cfg_rate;cfg_width;cfg_adc;cfg_skip;cfg_debug;pulso_previo;pulso_final_pulsio;pulso_final_fonendo;cfg_confirmacion;system_time
