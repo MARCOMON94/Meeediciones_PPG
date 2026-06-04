@@ -32,7 +32,7 @@ class SensorConfigWidget(QtWidgets.QGroupBox):
         self.rate = NoWheelComboBox(); self.rate.addItems(["50", "100", "200", "400", "800", "1000", "1600", "3200"]); self.rate.setCurrentText("100")
         self.width = NoWheelComboBox(); self.width.addItems(["69", "118", "215", "411"]); self.width.setCurrentText("411")
         self.adc = NoWheelComboBox(); self.adc.addItems(["2048", "4096", "8192", "16384"]); self.adc.setCurrentText("16384")
-        self.skip = NoWheelSpinBox(); self.skip.setRange(0, 200); self.skip.setValue(10)
+        self.skip = NoWheelSpinBox(); self.skip.setRange(0, 200); self.skip.setValue(50)
         self.debug = QtWidgets.QCheckBox("")
         labels = ["LED RED", "LED IR", "sampleAverage", "sampleRate", "pulseWidth", "adcRange", "Skip inicio"]
         widgets = [self.red, self.ir, self.avg, self.rate, self.width, self.adc, self.skip]

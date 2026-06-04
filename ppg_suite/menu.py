@@ -8,7 +8,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from .paths import BASE_DIR
 
 
-AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "temp", "relations", "fourier"]
+AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "experimento_vacio", "temp", "relations", "fourier"]
 
 
 class ModeSelectDialog(QtWidgets.QDialog):
@@ -45,10 +45,11 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_reajustes = QtWidgets.QPushButton("Reajustes")
         self.btn_configurations = QtWidgets.QPushButton("Configuraciones")
         self.btn_3m = QtWidgets.QPushButton("Experimento 3M")
+        self.btn_vacuum = QtWidgets.QPushButton("Experimento con vacio")
         self.btn_relations = QtWidgets.QPushButton("Estadisticas")
         self.btn_fourier = QtWidgets.QPushButton("Analisis experimental de Fourier")
 
-        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_relations, self.btn_fourier]:
+        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_vacuum, self.btn_relations, self.btn_fourier]:
             button.setMinimumHeight(38)
 
         grid.addWidget(self.btn_test, 0, 0)
@@ -56,8 +57,9 @@ class ModeSelectDialog(QtWidgets.QDialog):
         grid.addWidget(self.btn_reajustes, 1, 0)
         grid.addWidget(self.btn_configurations, 1, 1)
         grid.addWidget(self.btn_3m, 2, 0, 1, 2)
-        grid.addWidget(self.btn_relations, 3, 0, 1, 2)
-        grid.addWidget(self.btn_fourier, 4, 0, 1, 2)
+        grid.addWidget(self.btn_vacuum, 3, 0, 1, 2)
+        grid.addWidget(self.btn_relations, 4, 0, 1, 2)
+        grid.addWidget(self.btn_fourier, 5, 0, 1, 2)
 
         info = QtWidgets.QLabel(
             "Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.\n"
@@ -65,6 +67,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
             "Reajustes: calibracion larga con controles completos.\n"
             "Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor.\n"
             "Experimento 3M: optimizacion adaptativa del sensor usando BPM manual, pulso PPG, SpO2, ruido, PI y saturacion.\n"
+            "Experimento con vacio: PPG y microfono sincronizados; el notch se aplica solo al informe final.\n"
             "Estadisticas: sesiones, resultados, configuraciones y graficas comparativas.\n"
             "Fourier experimental: compara varios raw y razona que configuracion separa mejor el pulso."
         )
@@ -88,6 +91,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_reajustes.clicked.connect(lambda: self.choose("reajustes"))
         self.btn_configurations.clicked.connect(lambda: self.choose("configurations"))
         self.btn_3m.clicked.connect(lambda: self.choose("experimento_3m"))
+        self.btn_vacuum.clicked.connect(lambda: self.choose("experimento_vacio"))
         self.btn_relations.clicked.connect(lambda: self.choose("relations"))
         self.btn_fourier.clicked.connect(lambda: self.choose("fourier"))
         self.btn_updates.clicked.connect(self.show_latest_updates)

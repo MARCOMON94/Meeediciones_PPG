@@ -39,6 +39,14 @@ class PPGSuite(QtWidgets.QMainWindow):
         else:
             self.resize(1250, 800)
         self.state = CaptureState()
+        self.results_dir = getattr(self, "results_dir", RESULTS_DIR)
+        self.raw_dir = getattr(self, "raw_dir", RAW_DIR)
+        self.processed_dir = getattr(self, "processed_dir", PROCESSED_DIR)
+        self.session_dir = getattr(self, "session_dir", SESSION_DIR)
+        self.figures_dir = getattr(self, "figures_dir", FIGURES_DIR)
+        self.screenshot_dir = getattr(self, "screenshot_dir", SCREENSHOT_DIR)
+        self.config_dir = getattr(self, "config_dir", CONFIG_DIR)
+        self.report_dir = getattr(self, "report_dir", REPORT_DIR)
         self.serial_port: Optional[serial.Serial] = None
         self.rx_buffer = ""
         self.port_name = "NO CONECTADO"
@@ -55,21 +63,21 @@ class PPGSuite(QtWidgets.QMainWindow):
         self._last_long_window_refresh = 0.0
 
         if self.app_mode == "real":
-            self.info_update_interval = 0.25
-            self.metric_update_interval = 1.00
-            self.plot_update_interval = 0.12
+            self.info_update_interval = 0.75
+            self.metric_update_interval = 2.00
+            self.plot_update_interval = 1.20
             self.heavy_plot_interval = 9999.0
         elif self.app_mode == "test":
-            self.info_update_interval = 0.20
-            self.metric_update_interval = 0.50
-            self.plot_update_interval = 0.10
-            self.heavy_plot_interval = 1.25
+            self.info_update_interval = 0.75
+            self.metric_update_interval = 2.00
+            self.plot_update_interval = 1.20
+            self.heavy_plot_interval = 3.00
         else:
-            self.info_update_interval = 0.15
-            self.metric_update_interval = 0.35
-            self.plot_update_interval = 0.08
-            self.heavy_plot_interval = 0.80
-        self.session_file = SESSION_DIR / f"session_{now_stamp()}.csv"
+            self.info_update_interval = 0.75
+            self.metric_update_interval = 2.00
+            self.plot_update_interval = 1.20
+            self.heavy_plot_interval = 3.00
+        self.session_file = self.session_dir / f"session_{now_stamp()}.csv"
         self.session_handle = open(self.session_file, "w", newline="", encoding="utf-8")
         self.session_writer = csv.writer(self.session_handle, delimiter=";")
         self.write_session_header()
@@ -113,7 +121,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         capture_group = QtWidgets.QGroupBox("Toma normal")
         cap = QtWidgets.QFormLayout(capture_group)
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
-        self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(20.0); self.duration_spin.setSuffix(" s")
+        self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(90.0); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.condition_edit = QtWidgets.QLineEdit()
         self.condition_edit.setPlaceholderText("Ej.: campo, ordeño activo, sensor reajustado, animal inquieto...")
@@ -156,7 +164,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.btn_start.clicked.connect(self.start_normal_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
+        self.btn_open_base.clicked.connect(lambda: open_folder(self.results_dir))
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 9))
@@ -623,7 +631,7 @@ class PPGSuite(QtWidgets.QMainWindow):
 
     def open_raw_file(self):
         st = self.state
-        st.raw_file = RAW_DIR / f"raw_{st.base_name}.csv"
+        st.raw_file = self.raw_dir / f"raw_{st.base_name}.csv"
         st.raw_handle = open(st.raw_file, "w", newline="", encoding="utf-8")
         st.raw_writer = csv.writer(st.raw_handle, delimiter=";")
         st.raw_writer.writerow([
@@ -754,7 +762,7 @@ class PPGSuite(QtWidgets.QMainWindow):
 
     def check_auto_stop(self):
         st = self.state
-        if st.capturing and st.mode == "normal":
+        if st.capturing and st.mode in ("normal", "experimento_vacio"):
             if time.time() - st.capture_start_wall >= st.requested_duration_s:
                 self.stop_capture("DURACION_COMPLETADA_PYTHON")
 
@@ -810,7 +818,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.metrics = score_and_merge_metrics(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config())
             st.bpm_blocks = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=2)
             st.bpm_blocks_10s = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=10)
-        if st.mode in ("normal", "long"):
+        if st.mode in ("normal", "long", "experimento_vacio"):
             self.ask_final_reference()
         self.update_raw_manual_reference()
         self.save_processed()
@@ -866,8 +874,8 @@ class PPGSuite(QtWidgets.QMainWindow):
             log.warning("No se pudo actualizar pulso manual en raw %s: %s", path, exc)
 
     def save_current_config_json(self, prefix: str):
-        data = {"sensor": asdict(self.sensor_widget.get_config()), "analysis": asdict(self.analysis_widget.get_config()), "base_dir": str(BASE_DIR), "results_dir": str(RESULTS_DIR), "created": datetime.now().isoformat()}
-        path = CONFIG_DIR / f"{prefix}_{now_stamp()}.json"
+        data = {"sensor": asdict(self.sensor_widget.get_config()), "analysis": asdict(self.analysis_widget.get_config()), "base_dir": str(BASE_DIR), "results_dir": str(self.results_dir), "created": datetime.now().isoformat()}
+        path = self.config_dir / f"{prefix}_{now_stamp()}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         self.state.config_file = path
@@ -905,7 +913,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             nearest = np.searchsorted(t, peak_times)
             nearest = nearest[(nearest >= 0) & (nearest < t.size)]
             peak_flags[nearest] = 1
-        st.processed_file = PROCESSED_DIR / f"proc_{st.base_name}.csv"
+        st.processed_file = self.processed_dir / f"proc_{st.base_name}.csv"
         with open(st.processed_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
@@ -928,7 +936,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st = self.state
         if not st.base_name:
             return
-        st.blocks_file = REPORT_DIR / f"bpm_blocks_10s_{st.base_name}.csv"
+        st.blocks_file = self.report_dir / f"bpm_blocks_10s_{st.base_name}.csv"
         with open(st.blocks_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow(["session_id", "id", "base_name", "modo", "bloque", "inicio_s", "fin_s", "bpm_medio_10s"] )
@@ -941,8 +949,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         st = self.state
         if not st.base_name:
             return
-        st.plot_file = FIGURES_DIR / f"plot_{st.base_name}.png"
-        st.screenshot_file = SCREENSHOT_DIR / f"screen_{st.base_name}.png"
+        st.plot_file = self.figures_dir / f"plot_{st.base_name}.png"
+        st.screenshot_file = self.screenshot_dir / f"screen_{st.base_name}.png"
         self.tabs.grab().save(str(st.plot_file), "PNG")
         self.grab().save(str(st.screenshot_file), "PNG")
 
@@ -950,7 +958,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st = self.state
         if not st.base_name:
             return
-        st.summary_file = REPORT_DIR / f"summary_{st.base_name}.json"
+        st.summary_file = self.report_dir / f"summary_{st.base_name}.json"
         temp = self.temperature_summary()
         data = {
             "session_id": st.session_id or st.base_name,

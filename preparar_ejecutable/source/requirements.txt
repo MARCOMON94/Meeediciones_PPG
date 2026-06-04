@@ -3,3 +3,4 @@ numpy
 pyserial
 PyQt6
 pyqtgraph
+sounddevice
