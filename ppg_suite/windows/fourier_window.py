@@ -1393,13 +1393,15 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 fmt(result.bpm_hilbert_ir, 1, "-"),
                 fmt(result.bpm_wavelet_ir, 1, "-"),
                 fmt(result.wavelet_quality, 0, "-"),
+                fmt(result.spo2_est_pct, 1, "-"),
+                fmt(result.spo2_quality, 0, "-"),
                 fmt(result.diff_fft_ref_bpm, 1, "-"),
                 fmt(result.pi_ir_pct, 3, "-"),
             ])
         draw_table(
-            ["#", "Punt.", "Veredicto", "Configuracion", "Ref.", "FFT", "Autoc.", "Hilbert", "Wavelet", "WQ", "Dif.", "PI IR"],
+            ["#", "Punt.", "Veredicto", "Configuracion", "Ref.", "FFT", "Autoc.", "Hilbert", "Wavelet", "WQ", "SpO2", "QSpO2", "Dif.", "PI IR"],
             ranking_rows,
-            [22, 35, 66, 112, 38, 38, 40, 40, 42, 28, 36, 38],
+            [20, 32, 58, 96, 34, 34, 36, 38, 39, 25, 34, 34, 32, 34],
         )
 
         draw_text("Por que gana la mejor configuracion", 15, True)
@@ -1416,6 +1418,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                     ["Autocorrelacion", f"{fmt(result.bpm_autocorr, 1, '-')} BPM", f"Diferencia maxima estimadores {fmt(result.agreement_bpm, 1, '-')} BPM"],
                     ["Hilbert", f"{fmt(result.bpm_hilbert_ir, 1, '-')} BPM", f"Envolvente CV {fmt(result.hilbert_envelope_cv_pct, 1, '-')} % | calidad {fmt(result.hilbert_quality, 0, '-')}"],
                     ["Wavelet", f"{fmt(result.bpm_wavelet_ir, 1, '-')} BPM", f"Calidad {fmt(result.wavelet_quality, 0, '-')} | dominancia {fmt(result.wavelet_dominance, 2, '-')} | peso bajo"],
+                    ["SpO2 experimental", f"{fmt(result.spo2_est_pct, 1, '-')} %", f"Ratio R {fmt(result.spo2_ratio_r, 4, '-')} | calidad {fmt(result.spo2_quality, 0, '-')} | no calibrada clinicamente"],
                     ["Senal", f"PI IR {fmt(result.pi_ir_pct, 3, '-')} %", f"Artefactos {fmt(result.artifact_ir_pct, 1, '-')} % | saturacion {fmt(result.saturation_pct, 1, '-')} %"],
                     ["Cribado", f"Retenido {fmt(result.retained_pct, 1, '-')} %", f"Descartado {fmt(result.discarded_pct, 1, '-')} %"],
                 ],
