@@ -1,0 +1,55 @@
+{
+  "session_id": "VACIO_SIN_CROTAL_20260605_110612",
+  "base_name": "VACIO_SIN_CROTAL_20260605_110612",
+  "id": "SIN_CROTAL",
+  "reason": "STOP_MANUAL",
+  "sync": {
+    "ppg_start_perf": 597792.5421993,
+    "ppg_stop_perf": 597917.7684034,
+    "audio_start_perf": NaN,
+    "audio_stop_perf": 597917.7696184,
+    "audio_minus_ppg_start_s": NaN,
+    "created": "2026-06-05T11:08:38.794412"
+  },
+  "audio": {
+    "status": "audio no disponible: No module named 'sounddevice'",
+    "vacuum_hz": NaN,
+    "vacuum_bpm": NaN,
+    "dominance": NaN
+  },
+  "audio_device": {
+    "index": null,
+    "name": "",
+    "samplerate": 44100
+  },
+  "ppg_notch": {
+    "ppg_bpm_final": 45.025317216347865,
+    "ppg_fft_bpm_before_notch": 89.3528447279588,
+    "ppg_fft_dominance_before_notch": 1.0528090768173295,
+    "ppg_fft_bpm_excluding_audio_peak": 89.3528447279588,
+    "ppg_fft_bpm_after_notch": 89.3528447279588,
+    "ppg_fft_dominance_after_notch": 1.0528090768173295,
+    "audio_ppg_peak_distance_bpm": NaN
+  },
+  "metrics": {
+    "bpm": 45.025317216347865,
+    "bpm_peak": 101.22954658762771,
+    "bpm_fft": 45.025317216347865,
+    "bpm_autocorr": 181.48213580867815,
+    "quality": 0.0,
+    "quality_label": "dudosa",
+    "spo2": 0.0,
+    "ratio_r": 2.0453545134072737,
+    "pi_ir_pct": 0.04354915320966319,
+    "pi_red_pct": 0.08907345707244947,
+    "artifact_ir_pct": 27.6813670859205,
+    "contact_label": "contacto débil / baja perfusión",
+    "reason": "primeros 1.0 s ignorados; cribado robusto descarta 27.7 % | cv_intervalos=0.38 | dominancia_fft=1.50 | autocorr=0.40 | estimadores discrepantes; se usa FFT spread=56.2 | BPM por debajo del umbral de calidad | estimada no calibrada"
+  },
+  "files": {
+    "raw_ppg": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\experimento_con_vacio\\raw_ppg\\raw_VACIO_SIN_CROTAL_20260605_110612.csv",
+    "audio_wav": "",
+    "processed_ppg": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\experimento_con_vacio\\processed\\proc_VACIO_SIN_CROTAL_20260605_110612.csv",
+    "summary": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\experimento_con_vacio\\reports\\summary_VACIO_SIN_CROTAL_20260605_110612.json"
+  }
+}

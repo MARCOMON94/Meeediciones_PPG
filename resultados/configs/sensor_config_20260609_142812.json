@@ -1,0 +1,28 @@
+{
+  "sensor": {
+    "red": 63,
+    "ir": 63,
+    "avg": 4,
+    "rate": 800,
+    "width": 411,
+    "adc": 16384,
+    "skip": 50,
+    "debug": false
+  },
+  "analysis": {
+    "bpm_min": 45,
+    "bpm_max": 180,
+    "peak_threshold_sd": 0.55,
+    "detrend_seconds": 2.0,
+    "smooth_seconds": 0.07,
+    "ignore_initial_seconds": 1.0,
+    "min_quality_to_accept": 45.0,
+    "spo2_formula": "quad",
+    "spo2_custom_a": 94.845,
+    "spo2_custom_b": 30.354,
+    "spo2_custom_c": -45.06
+  },
+  "base_dir": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2",
+  "results_dir": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados",
+  "created": "2026-06-09T14:28:12.084908"
+}

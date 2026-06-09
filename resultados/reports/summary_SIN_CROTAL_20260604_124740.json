@@ -1,0 +1,106 @@
+{
+  "session_id": "SIN_CROTAL_20260604_124740",
+  "id": "SIN_CROTAL",
+  "base_name": "SIN_CROTAL_20260604_124740",
+  "mode": "normal",
+  "measurement_condition": "",
+  "config_label": "manual",
+  "reason": "DURACION_COMPLETADA_PYTHON",
+  "requested_duration_s": 20.0,
+  "samples": 788,
+  "metrics": {
+    "n": 701,
+    "hz": 39.499955393264656,
+    "duration_s": 17.721539,
+    "bpm": 69.58590298575456,
+    "bpm_peak": 71.09991970787631,
+    "bpm_fft": 67.71420924559656,
+    "bpm_autocorr": 69.0087455988212,
+    "spo2": 99.95677934460156,
+    "ratio_r": 0.33532031675737145,
+    "resp_rate_rpm": NaN,
+    "resp_quality": 0.0,
+    "resp_reason": "respiracion experimental no estimable: toma menor de 20 s",
+    "quality": 74.54516252942726,
+    "quality_label": "buena",
+    "artifact_ir_pct": 0.9887005649717515,
+    "artifact_red_pct": 0.9985734664764622,
+    "pi_ir_pct": 0.04368288946986516,
+    "pi_red_pct": 0.014647760333912432,
+    "ac_ir": 19.28876396244242,
+    "dc_ir": 44156.337175792505,
+    "ac_red": 7.1641775778135965,
+    "dc_red": 48909.71325648415,
+    "saturation_pct": 0.0,
+    "contact_label": "contacto débil / baja perfusión",
+    "polarity": "normal",
+    "reason": "primeros 1.0 s ignorados; cribado robusto descarta 1.0 % | cv_intervalos=0.13 | dominancia_fft=1.31 | autocorr=0.61 | estimadores coherentes spread=3.4 | estimada no calibrada",
+    "peaks_count": 21
+  },
+  "temperature": {
+    "temp_samples": 788,
+    "temp_c_last": 29.7,
+    "temp_c_mean": 29.948692893401017,
+    "temp_c_min": 28.91,
+    "temp_c_max": 31.16,
+    "temp_raw_last": 2230.0
+  },
+  "bpm_blocks_2s_orientative": [
+    NaN,
+    71.36678360378266,
+    70.8436245156155,
+    68.84119926658549,
+    68.7797348013081,
+    69.66155467183016,
+    70.3860321935656,
+    71.54893327228434,
+    71.94430129524292,
+    NaN
+  ],
+  "bpm_blocks_10s_mean": [
+    68.9203202663768,
+    70.12940560741592
+  ],
+  "sensor_config": {
+    "red": 63,
+    "ir": 63,
+    "avg": 1,
+    "rate": 100,
+    "width": 411,
+    "adc": 16384,
+    "skip": 10,
+    "debug": false
+  },
+  "analysis_config": {
+    "bpm_min": 45,
+    "bpm_max": 150,
+    "peak_threshold_sd": 0.55,
+    "detrend_seconds": 2.0,
+    "smooth_seconds": 0.07,
+    "ignore_initial_seconds": 1.0,
+    "min_quality_to_accept": 45.0,
+    "spo2_formula": "quad",
+    "spo2_custom_a": 94.845,
+    "spo2_custom_b": 30.354,
+    "spo2_custom_c": -45.06
+  },
+  "config_confirmation": {
+    "status": "confirmada",
+    "command": "CONFIG RED=63 IR=63 AVG=1 RATE=100 WIDTH=411 ADC=16384 SKIP=10 DEBUG=0",
+    "arduino_cfg_line": "CFG RED=63 IR=63 AVG=1 RATE=100 WIDTH=411 ADC=16384 SKIP=10 DEBUG=0"
+  },
+  "manual_reference": {
+    "pulso_previo": "68",
+    "pulso_final_pulsio": "66",
+    "pulso_final_fonendo": ""
+  },
+  "files": {
+    "raw": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\raw\\raw_SIN_CROTAL_20260604_124740.csv",
+    "processed": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\processed\\proc_SIN_CROTAL_20260604_124740.csv",
+    "plot": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\figures\\plot_SIN_CROTAL_20260604_124740.png",
+    "screenshot": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\screenshots\\screen_SIN_CROTAL_20260604_124740.png",
+    "config": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\configs\\config_SIN_CROTAL_20260604_124740_20260604_124740.json",
+    "bpm_blocks_10s": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\reports\\bpm_blocks_10s_SIN_CROTAL_20260604_124740.csv"
+  },
+  "created": "2026-06-04T12:48:14.683415"
+}
