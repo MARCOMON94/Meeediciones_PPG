@@ -1,0 +1,89 @@
+{
+  "session_id": "BLOQUE_16CFG_386_20260610_135136_CFG004_CONFIG_03_-_B3F_AVG4_ADC16384",
+  "id": "386",
+  "base_name": "BLOQUE_16CFG_386_20260610_135136_CFG004_CONFIG_03_-_B3F_AVG4_ADC16384",
+  "mode": "configurations",
+  "measurement_condition": "LEFT",
+  "config_label": "CONFIG 03 - B3F_AVG4_ADC16384",
+  "config_description": "Brillo bajo, promediado x4, rango ADC 16384",
+  "reason": "BLOQUE_COMPLETADO",
+  "requested_duration_s": 30.0,
+  "samples": 1143,
+  "metrics": {
+    "n": 979,
+    "hz": 36.613757540777435,
+    "duration_s": 26.71127100000001,
+    "bpm": 47.17109867216725,
+    "bpm_peak": 113.31046982626417,
+    "bpm_fft": 47.17109867216725,
+    "bpm_autocorr": 185.41713244297773,
+    "spo2": 95.98187373053233,
+    "ratio_r": 0.6338291243168301,
+    "resp_rate_rpm": 11.23121396956363,
+    "resp_quality": 64.33181927890705,
+    "resp_reason": "experimental: pico lento 11.2 resp/min; dominancia=1.16; banda=0.92; ciclos~5.0",
+    "quality": 5.7099153055598055,
+    "quality_label": "dudosa",
+    "artifact_ir_pct": 7.902163687676388,
+    "artifact_red_pct": 6.435137895812053,
+    "pi_ir_pct": 0.15657169784660643,
+    "pi_red_pct": 0.09923970213891387,
+    "ac_ir": 46.1206446626105,
+    "dc_ir": 29456.565456545653,
+    "ac_red": 12.324561140697343,
+    "dc_red": 12418.982398239825,
+    "saturation_pct": 0.0,
+    "contact_label": "contacto útil",
+    "polarity": "normal",
+    "reason": "primeros 1.0 s ignorados; cribado robusto descarta 7.9 % | cv_intervalos=0.31 | dominancia_fft=1.19 | autocorr=0.73 | estimadores discrepantes; se usa FFT spread=66.1 | BPM por debajo del umbral de calidad | estimada no calibrada",
+    "peaks_count": 17
+  },
+  "temperature": {
+    "temp_samples": 1143,
+    "temp_c_last": 31.96,
+    "temp_c_mean": 33.882563429571306,
+    "temp_c_min": 31.24,
+    "temp_c_max": 37.94,
+    "temp_raw_last": 2315.0
+  },
+  "bpm_blocks_10s_mean": [
+    NaN,
+    NaN,
+    NaN
+  ],
+  "sensor_config": {
+    "red": 63,
+    "ir": 63,
+    "avg": 4,
+    "rate": 800,
+    "width": 411,
+    "adc": 16384,
+    "skip": 50,
+    "debug": false
+  },
+  "analysis_config": {
+    "bpm_min": 45,
+    "bpm_max": 180,
+    "peak_threshold_sd": 0.55,
+    "detrend_seconds": 2.0,
+    "smooth_seconds": 0.07,
+    "ignore_initial_seconds": 1.0,
+    "min_quality_to_accept": 45.0,
+    "spo2_formula": "quad",
+    "spo2_custom_a": 94.845,
+    "spo2_custom_b": 30.354,
+    "spo2_custom_c": -45.06
+  },
+  "files": {
+    "raw": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\raw\\raw_BLOQUE_16CFG_386_20260610_135136_CFG004_CONFIG_03_-_B3F_AVG4_ADC16384.csv",
+    "processed": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\processed\\proc_BLOQUE_16CFG_386_20260610_135136_CFG004_CONFIG_03_-_B3F_AVG4_ADC16384.csv",
+    "plot": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\figures\\plot_BLOQUE_16CFG_386_20260610_135136_CFG004_CONFIG_03_-_B3F_AVG4_ADC16384.png",
+    "bpm_blocks_10s": "C:\\Users\\julia\\OneDrive\\Desktop\\tesis\\mtestv2\\resultados\\reports\\bpm_blocks_10s_BLOQUE_16CFG_386_20260610_135136_CFG004_CONFIG_03_-_B3F_AVG4_ADC16384.csv"
+  },
+  "manual_reference": {
+    "pulso_previo": "110",
+    "pulso_final_pulsio": "110",
+    "pulso_final_fonendo": ""
+  },
+  "created": "2026-06-10T14:03:00.181453"
+}
