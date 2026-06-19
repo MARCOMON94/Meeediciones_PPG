@@ -5,30 +5,30 @@ MAX30105 sensor;
 
 // ======================================================
 // Firmware mtestv2
-// MAX3010x + NTC A0
+// MAX3010x + NTC A0/A1
 //
 // Comandos desde Python:
 //   STATUS
-//   CONFIG RED=31 IR=31 AVG=1 RATE=100 WIDTH=411 ADC=16384 SKIP=10 DEBUG=0
+//   CONFIG RED=63 IR=63 AVG=4 RATE=800 WIDTH=411 ADC=16384 SKIP=50 DEBUG=0
 //   CONFIG_TEMP VCC=3.30 RFIX=10000 RN=10000 BETA=3435 OFFSET=0.0 ADCBITS=12
 //   START_CONTINUOUS
 //   START_TEMP
 //   STOP
 //
 // Datos enviados:
-//   micros,red,ir,tempC,tempRaw
+//   micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw
 // ======================================================
 
 
 // ---------- MAX3010x ----------
 struct SensorConfig {
-  uint8_t red = 31;
-  uint8_t ir = 31;
-  uint8_t avg = 1;
-  uint16_t rate = 100;
+  uint8_t red = 63;
+  uint8_t ir = 63;
+  uint8_t avg = 4;
+  uint16_t rate = 800;
   uint16_t width = 411;
   uint16_t adc = 16384;
-  uint16_t skip = 10;
+  uint16_t skip = 50;
   bool debug = false;
 };
 
@@ -36,7 +36,8 @@ SensorConfig cfg;
 
 
 // ---------- NTC TEMPERATURA ----------
-const int PIN_TEMP = A0;
+const int PIN_TEMP_A0 = A0;
+const int PIN_TEMP_A1 = A1;
 
 // Montaje asumido:
 // 3.3V ---- NTC ---- A0 ---- R_FIJA ---- GND
@@ -173,8 +174,8 @@ void handleConfig(const String &line) {
 
   cfg.red = constrain(red, 0, 255);
   cfg.ir = constrain(ir, 0, 255);
-  cfg.avg = validAvg(avg) ? avg : 1;
-  cfg.rate = validRate(rate) ? rate : 100;
+  cfg.avg = validAvg(avg) ? avg : 4;
+  cfg.rate = validRate(rate) ? rate : 800;
   cfg.width = validWidth(width) ? width : 411;
   cfg.adc = validAdc(adc) ? adc : 16384;
   cfg.skip = constrain(skip, 0, 200);
@@ -215,8 +216,8 @@ uint32_t adcMaxValue() {
   return (1UL << tempCfg.adcBits) - 1UL;
 }
 
-uint16_t leerTempRaw() {
-  return analogRead(PIN_TEMP);
+uint16_t leerTempRaw(int pin) {
+  return analogRead(pin);
 }
 
 float leerTemperaturaC(uint16_t raw) {
@@ -241,8 +242,10 @@ float leerTemperaturaC(uint16_t raw) {
 }
 
 void printDataLine(uint32_t red, uint32_t ir) {
-  uint16_t rawTemp = leerTempRaw();
-  float tempC = leerTemperaturaC(rawTemp);
+  uint16_t rawTempA0 = leerTempRaw(PIN_TEMP_A0);
+  uint16_t rawTempA1 = leerTempRaw(PIN_TEMP_A1);
+  float tempA0C = leerTemperaturaC(rawTempA0);
+  float tempA1C = leerTemperaturaC(rawTempA1);
 
   Serial.print(micros());
   Serial.print(",");
@@ -250,10 +253,15 @@ void printDataLine(uint32_t red, uint32_t ir) {
   Serial.print(",");
   Serial.print(ir);
   Serial.print(",");
-  if (isnan(tempC)) Serial.print("nan");
-  else Serial.print(tempC, 2);
+  if (isnan(tempA0C)) Serial.print("nan");
+  else Serial.print(tempA0C, 2);
   Serial.print(",");
-  Serial.println(rawTemp);
+  Serial.print(rawTempA0);
+  Serial.print(",");
+  if (isnan(tempA1C)) Serial.print("nan");
+  else Serial.print(tempA1C, 2);
+  Serial.print(",");
+  Serial.println(rawTempA1);
 }
 
 // ======================================================
@@ -375,7 +383,7 @@ void diagnosticoTemperatura() {
   const byte muestras = 20;
 
   // Lectura normal
-  pinMode(PIN_TEMP, INPUT);
+  pinMode(PIN_TEMP_A0, INPUT);
   delay(5);
 
   uint32_t rawSum = 0;
@@ -383,7 +391,7 @@ void diagnosticoTemperatura() {
   uint16_t rawMax = 0;
 
   for (byte i = 0; i < muestras; i++) {
-    uint16_t raw = leerTempRaw();
+    uint16_t raw = leerTempRaw(PIN_TEMP_A0);
 
     rawSum += raw;
 
@@ -397,20 +405,20 @@ void diagnosticoTemperatura() {
 
   // Prueba con pullup interno para detectar pin flotante.
   // Si A0 no esta conectado a nada, al activar pullup suele subir mucho.
-  pinMode(PIN_TEMP, INPUT_PULLUP);
+  pinMode(PIN_TEMP_A0, INPUT_PULLUP);
   delay(20);
 
   uint32_t rawPullupSum = 0;
 
   for (byte i = 0; i < muestras; i++) {
-    rawPullupSum += leerTempRaw();
+    rawPullupSum += leerTempRaw(PIN_TEMP_A0);
     delay(2);
   }
 
   uint16_t rawPullupAvg = rawPullupSum / muestras;
 
   // Volvemos a dejarlo como entrada normal para no afectar al resto del programa.
-  pinMode(PIN_TEMP, INPUT);
+  pinMode(PIN_TEMP_A0, INPUT);
   delay(5);
 
   uint32_t adcMax = adcMaxValue();

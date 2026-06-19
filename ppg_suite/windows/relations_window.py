@@ -45,6 +45,8 @@ HEADER_TOOLTIPS = {
     "Animal": "Identificador introducido para el animal o sujeto de la toma.",
     "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
     "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
+    "Ubre": "Lado o zona indicada para la toma: ubre, right o left. Es metadato, no entra en calculos.",
+    "Medicion": "Indica si la toma se hizo con vacio o sin vacio. Es metadato, no entra en calculos.",
     "Estado": "Lectura rapida de calidad: Buena, Aceptable o Dudosa segun la calidad calculada.",
     "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
     "Dif. BPM-ref": "Diferencia absoluta entre el BPM calculado por el sistema y el BPM de referencia manual.",
@@ -59,6 +61,12 @@ HEADER_TOOLTIPS = {
     "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG. Requiere validacion externa.",
     "Calidad resp.": "Confianza interna de la respiracion experimental, de 0 a 100.",
     "Temp raw": "Valor bruto del ADC de temperatura.",
+    "Temp A0 media": "Temperatura media calculada desde la fuente analogica A0.",
+    "Temp A0 ult.": "Ultima temperatura calculada desde la fuente analogica A0.",
+    "Temp A0 raw": "Ultimo valor bruto ADC de la fuente analogica A0.",
+    "Temp A1 media": "Temperatura media calculada desde la fuente analogica A1.",
+    "Temp A1 ult.": "Ultima temperatura calculada desde la fuente analogica A1.",
+    "Temp A1 raw": "Ultimo valor bruto ADC de la fuente analogica A1.",
     "Calidad": "Puntuacion global interna de la toma tras BPM, PI, artefactos, saturacion y cribado.",
     "Contacto": "Etiqueta de contacto/perfusion derivada del nivel DC e indice de perfusion IR.",
     "PI IR %": "Indice de perfusion IR: componente pulsatile AC respecto al nivel DC. Cuanto mayor, mas visible es el pulso.",
@@ -258,14 +266,31 @@ class DictTableModel(QtCore.QAbstractTableModel):
         self.rows = rows
         self.endResetModel()
 
+    def sort(self, column: int, order=QtCore.Qt.SortOrder.AscendingOrder):
+        if not (0 <= column < len(self.headers)):
+            return
+        key = self.headers[column]
+
+        def sort_key(row: dict[str, str]):
+            text = row.get(key, "")
+            number = _as_float(text)
+            if np.isfinite(number):
+                return (0, number)
+            return (1, text.lower())
+
+        self.layoutAboutToBeChanged.emit()
+        self.rows.sort(key=sort_key, reverse=order == QtCore.Qt.SortOrder.DescendingOrder)
+        self.layoutChanged.emit()
+
 
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
+        "Hora", "Animal", "Modo", "Ubre", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
         "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
+        "Temp A0 media", "Temp A0 ult.", "Temp A0 raw", "Temp A1 media", "Temp A1 ult.", "Temp A1 raw",
         "Resp/min (experimental)", "Calidad resp.", "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
         "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
         "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final pulsio", "Pulso final fonendo",
@@ -306,6 +331,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.text_filter.setPlaceholderText("Animal, modo, configuracion, contacto...")
         self.mode_filter = QtWidgets.QComboBox()
         self.mode_filter.addItem("Todos")
+        self.udder_filter = QtWidgets.QComboBox()
+        self.udder_filter.addItem("Todos")
+        self.vacuum_filter = QtWidgets.QComboBox()
+        self.vacuum_filter.addItem("Todos")
         self.quality_min = QtWidgets.QDoubleSpinBox()
         self.quality_min.setRange(0, 100)
         self.quality_min.setValue(0)
@@ -315,13 +344,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.text_filter, 0, 1, 1, 4)
         fl.addWidget(QtWidgets.QLabel("Modo"), 0, 5)
         fl.addWidget(self.mode_filter, 0, 6)
-        fl.addWidget(QtWidgets.QLabel("Calidad min."), 0, 7)
-        fl.addWidget(self.quality_min, 0, 8)
-        fl.addWidget(self.btn_clear, 0, 9)
-        fl.addWidget(self.btn_import, 0, 10)
+        fl.addWidget(QtWidgets.QLabel("Ubre"), 0, 7)
+        fl.addWidget(self.udder_filter, 0, 8)
+        fl.addWidget(QtWidgets.QLabel("Medicion"), 0, 9)
+        fl.addWidget(self.vacuum_filter, 0, 10)
+        fl.addWidget(QtWidgets.QLabel("Calidad min."), 1, 0)
+        fl.addWidget(self.quality_min, 1, 1)
+        fl.addWidget(self.btn_clear, 1, 2)
+        fl.addWidget(self.btn_import, 1, 3)
         root.addWidget(filters)
         self.text_filter.textChanged.connect(self.apply_filters)
         self.mode_filter.currentTextChanged.connect(self.apply_filters)
+        self.udder_filter.currentTextChanged.connect(self.apply_filters)
+        self.vacuum_filter.currentTextChanged.connect(self.apply_filters)
         self.quality_min.valueChanged.connect(self.apply_filters)
         self.btn_clear.clicked.connect(self.clear_filters)
         self.btn_import.clicked.connect(self.pick_folder)
@@ -341,6 +376,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.sessions_table.setAlternatingRowColors(True)
         self.sessions_table.verticalHeader().setVisible(False)
+        self.sessions_table.setSortingEnabled(True)
         self.sessions_table.selectionModel().selectionChanged.connect(self.select_session)
         self.sessions_table.doubleClicked.connect(self.open_selected_session_file)
         sessions_layout.addWidget(self.sessions_table)
@@ -358,6 +394,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.captures_table.setAlternatingRowColors(True)
         self.captures_table.verticalHeader().setVisible(False)
+        self.captures_table.setSortingEnabled(True)
         self.captures_table.selectionModel().selectionChanged.connect(self.select_capture)
         self.captures_table.doubleClicked.connect(self.open_selected_capture_file)
         captures_layout.addWidget(self.captures_table)
@@ -401,6 +438,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.temporal_table.setAlternatingRowColors(True)
         self.temporal_table.verticalHeader().setVisible(False)
+        self.temporal_table.setSortingEnabled(True)
         self.temporal_table.setMinimumWidth(520)
         self.temporal_table.selectionModel().selectionChanged.connect(self.update_selected_temporal_plot)
         temporal_layout.addWidget(self.temporal_table, stretch=0)
@@ -439,6 +477,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.files_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.files_table.setAlternatingRowColors(True)
         self.files_table.verticalHeader().setVisible(False)
+        self.files_table.setSortingEnabled(True)
         self.files_table.doubleClicked.connect(self.open_file_from_files_table)
         self.detail_tabs.addTab(self.files_table, "Archivos")
 
@@ -454,19 +493,37 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def clear_filters(self):
         self.text_filter.clear()
         self.mode_filter.setCurrentIndex(0)
+        self.udder_filter.setCurrentIndex(0)
+        self.vacuum_filter.setCurrentIndex(0)
         self.quality_min.setValue(0)
         self.apply_filters()
 
     def reload_data(self):
         self.sessions = self._discover_sessions()
         modes = sorted({_mode_label(cap.value("modo")) for session in self.sessions for cap in session.captures if cap.value("modo")})
+        udders = sorted({cap.value("ubre") for session in self.sessions for cap in session.captures if cap.value("ubre")})
+        vacuums = sorted({cap.value("medicion_vacio") for session in self.sessions for cap in session.captures if cap.value("medicion_vacio")})
         current = self.mode_filter.currentText()
+        current_udder = self.udder_filter.currentText()
+        current_vacuum = self.vacuum_filter.currentText()
         self.mode_filter.blockSignals(True)
+        self.udder_filter.blockSignals(True)
+        self.vacuum_filter.blockSignals(True)
         self.mode_filter.clear()
         self.mode_filter.addItem("Todos")
         self.mode_filter.addItems(modes)
         self.mode_filter.setCurrentText(current if current in ["Todos", *modes] else "Todos")
+        self.udder_filter.clear()
+        self.udder_filter.addItem("Todos")
+        self.udder_filter.addItems(udders)
+        self.udder_filter.setCurrentText(current_udder if current_udder in ["Todos", *udders] else "Todos")
+        self.vacuum_filter.clear()
+        self.vacuum_filter.addItem("Todos")
+        self.vacuum_filter.addItems(vacuums)
+        self.vacuum_filter.setCurrentText(current_vacuum if current_vacuum in ["Todos", *vacuums] else "Todos")
         self.mode_filter.blockSignals(False)
+        self.udder_filter.blockSignals(False)
+        self.vacuum_filter.blockSignals(False)
         self.apply_filters()
 
     def _find_files(self) -> dict[str, dict[str, Path]]:
@@ -500,6 +557,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         cap.row.setdefault("id", str(data.get("id") or ""))
         cap.row.setdefault("modo", str(data.get("mode") or ""))
         cap.row.setdefault("condiciones_medida", str(data.get("measurement_condition") or ""))
+        cap.row.setdefault("ubre", str(data.get("udder_side") or data.get("ubre") or ""))
+        cap.row.setdefault("medicion_vacio", str(data.get("vacuum_condition") or data.get("medicion_vacio") or ""))
         cap.row.setdefault("config_label", str(data.get("config_label") or ""))
         cap.row.setdefault("config_description", str(data.get("config_description") or ""))
         cap.row.setdefault("motivo_fin", str(data.get("reason") or ""))
@@ -529,6 +588,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "temp_c_min": temp.get("temp_c_min"),
             "temp_c_max": temp.get("temp_c_max"),
             "temp_raw_ultima": temp.get("temp_raw_last"),
+            "temp_a0_c_media": temp.get("temp_a0_c_mean"),
+            "temp_a0_c_ultima": temp.get("temp_a0_c_last"),
+            "temp_a0_raw_ultima": temp.get("temp_a0_raw_last"),
+            "temp_a1_c_media": temp.get("temp_a1_c_mean"),
+            "temp_a1_c_ultima": temp.get("temp_a1_c_last"),
+            "temp_a1_raw_ultima": temp.get("temp_a1_raw_last"),
             "artefactos_ir_pct": metrics.get("artifact_ir_pct"),
             "artefactos_red_pct": metrics.get("artifact_red_pct"),
             "pi_ir_pct": metrics.get("pi_ir_pct"),
@@ -661,6 +726,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def apply_filters(self):
         text = self.text_filter.text().strip().lower()
         mode = self.mode_filter.currentText()
+        udder = self.udder_filter.currentText()
+        vacuum = self.vacuum_filter.currentText()
         quality_min = self.quality_min.value()
         filtered: list[SessionGroup] = []
         for session in self.sessions:
@@ -671,14 +738,23 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     continue
                 if mode != "Todos" and _mode_label(cap.value("modo")) != mode:
                     continue
+                if udder != "Todos" and cap.value("ubre") != udder:
+                    continue
+                if vacuum != "Todos" and cap.value("medicion_vacio") != vacuum:
+                    continue
                 quality = _as_float(cap.value("calidad"))
                 if np.isfinite(quality) and quality < quality_min:
                     continue
                 captures.append(cap)
-            if captures or (not session.captures and not text and mode == "Todos"):
+            if captures or (not session.captures and not text and mode == "Todos" and udder == "Todos" and vacuum == "Todos"):
                 filtered.append(SessionGroup(key=session.key, path=session.path, captures=captures))
         self.filtered_sessions = filtered
-        self.sessions_model.set_rows(self.session_headers, [self._session_row(session) for session in filtered])
+        session_rows = []
+        for idx, session in enumerate(filtered):
+            row = self._session_row(session)
+            row["_session_index"] = str(idx)
+            session_rows.append(row)
+        self.sessions_model.set_rows(self.session_headers, session_rows)
         self.sessions_table.resizeColumnsToContents()
         self.sessions_label.setText(f"{len(filtered)} sesiones | {sum(len(s.captures) for s in filtered)} tomas visibles")
         if filtered:
@@ -710,7 +786,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.set_session(None)
             return
         row = indexes[0].row()
-        self.set_session(self.filtered_sessions[row] if 0 <= row < len(self.filtered_sessions) else None)
+        model_row = self.sessions_model.rows[row] if 0 <= row < len(self.sessions_model.rows) else {}
+        source_row = int(model_row.get("_session_index", row) or row)
+        self.set_session(self.filtered_sessions[source_row] if 0 <= source_row < len(self.filtered_sessions) else None)
 
     def set_session(self, session: SessionGroup | None):
         self.current_session = session
@@ -721,7 +799,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.set_capture(None)
             return
         self.captures_label.setText(f"Raws / tomas dentro de {session.name}")
-        self.captures_model.set_rows(self.capture_headers, [self._capture_row(cap) for cap in session.captures])
+        capture_rows = []
+        for idx, cap in enumerate(session.captures):
+            row = self._capture_row(cap)
+            row["_capture_index"] = str(idx)
+            capture_rows.append(row)
+        self.captures_model.set_rows(self.capture_headers, capture_rows)
         self.captures_table.resizeColumnsToContents()
         if session.captures:
             _select_first_row(self.captures_table)
@@ -747,6 +830,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
             "Modo": _mode_label(cap.value("modo")),
+            "Ubre": cap.value("ubre"),
+            "Medicion": cap.value("medicion_vacio"),
             "Configuracion": cap.value("config_label"),
             "Estado": state,
             "Pulso ref.": fmt(ref_avg, 1, ""),
@@ -761,6 +846,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
             "Temp media": fmt(_as_float(cap.value("temp_c_media")), 1, ""),
             "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
+            "Temp A0 media": fmt(_as_float(_cap_first(cap, "temp_a0_c_media", "temp_c_media")), 1, ""),
+            "Temp A0 ult.": fmt(_as_float(_cap_first(cap, "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
+            "Temp A0 raw": fmt(_as_float(_cap_first(cap, "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
+            "Temp A1 media": fmt(_as_float(cap.value("temp_a1_c_media")), 1, ""),
+            "Temp A1 ult.": fmt(_as_float(cap.value("temp_a1_c_ultima")), 1, ""),
+            "Temp A1 raw": fmt(_as_float(cap.value("temp_a1_raw_ultima")), 0, ""),
             "Temp raw": fmt(_as_float(cap.value("temp_raw_ultima")), 0, ""),
             "Calidad": fmt(quality, 0, ""),
             "Contacto": cap.value("contacto"),
@@ -792,7 +883,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.set_capture(None)
             return
         row = indexes[0].row()
-        self.set_capture(self.current_session.captures[row] if 0 <= row < len(self.current_session.captures) else None)
+        model_row = self.captures_model.rows[row] if 0 <= row < len(self.captures_model.rows) else {}
+        source_row = int(model_row.get("_capture_index", row) or row)
+        self.set_capture(self.current_session.captures[source_row] if 0 <= source_row < len(self.current_session.captures) else None)
 
     def set_capture(self, cap: CaptureRecord | None):
         self.current_capture = cap
@@ -845,8 +938,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if not indexes:
             return
         row = indexes[0].row()
-        if 0 <= row < len(self.filtered_sessions):
-            self.open_path(self.filtered_sessions[row].path)
+        model_row = self.sessions_model.rows[row] if 0 <= row < len(self.sessions_model.rows) else {}
+        source_row = int(model_row.get("_session_index", row) or row)
+        if 0 <= source_row < len(self.filtered_sessions):
+            self.open_path(self.filtered_sessions[source_row].path)
 
     def open_selected_capture_file(self, *_args):
         cap = self.current_capture
@@ -911,6 +1006,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip() or "-"),
             ("Configuracion", cap.value("config_label") or "-"),
             ("Descripcion configuracion", cap.value("config_description") or "-"),
+            ("Ubre", cap.value("ubre") or "-"),
+            ("Medicion", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
             ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
             ("Pulso previo / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
@@ -926,6 +1023,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
             ("Temperatura media / ultima", f"{fmt(_as_float(cap.value('temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
+            ("Temperatura A0 media / ultima / raw", f"{fmt(_as_float(_cap_first(cap, 'temp_a0_c_media', 'temp_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
+            ("Temperatura A1 media / ultima / raw", f"{fmt(_as_float(cap.value('temp_a1_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a1_raw_ultima')), 0, '-')}"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
@@ -1209,10 +1308,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     def _sensor_config_from_capture(self, cap: CaptureRecord) -> SensorConfig:
         return SensorConfig(
-            red=self._int_cap(cap, "cfg_red", 31),
-            ir=self._int_cap(cap, "cfg_ir", 31),
-            avg=self._int_cap(cap, "cfg_avg", 1),
-            rate=self._int_cap(cap, "cfg_rate", 100),
+            red=self._int_cap(cap, "cfg_red", 63),
+            ir=self._int_cap(cap, "cfg_ir", 63),
+            avg=self._int_cap(cap, "cfg_avg", 4),
+            rate=self._int_cap(cap, "cfg_rate", 800),
             width=self._int_cap(cap, "cfg_width", 411),
             adc=self._int_cap(cap, "cfg_adc", 16384),
             skip=self._int_cap(cap, "cfg_skip", 50),

@@ -123,11 +123,17 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(90.0); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.udder_combo = QtWidgets.QComboBox()
+        self.udder_combo.addItems(["", "ubre", "right", "left"])
+        self.vacuum_combo = QtWidgets.QComboBox()
+        self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit()
         self.condition_edit.setPlaceholderText("Ej.: campo, ordeño activo, sensor reajustado, animal inquieto...")
         cap.addRow("Crotal:", self.crotal_edit)
         cap.addRow("Duración:", self.duration_spin)
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
+        cap.addRow("Ubre:", self.udder_combo)
+        cap.addRow("Medicion:", self.vacuum_combo)
         cap.addRow("Condiciones:", self.condition_edit)
         left.addWidget(capture_group)
 
@@ -395,6 +401,16 @@ class PPGSuite(QtWidgets.QMainWindow):
             return self.condition_edit.text().strip()
         return ""
 
+    def current_udder_text(self) -> str:
+        if hasattr(self, "udder_combo"):
+            return self.udder_combo.currentText().strip()
+        return ""
+
+    def current_vacuum_text(self) -> str:
+        if hasattr(self, "vacuum_combo"):
+            return self.vacuum_combo.currentText().strip()
+        return ""
+
     def ensure_initial_pulse_or_confirm(self) -> str | None:
         current = safe_float_text(self.prev_pulse_edit.text())
         try:
@@ -477,7 +493,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         # micros,red,ir
         # micros,red,ir,tempC
         # micros,red,ir,tempC,tempRaw
-        if len(parts) not in (3, 4, 5):
+        # micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw
+        if len(parts) not in (3, 4, 5, 6, 7):
             return False
 
         try:
@@ -488,8 +505,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             if len(parts) >= 4 and parts[3].lower() != "nan":
                 float(parts[3])
 
-            if len(parts) >= 5 and parts[4].lower() != "nan":
-                float(parts[4])
+            for value in parts[4:]:
+                if value.lower() != "nan":
+                    float(value)
 
             return True
         except Exception:
@@ -555,13 +573,23 @@ class PPGSuite(QtWidgets.QMainWindow):
             ir = float(ir_s.strip())
             temp_c = math.nan
             temp_raw = math.nan
+            temp_a0_c = math.nan
+            temp_a0_raw = math.nan
+            temp_a1_c = math.nan
+            temp_a1_raw = math.nan
 
             if len(parts) >= 4 and parts[3].strip().lower() != "nan":
-                temp_c = float(parts[3].strip())
+                temp_a0_c = float(parts[3].strip())
             if len(parts) >= 5 and parts[4].strip().lower() != "nan":
-                temp_raw = float(parts[4].strip())
+                temp_a0_raw = float(parts[4].strip())
+            if len(parts) >= 6 and parts[5].strip().lower() != "nan":
+                temp_a1_c = float(parts[5].strip())
+            if len(parts) >= 7 and parts[6].strip().lower() != "nan":
+                temp_a1_raw = float(parts[6].strip())
+            temp_c = temp_a0_c
+            temp_raw = temp_a0_raw
 
-            if red == 0 and ir == 0 and not np.isfinite(temp_c) and not np.isfinite(temp_raw):
+            if red == 0 and ir == 0 and not np.isfinite(temp_a0_c) and not np.isfinite(temp_a0_raw) and not np.isfinite(temp_a1_c) and not np.isfinite(temp_a1_raw):
                 st.discarded_lines += 1
                 return
 
@@ -579,6 +607,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.ir.append(ir)
             st.temp_c.append(temp_c)
             st.temp_raw.append(temp_raw)
+            st.temp_a0_c.append(temp_a0_c)
+            st.temp_a0_raw.append(temp_a0_raw)
+            st.temp_a1_c.append(temp_a1_c)
+            st.temp_a1_raw.append(temp_a1_raw)
             st.valid_lines += 1
 
             if st.raw_writer:
@@ -589,6 +621,8 @@ class PPGSuite(QtWidgets.QMainWindow):
                     st.base_name,
                     st.mode,
                     st.measurement_condition,
+                    st.udder_side,
+                    st.vacuum_condition,
                     st.config_label,
                     st.valid_lines,
                     f"{trel:.6f}",
@@ -596,6 +630,10 @@ class PPGSuite(QtWidgets.QMainWindow):
                     f"{ir:.0f}",
                     fmt(temp_c, 2, ""),
                     fmt(temp_raw, 0, ""),
+                    fmt(temp_a0_c, 2, ""),
+                    fmt(temp_a0_raw, 0, ""),
+                    fmt(temp_a1_c, 2, ""),
+                    fmt(temp_a1_raw, 0, ""),
                     cfg.red,
                     cfg.ir,
                     cfg.avg,
@@ -620,10 +658,14 @@ class PPGSuite(QtWidgets.QMainWindow):
         crotal = old.crotal_id if keep_identity else sanitize_id(self.crotal_edit.text())
         prev = old.pulse_prev if keep_identity else safe_float_text(self.prev_pulse_edit.text())
         condition = old.measurement_condition if keep_identity else self.current_condition_text()
+        udder = old.udder_side if keep_identity else self.current_udder_text()
+        vacuum = old.vacuum_condition if keep_identity else self.current_vacuum_text()
         self.state = CaptureState(
             crotal_id=crotal,
             pulse_prev=prev,
             measurement_condition=condition,
+            udder_side=udder,
+            vacuum_condition=vacuum,
             sensor_ready=old.sensor_ready,
             last_config_ack=self.last_config_ack,
             last_config_line=self.last_config_line,
@@ -635,8 +677,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.raw_handle = open(st.raw_file, "w", newline="", encoding="utf-8")
         st.raw_writer = csv.writer(st.raw_handle, delimiter=";")
         st.raw_writer.writerow([
-            "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
-            "red_raw", "ir_raw", "temp_c", "temp_raw",
+            "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+            "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
             "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
             "cfg_confirmacion", "system_time"
@@ -776,10 +818,25 @@ class PPGSuite(QtWidgets.QMainWindow):
         n = min(len(st.t), len(st.temp_c), len(st.temp_raw))
         return np.asarray(st.temp_c[:n], dtype=float), np.asarray(st.temp_raw[:n], dtype=float)
 
+    def temp_dual_arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        st = self.state
+        n = min(len(st.t), len(st.temp_a0_c), len(st.temp_a0_raw), len(st.temp_a1_c), len(st.temp_a1_raw))
+        return (
+            np.asarray(st.temp_a0_c[:n], dtype=float),
+            np.asarray(st.temp_a0_raw[:n], dtype=float),
+            np.asarray(st.temp_a1_c[:n], dtype=float),
+            np.asarray(st.temp_a1_raw[:n], dtype=float),
+        )
+
     def temperature_summary(self) -> dict[str, float | int]:
         temp_c, temp_raw = self.temp_arrays()
+        temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw = self.temp_dual_arrays()
         finite_temp = temp_c[np.isfinite(temp_c)] if temp_c.size else np.asarray([], dtype=float)
         finite_raw = temp_raw[np.isfinite(temp_raw)] if temp_raw.size else np.asarray([], dtype=float)
+        finite_a0 = temp_a0_c[np.isfinite(temp_a0_c)] if temp_a0_c.size else np.asarray([], dtype=float)
+        finite_a0_raw = temp_a0_raw[np.isfinite(temp_a0_raw)] if temp_a0_raw.size else np.asarray([], dtype=float)
+        finite_a1 = temp_a1_c[np.isfinite(temp_a1_c)] if temp_a1_c.size else np.asarray([], dtype=float)
+        finite_a1_raw = temp_a1_raw[np.isfinite(temp_a1_raw)] if temp_a1_raw.size else np.asarray([], dtype=float)
         return {
             "temp_samples": int(finite_temp.size),
             "temp_c_last": float(finite_temp[-1]) if finite_temp.size else math.nan,
@@ -787,6 +844,12 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_c_min": float(np.min(finite_temp)) if finite_temp.size else math.nan,
             "temp_c_max": float(np.max(finite_temp)) if finite_temp.size else math.nan,
             "temp_raw_last": float(finite_raw[-1]) if finite_raw.size else math.nan,
+            "temp_a0_c_last": float(finite_a0[-1]) if finite_a0.size else math.nan,
+            "temp_a0_c_mean": float(np.mean(finite_a0)) if finite_a0.size else math.nan,
+            "temp_a0_raw_last": float(finite_a0_raw[-1]) if finite_a0_raw.size else math.nan,
+            "temp_a1_c_last": float(finite_a1[-1]) if finite_a1.size else math.nan,
+            "temp_a1_c_mean": float(np.mean(finite_a1)) if finite_a1.size else math.nan,
+            "temp_a1_raw_last": float(finite_a1_raw[-1]) if finite_a1_raw.size else math.nan,
         }
 
     def compute_current_metrics(self, window_s: Optional[float] = None) -> Metrics:
@@ -884,6 +947,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         st = self.state
         t, red, ir = self.arrays()
         temp_c, temp_raw = self.temp_arrays()
+        temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw = self.temp_dual_arrays()
         if t.size < 2 or not st.base_name:
             return
         cfg = self.analysis_widget.get_config()
@@ -917,17 +981,22 @@ class PPGSuite(QtWidgets.QMainWindow):
         with open(st.processed_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
-                "red_raw", "ir_raw", "temp_c", "temp_raw",
+                "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s"
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
+                ta0c = temp_a0_c[i] if i < temp_a0_c.size else math.nan
+                ta0r = temp_a0_raw[i] if i < temp_a0_raw.size else math.nan
+                ta1c = temp_a1_c[i] if i < temp_a1_c.size else math.nan
+                ta1r = temp_a1_raw[i] if i < temp_a1_raw.size else math.nan
                 w.writerow([
-                    st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, st.measurement_condition, st.config_label, i + 1, f"{t[i]:.6f}",
+                    st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, st.measurement_condition, st.udder_side, st.vacuum_condition, st.config_label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
+                    fmt(ta0c, 2, ""), fmt(ta0r, 0, ""), fmt(ta1c, 2, ""), fmt(ta1r, 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, "")
                 ])
@@ -966,6 +1035,8 @@ class PPGSuite(QtWidgets.QMainWindow):
             "base_name": st.base_name,
             "mode": st.mode,
             "measurement_condition": st.measurement_condition,
+            "udder_side": st.udder_side,
+            "vacuum_condition": st.vacuum_condition,
             "config_label": st.config_label,
             "reason": reason,
             "requested_duration_s": st.requested_duration_s if np.isfinite(st.requested_duration_s) else None,
@@ -1000,13 +1071,13 @@ class PPGSuite(QtWidgets.QMainWindow):
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     def write_session_header(self):
-        header = ["session_id", "id", "base_name", "fecha", "hora", "modo", "condiciones_medida", "config_label", "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real", "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label", "spo2_pct", "ratio_r", "resp_min_exp", "resp_calidad_exp", "resp_razon_exp", "temp_c_media", "temp_c_ultima", "temp_raw_ultima", "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto", "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file"]
+        header = ["session_id", "id", "base_name", "fecha", "hora", "modo", "condiciones_medida", "ubre", "medicion_vacio", "config_label", "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real", "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label", "spo2_pct", "ratio_r", "resp_min_exp", "resp_calidad_exp", "resp_razon_exp", "temp_c_media", "temp_c_ultima", "temp_raw_ultima", "temp_a0_c_media", "temp_a0_c_ultima", "temp_a0_raw_ultima", "temp_a1_c_media", "temp_a1_c_ultima", "temp_a1_raw_ultima", "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto", "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file"]
         self.session_writer.writerow(header); self.session_handle.flush()
 
     def write_session_row(self, reason: str):
         st = self.state; m = st.metrics; now = datetime.now()
         temp = self.temperature_summary()
-        row = [st.session_id or st.base_name, st.crotal_id, st.base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.mode, st.measurement_condition, st.config_label, reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""), fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""), fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""), fmt(m.resp_rate_rpm, 1, ""), fmt(m.resp_quality, 0, ""), m.resp_reason, fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""), fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""), m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo, st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "", st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "", st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "", json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else ""]
+        row = [st.session_id or st.base_name, st.crotal_id, st.base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.mode, st.measurement_condition, st.udder_side, st.vacuum_condition, st.config_label, reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""), fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""), fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""), fmt(m.resp_rate_rpm, 1, ""), fmt(m.resp_quality, 0, ""), m.resp_reason, fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""), fmt(temp["temp_a0_c_mean"], 2, ""), fmt(temp["temp_a0_c_last"], 2, ""), fmt(temp["temp_a0_raw_last"], 0, ""), fmt(temp["temp_a1_c_mean"], 2, ""), fmt(temp["temp_a1_c_last"], 2, ""), fmt(temp["temp_a1_raw_last"], 0, ""), fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""), m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo, st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "", st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "", st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "", json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else ""]
         self.session_writer.writerow(row); self.session_handle.flush()
 
     def tick(self):
