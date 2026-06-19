@@ -430,6 +430,10 @@ class ScheduledConfigWindow(PPGSuite):
         finite_a1_raw = temp_a1_raw[np.isfinite(temp_a1_raw)] if temp_a1_raw.size else np.asarray([], dtype=float)
         return {
             "temp_samples": int(finite_temp.size),
+            "temp_a0_samples": int(finite_a0.size),
+            "temp_a0_raw_samples": int(finite_a0_raw.size),
+            "temp_a1_samples": int(finite_a1.size),
+            "temp_a1_raw_samples": int(finite_a1_raw.size),
             "temp_c_last": float(finite_temp[-1]) if finite_temp.size else math.nan,
             "temp_c_mean": float(np.mean(finite_temp)) if finite_temp.size else math.nan,
             "temp_c_min": float(np.min(finite_temp)) if finite_temp.size else math.nan,

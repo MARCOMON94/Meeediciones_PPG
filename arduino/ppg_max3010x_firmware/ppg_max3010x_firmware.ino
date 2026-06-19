@@ -160,6 +160,8 @@ void applyTempConfig() {
 #if defined(ARDUINO_ARCH_SAMD) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_MBED)
   analogReadResolution(tempCfg.adcBits);
 #endif
+  pinMode(PIN_TEMP_A0, INPUT);
+  pinMode(PIN_TEMP_A1, INPUT);
 }
 
 void handleConfig(const String &line) {
@@ -217,6 +219,8 @@ uint32_t adcMaxValue() {
 }
 
 uint16_t leerTempRaw(int pin) {
+  analogRead(pin);
+  delayMicroseconds(250);
   return analogRead(pin);
 }
 

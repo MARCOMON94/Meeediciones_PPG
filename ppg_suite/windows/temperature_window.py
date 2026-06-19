@@ -64,6 +64,16 @@ class TemperatureWindow(PPGSuite):
         form.addRow("Condiciones:", self.condition_edit)
         left.addWidget(capture_group)
 
+        wiring = QtWidgets.QLabel(
+            "Conexiones NTC:\n"
+            "A0: 3.3V -> NTC 1 -> A0 -> resistencia fija 10k -> GND\n"
+            "A1: 3.3V -> NTC 2 -> A1 -> resistencia fija 10k -> GND\n"
+            "Ambos divisores comparten 3.3V y GND. No conectes la NTC sola al pin: sin la resistencia a GND queda flotante."
+        )
+        wiring.setWordWrap(True)
+        wiring.setStyleSheet("color: #24415f; font-weight: bold;")
+        left.addWidget(wiring)
+
         self.btn_start = QtWidgets.QPushButton("Iniciar temperatura")
         self.btn_diagnostic = QtWidgets.QPushButton("Diagnostico Arduino")
         self.btn_stop = QtWidgets.QPushButton("Parar")
@@ -194,7 +204,9 @@ class TemperatureWindow(PPGSuite):
             f"Puerto: {self.port_name}\n"
             f"Estado: {status}\n"
             f"Crotal: {st.crotal_id}\n"
-            f"Muestras A0: {temp['temp_samples']} | lineas OK: {st.valid_lines} | descartadas: {st.discarded_lines}\n"
+            f"Muestras A0: {temp['temp_a0_samples']} temp / {temp['temp_a0_raw_samples']} raw\n"
+            f"Muestras A1: {temp['temp_a1_samples']} temp / {temp['temp_a1_raw_samples']} raw\n"
+            f"Lineas OK: {st.valid_lines} | descartadas: {st.discarded_lines}\n"
             f"Serial: {format_status}\n\n"
             f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | media {fmt(temp['temp_a0_c_mean'], 2)} C\n"
             f"A0 min/max: {fmt(temp['temp_a0_c_min'], 2)} / {fmt(temp['temp_a0_c_max'], 2)} C | raw {fmt(temp['temp_a0_raw_last'], 0)}\n"
@@ -203,6 +215,9 @@ class TemperatureWindow(PPGSuite):
             f"Diagnostico rapido:\n"
             f"{a0_status}\n"
             f"{a1_status}\n\n"
+            f"Conexiones:\n"
+            f"A0: 3.3V -> NTC 1 -> A0 -> R fija 10k -> GND\n"
+            f"A1: 3.3V -> NTC 2 -> A1 -> R fija 10k -> GND\n\n"
             f"Ultima linea: {st.last_line[:110]}\n"
             f"Ultimo control: {st.last_control[:110]}\n\n"
             f"Raw: {st.raw_file.name if st.raw_file else '-'}\n"
