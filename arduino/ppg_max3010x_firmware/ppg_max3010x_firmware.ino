@@ -377,8 +377,114 @@ void diagnosticoMax3010x(bool maxFound) {
   Serial.println(F("MAX3010X_FIN"));
 }
 
+void diagnosticoPinTemperatura(int pin, const __FlashStringHelper *label) {
+  const byte muestras = 20;
+
+  pinMode(pin, INPUT);
+  delay(5);
+
+  uint32_t rawSum = 0;
+  uint16_t rawMin = 65535;
+  uint16_t rawMax = 0;
+
+  for (byte i = 0; i < muestras; i++) {
+    uint16_t raw = leerTempRaw(pin);
+    rawSum += raw;
+    if (raw < rawMin) rawMin = raw;
+    if (raw > rawMax) rawMax = raw;
+    delay(2);
+  }
+
+  uint16_t rawAvg = rawSum / muestras;
+
+  pinMode(pin, INPUT_PULLUP);
+  delay(20);
+
+  uint32_t rawPullupSum = 0;
+  for (byte i = 0; i < muestras; i++) {
+    rawPullupSum += leerTempRaw(pin);
+    delay(2);
+  }
+
+  uint16_t rawPullupAvg = rawPullupSum / muestras;
+
+  pinMode(pin, INPUT);
+  delay(5);
+
+  uint32_t adcMax = adcMaxValue();
+  float tempC = leerTemperaturaC(rawAvg);
+  uint16_t variacion = rawMax - rawMin;
+  uint16_t diferenciaPullup = rawPullupAvg > rawAvg ? rawPullupAvg - rawAvg : rawAvg - rawPullupAvg;
+
+  Serial.print(F("TEMP_SENSOR "));
+  Serial.println(label);
+
+  Serial.print(F("TEMP_RAW_AVG "));
+  Serial.print(rawAvg);
+  Serial.print(F("/"));
+  Serial.println(adcMax);
+
+  Serial.print(F("TEMP_RAW_MIN "));
+  Serial.println(rawMin);
+
+  Serial.print(F("TEMP_RAW_MAX "));
+  Serial.println(rawMax);
+
+  Serial.print(F("TEMP_RAW_PULLUP "));
+  Serial.println(rawPullupAvg);
+
+  Serial.print(F("TEMP_DIF_PULLUP "));
+  Serial.println(diferenciaPullup);
+
+  Serial.print(F("TEMP_C "));
+  if (isnan(tempC)) Serial.println(F("nan"));
+  else Serial.println(tempC, 2);
+
+  if (diferenciaPullup > adcMax / 4) {
+    Serial.print(F("TEMP_RESULTADO ERROR_FLOTANTE "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION Cambia mucho al activar pullup interno. Probablemente no hay divisor NTC-resistencia conectado."));
+  }
+  else if (rawAvg <= 5) {
+    Serial.print(F("TEMP_RESULTADO ERROR_CASI_0V "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La entrada esta casi a GND."));
+  }
+  else if (rawAvg >= adcMax - 5) {
+    Serial.print(F("TEMP_RESULTADO ERROR_CASI_VCC "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La entrada esta casi a VCC."));
+  }
+  else if (variacion > adcMax / 10) {
+    Serial.print(F("TEMP_RESULTADO AVISO_INESTABLE "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La lectura varia demasiado. Puede haber mala conexion o pin flotando."));
+  }
+  else if (isnan(tempC)) {
+    Serial.print(F("TEMP_RESULTADO ERROR_CALCULO_NAN "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION El calculo de temperatura no es valido."));
+  }
+  else if (tempC < -10.0 || tempC > 80.0) {
+    Serial.print(F("TEMP_RESULTADO AVISO_TEMPERATURA_RARA "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La temperatura calculada esta fuera de rango razonable para una prueba normal."));
+  }
+  else {
+    Serial.print(F("TEMP_RESULTADO OK_PROBABLEMENTE_CONECTADA "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La lectura parece estable y no reacciona como un pin flotante."));
+  }
+}
+
 void diagnosticoTemperatura() {
   Serial.println(F("TEMP_INICIO"));
+
+  diagnosticoPinTemperatura(PIN_TEMP_A0, F("NTC_A0"));
+  diagnosticoPinTemperatura(PIN_TEMP_A1, F("NTC_A1"));
+  Serial.println(F("TEMP_NOTA Para deteccion fiable, cada entrada debe tener su divisor NTC-resistencia: 3.3V -> NTC -> Ax -> resistencia fija 10k -> GND."));
+  Serial.println(F("TEMP_FIN"));
+  return;
 
   const byte muestras = 20;
 

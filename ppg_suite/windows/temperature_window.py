@@ -65,13 +65,15 @@ class TemperatureWindow(PPGSuite):
         left.addWidget(capture_group)
 
         self.btn_start = QtWidgets.QPushButton("Iniciar temperatura")
+        self.btn_diagnostic = QtWidgets.QPushButton("Diagnostico Arduino")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
         self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
-        for b in [self.btn_start, self.btn_stop, self.btn_back_menu, self.btn_open_base]:
+        for b in [self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_back_menu, self.btn_open_base]:
             b.setMinimumHeight(42)
             left.addWidget(b)
         self.btn_start.clicked.connect(self.start_temperature_capture)
+        self.btn_diagnostic.clicked.connect(self.send_diagnostic_command)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_TEMP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
         self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
@@ -83,11 +85,13 @@ class TemperatureWindow(PPGSuite):
         self.info.setMinimumWidth(320)
         left.addWidget(self.info, stretch=1)
 
-        self.plot_temp = pg.PlotWidget(title="Temperatura")
+        self.plot_temp = pg.PlotWidget(title="Temperatura A0 / A1")
         self.plot_temp.setBackground("w")
         self.plot_temp.showGrid(x=True, y=True, alpha=0.25)
         self.plot_temp.setLabel("bottom", "Tiempo", units="s")
-        self.temp_curve = self.plot_temp.plot([], [], pen=pg.mkPen((180, 60, 60), width=2))
+        self.temp_a0_curve = self.plot_temp.plot([], [], pen=pg.mkPen((180, 60, 60), width=2), name="A0")
+        self.temp_a1_curve = self.plot_temp.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1")
+        self.plot_temp.addLegend()
         root.addWidget(self.plot_temp, stretch=1)
 
     def start_temperature_capture(self):
@@ -129,13 +133,41 @@ class TemperatureWindow(PPGSuite):
 
     def update_plots(self):
         t, _red, _ir = self.arrays()
-        temp_c, _raw = self.temp_arrays()
-        n = min(t.size, temp_c.size)
+        temp_a0_c, _temp_a0_raw, temp_a1_c, _temp_a1_raw = self.temp_dual_arrays()
+        n = min(t.size, temp_a0_c.size, temp_a1_c.size)
         if n < 2:
-            self.temp_curve.setData([], [])
+            self.temp_a0_curve.setData([], [])
+            self.temp_a1_curve.setData([], [])
             return
-        self.temp_curve.setData(t[:n], temp_c[:n])
+        self.temp_a0_curve.setData(t[:n], temp_a0_c[:n])
+        self.temp_a1_curve.setData(t[:n], temp_a1_c[:n])
         self.plot_temp.setXRange(float(t[0]), max(float(t[n - 1]), float(t[0]) + 1), padding=0.01)
+
+    def _temp_channel_status(self, name: str, temp_c: float, raw: float) -> str:
+        if not math.isfinite(raw):
+            return f"{name}: sin dato raw"
+        adc_max = 4095.0
+        if raw <= 5:
+            return f"{name}: ERROR raw casi 0 -> posible GND/cableado"
+        if raw >= adc_max - 5:
+            return f"{name}: ERROR raw casi max -> posible VCC/abierto"
+        if not math.isfinite(temp_c):
+            return f"{name}: raw {fmt(raw,0)} pero temp NaN -> revisar divisor/config temp"
+        if temp_c < -10 or temp_c > 80:
+            return f"{name}: temp rara ({fmt(temp_c,2)} C) raw {fmt(raw,0)}"
+        return f"{name}: OK probable ({fmt(temp_c,2)} C | raw {fmt(raw,0)})"
+
+    def _last_data_fields(self) -> int:
+        parts = self.state.last_line.split(",")
+        if len(parts) >= 3:
+            try:
+                int(parts[0].strip())
+                float(parts[1].strip())
+                float(parts[2].strip())
+                return len(parts)
+            except Exception:
+                return 0
+        return 0
 
     def update_info(self):
         st = self.state
@@ -147,6 +179,35 @@ class TemperatureWindow(PPGSuite):
             status = "READY | preparado"
         else:
             status = "esperando READY"
+        fields = self._last_data_fields()
+        format_status = "sin datos de temperatura"
+        if fields == 5:
+            format_status = "formato antiguo: solo A0 (5 campos)"
+        elif fields == 7:
+            format_status = "formato nuevo: A0 + A1 (7 campos)"
+        elif fields:
+            format_status = f"formato inesperado: {fields} campos"
+        a0_status = self._temp_channel_status("A0", float(temp["temp_a0_c_last"]), float(temp["temp_a0_raw_last"]))
+        a1_status = self._temp_channel_status("A1", float(temp["temp_a1_c_last"]), float(temp["temp_a1_raw_last"]))
+        self.info.setText(
+            f"MODO CAMPO - SOLO TEMPERATURA\n"
+            f"Puerto: {self.port_name}\n"
+            f"Estado: {status}\n"
+            f"Crotal: {st.crotal_id}\n"
+            f"Muestras A0: {temp['temp_samples']} | lineas OK: {st.valid_lines} | descartadas: {st.discarded_lines}\n"
+            f"Serial: {format_status}\n\n"
+            f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | media {fmt(temp['temp_a0_c_mean'], 2)} C\n"
+            f"A0 min/max: {fmt(temp['temp_a0_c_min'], 2)} / {fmt(temp['temp_a0_c_max'], 2)} C | raw {fmt(temp['temp_a0_raw_last'], 0)}\n"
+            f"A1 actual: {fmt(temp['temp_a1_c_last'], 2)} C | media {fmt(temp['temp_a1_c_mean'], 2)} C\n"
+            f"A1 min/max: {fmt(temp['temp_a1_c_min'], 2)} / {fmt(temp['temp_a1_c_max'], 2)} C | raw {fmt(temp['temp_a1_raw_last'], 0)}\n\n"
+            f"Diagnostico rapido:\n"
+            f"{a0_status}\n"
+            f"{a1_status}\n\n"
+            f"Ultima linea: {st.last_line[:110]}\n"
+            f"Ultimo control: {st.last_control[:110]}\n\n"
+            f"Raw: {st.raw_file.name if st.raw_file else '-'}\n"
+        )
+        return
         self.info.setText(
             f"MODO CAMPO - SOLO TEMPERATURA\n"
             f"Puerto: {self.port_name}\n"

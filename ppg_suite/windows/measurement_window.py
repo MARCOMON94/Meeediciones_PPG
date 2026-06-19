@@ -846,9 +846,13 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_raw_last": float(finite_raw[-1]) if finite_raw.size else math.nan,
             "temp_a0_c_last": float(finite_a0[-1]) if finite_a0.size else math.nan,
             "temp_a0_c_mean": float(np.mean(finite_a0)) if finite_a0.size else math.nan,
+            "temp_a0_c_min": float(np.min(finite_a0)) if finite_a0.size else math.nan,
+            "temp_a0_c_max": float(np.max(finite_a0)) if finite_a0.size else math.nan,
             "temp_a0_raw_last": float(finite_a0_raw[-1]) if finite_a0_raw.size else math.nan,
             "temp_a1_c_last": float(finite_a1[-1]) if finite_a1.size else math.nan,
             "temp_a1_c_mean": float(np.mean(finite_a1)) if finite_a1.size else math.nan,
+            "temp_a1_c_min": float(np.min(finite_a1)) if finite_a1.size else math.nan,
+            "temp_a1_c_max": float(np.max(finite_a1)) if finite_a1.size else math.nan,
             "temp_a1_raw_last": float(finite_a1_raw[-1]) if finite_a1_raw.size else math.nan,
         }
 
