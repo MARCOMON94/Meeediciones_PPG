@@ -322,8 +322,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         cap.addRow("Crotal:", self.crotal_edit)
         cap.addRow("Duración:", self.duration_spin)
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
-        cap.addRow("Ubre:", self.udder_combo)
-        cap.addRow("Asignacion termometros:", self.temp_mapping_combo)
+        cap.addRow("Sensor:", self.udder_combo)
+        cap.addRow("Termometros:", self.temp_mapping_combo)
         cap.addRow("Medicion:", self.vacuum_combo)
         cap.addRow("Condiciones:", self.condition_edit)
         left.addWidget(capture_group)
@@ -418,13 +418,13 @@ class PPGSuite(QtWidgets.QMainWindow):
 
     def configure_udder_combo(self, combo: QtWidgets.QComboBox):
         combo.clear()
-        combo.addItem("RT - ubre derecha", "RT")
-        combo.addItem("LT - ubre izquierda", "LT")
+        combo.addItem("Sensor derecha", "RT")
+        combo.addItem("Sensor izquierda", "LT")
 
     def configure_temp_mapping_combo(self, combo: QtWidgets.QComboBox):
         combo.clear()
-        combo.addItem("A0=RT / A1=LT", TEMP_MAPPING_DEFAULT)
-        combo.addItem("A0=LT / A1=RT", TEMP_MAPPING_INVERTED)
+        combo.addItem("A0 derecha / A1 izquierda", TEMP_MAPPING_DEFAULT)
+        combo.addItem("A0 izquierda / A1 derecha", TEMP_MAPPING_INVERTED)
 
     def is_bluetooth_port(self, port_info) -> bool:
         txt = f"{getattr(port_info, 'device', '')} {getattr(port_info, 'description', '')} {getattr(port_info, 'hwid', '')}".upper()
@@ -434,9 +434,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.port_combo.clear()
         ports = list(list_ports.comports())
         for p in ports:
-            suffix = " | Bluetooth detectado" if self.is_bluetooth_port(p) else ""
-            self.port_combo.addItem(f"{p.device} | {p.description}{suffix}", p.device)
-        self.port_combo.addItem("Bluetooth BLE | Arduino Nano 33 IoT mtestv2", BLE_PORT_ID)
+            self.port_combo.addItem(f"{p.device} | {p.description}", p.device)
+        self.port_combo.addItem("BLE Nano 33 IoT mtestv2", BLE_PORT_ID)
         if not ports:
             self.port_combo.addItem("Sin puertos USB", "")
 

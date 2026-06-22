@@ -45,8 +45,8 @@ HEADER_TOOLTIPS = {
     "Animal": "Identificador introducido para el animal o sujeto de la toma.",
     "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
     "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
-    "Ubre": "Lado indicado para la toma: RT derecha o LT izquierda.",
-    "Temp mapping": "Asignacion de canales analogicos a ubres usada al capturar.",
+    "Sensor": "Sensor indicado para la toma: derecha o izquierda.",
+    "Termometros": "Asignacion de termometros analogicos A0/A1 a derecha/izquierda usada al capturar.",
     "Canal temp": "Canal analogico usado como temperatura primaria de la toma.",
     "Medicion": "Indica si la toma se hizo con vacio o sin vacio. Es metadato, no entra en calculos.",
     "Estado": "Lectura rapida de calidad: Buena, Aceptable o Dudosa segun la calidad calculada.",
@@ -302,7 +302,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Ubre", "Temp mapping", "Canal temp", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
+        "Hora", "Animal", "Modo", "Sensor", "Termometros", "Canal temp", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
         "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp final", "Temp ult.",
         "Temp RT final", "Temp RT ult.", "Temp RT raw", "Temp LT final", "Temp LT ult.", "Temp LT raw",
         "Temp A0 final", "Temp A0 ult.", "Temp A0 raw", "Temp A1 final", "Temp A1 ult.", "Temp A1 raw",
@@ -359,7 +359,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.text_filter, 0, 1, 1, 4)
         fl.addWidget(QtWidgets.QLabel("Modo"), 0, 5)
         fl.addWidget(self.mode_filter, 0, 6)
-        fl.addWidget(QtWidgets.QLabel("Ubre"), 0, 7)
+        fl.addWidget(QtWidgets.QLabel("Sensor"), 0, 7)
         fl.addWidget(self.udder_filter, 0, 8)
         fl.addWidget(QtWidgets.QLabel("Medicion"), 0, 9)
         fl.addWidget(self.vacuum_filter, 0, 10)
@@ -868,8 +868,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
             "Modo": _mode_label(cap.value("modo")),
-            "Ubre": cap.value("ubre"),
-            "Temp mapping": cap.value("temp_mapping"),
+            "Sensor": cap.value("ubre"),
+            "Termometros": self._display_temp_mapping(cap.value("temp_mapping")),
             "Canal temp": cap.value("temp_primary_channel"),
             "Medicion": cap.value("medicion_vacio"),
             "Configuracion": cap.value("config_label"),
@@ -919,6 +919,14 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Pulso final pulsio": cap.value("pulso_final_pulsio"),
             "Pulso final fonendo": cap.value("pulso_final_fonendo"),
         }
+
+    def _display_temp_mapping(self, value: str) -> str:
+        mapping = (value or "").strip()
+        if mapping == "A0_RT_A1_LT":
+            return "A0 derecha / A1 izquierda"
+        if mapping == "A0_LT_A1_RT":
+            return "A0 izquierda / A1 derecha"
+        return mapping
 
     def select_capture(self):
         if self.current_session is None:
@@ -1052,8 +1060,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip() or "-"),
             ("Configuracion", cap.value("config_label") or "-"),
             ("Descripcion configuracion", cap.value("config_description") or "-"),
-            ("Ubre", cap.value("ubre") or "-"),
-            ("Asignacion termometros", cap.value("temp_mapping") or "-"),
+            ("Sensor", cap.value("ubre") or "-"),
+            ("Termometros", self._display_temp_mapping(cap.value("temp_mapping")) or "-"),
             ("Canal temp primario", cap.value("temp_primary_channel") or "-"),
             ("Medicion", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
