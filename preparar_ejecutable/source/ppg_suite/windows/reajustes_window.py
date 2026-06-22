@@ -9,7 +9,7 @@ import pyqtgraph as pg
 
 from ..models import CaptureState, Metrics
 from ..paths import FIGURES_DIR, RESULTS_DIR, SCREENSHOT_DIR
-from ..processing import estimate_hz, processed_for_plot, score_and_merge_metrics
+from ..processing import estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
 from ..utils import fmt, now_stamp, open_folder
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite
@@ -60,6 +60,12 @@ class ReajustesWindow(PPGSuite):
         identity = QtWidgets.QFormLayout(identity_group)
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.udder_combo = QtWidgets.QComboBox()
+        self.configure_udder_combo(self.udder_combo)
+        self.temp_mapping_combo = QtWidgets.QComboBox()
+        self.configure_temp_mapping_combo(self.temp_mapping_combo)
+        self.vacuum_combo = QtWidgets.QComboBox()
+        self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit()
         self.condition_edit.setPlaceholderText("Ej.: reajuste con sensor fijo, ordeño activo, prueba de LEDs...")
         self.duration_spin = NoWheelDoubleSpinBox()
@@ -70,6 +76,9 @@ class ReajustesWindow(PPGSuite):
         self.duration_spin.setVisible(False)
         identity.addRow("Crotal:", self.crotal_edit)
         identity.addRow("Pulso previo ref.:", self.prev_pulse_edit)
+        identity.addRow("Ubre:", self.udder_combo)
+        identity.addRow("Asignacion termometros:", self.temp_mapping_combo)
+        identity.addRow("Medicion:", self.vacuum_combo)
         identity.addRow("Condiciones:", self.condition_edit)
         left.addWidget(identity_group)
 
@@ -175,6 +184,8 @@ class ReajustesWindow(PPGSuite):
         start = max(0.0, float(t[-1]) - self.window_s.value())
         mask = t >= start
         met = score_and_merge_metrics(t[mask] - t[mask][0], red[mask], ir[mask], sensor_cfg, cfg) if int(np.sum(mask)) > 20 else Metrics()
+        spo2_warning = spo2_support_message(met)
+        spo2_warning_line = f"{spo2_warning}\n" if spo2_warning else ""
         status = f"CAPTURANDO {st.mode}" if st.capturing else ("READY | preparado" if st.sensor_ready else "PARADO")
         elapsed = time.time() - st.capture_start_wall if st.capturing else 0.0
         self.info.setText(
@@ -188,8 +199,9 @@ class ReajustesWindow(PPGSuite):
             f"BPM picos: {fmt(met.bpm_peak, 0)} | FFT: {fmt(met.bpm_fft, 0)} | autocorr: {fmt(met.bpm_autocorr, 0)}\n"
             f"Picos: {met.peaks_count} | polaridad: {met.polarity}\n"
             f"SpO2 estimada: {fmt(met.spo2, 1)} % | R={fmt(met.ratio_r, 4)}\n"
+            f"{spo2_warning_line}"
             f"Respiraciones (experimental): {fmt(met.resp_rate_rpm, 1)} resp/min | calidad {fmt(met.resp_quality, 0)}\n"
-            f"Temp: {fmt(temp['temp_c_last'], 1)} °C | media {fmt(temp['temp_c_mean'], 1)} °C | raw {fmt(temp['temp_raw_last'], 0)}\n"
+            f"Temp RT/LT final: {fmt(temp['temp_rt_c_final_max_5s'], 1)} / {fmt(temp['temp_lt_c_final_max_5s'], 1)} C | canal {st.temp_primary_channel} {fmt(temp['temp_c_final_max_5s'], 1)} C\n"
             f"AC/DC IR: {fmt(met.ac_ir, 2)} / {fmt(met.dc_ir, 0)} | PI IR={fmt(met.pi_ir_pct, 3)} %\n"
             f"AC/DC RED: {fmt(met.ac_red, 2)} / {fmt(met.dc_red, 0)} | PI RED={fmt(met.pi_red_pct, 3)} %\n"
             f"Artefactos IR/RED: {fmt(met.artifact_ir_pct, 1)} / {fmt(met.artifact_red_pct, 1)} %\n"

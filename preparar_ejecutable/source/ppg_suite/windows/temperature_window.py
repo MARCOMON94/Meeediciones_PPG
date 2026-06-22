@@ -52,20 +52,41 @@ class TemperatureWindow(PPGSuite):
         self.duration_spin.setValue(60.0)
         self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.udder_combo = QtWidgets.QComboBox()
+        self.configure_udder_combo(self.udder_combo)
+        self.temp_mapping_combo = QtWidgets.QComboBox()
+        self.configure_temp_mapping_combo(self.temp_mapping_combo)
+        self.vacuum_combo = QtWidgets.QComboBox()
+        self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit("solo temperatura en campo")
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Duración:", self.duration_spin)
+        form.addRow("Ubre:", self.udder_combo)
+        form.addRow("Asignacion termometros:", self.temp_mapping_combo)
+        form.addRow("Medicion:", self.vacuum_combo)
         form.addRow("Condiciones:", self.condition_edit)
         left.addWidget(capture_group)
 
+        wiring = QtWidgets.QLabel(
+            "Conexiones NTC:\n"
+            "A0: 3.3V -> NTC 1 -> A0 -> resistencia fija 10k -> GND\n"
+            "A1: 3.3V -> NTC 2 -> A1 -> resistencia fija 10k -> GND\n"
+            "Ambos divisores comparten 3.3V y GND. No conectes la NTC sola al pin: sin la resistencia a GND queda flotante."
+        )
+        wiring.setWordWrap(True)
+        wiring.setStyleSheet("color: #24415f; font-weight: bold;")
+        left.addWidget(wiring)
+
         self.btn_start = QtWidgets.QPushButton("Iniciar temperatura")
+        self.btn_diagnostic = QtWidgets.QPushButton("Diagnostico Arduino")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
         self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
-        for b in [self.btn_start, self.btn_stop, self.btn_back_menu, self.btn_open_base]:
+        for b in [self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_back_menu, self.btn_open_base]:
             b.setMinimumHeight(42)
             left.addWidget(b)
         self.btn_start.clicked.connect(self.start_temperature_capture)
+        self.btn_diagnostic.clicked.connect(self.send_diagnostic_command)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_TEMP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
         self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
@@ -77,11 +98,13 @@ class TemperatureWindow(PPGSuite):
         self.info.setMinimumWidth(320)
         left.addWidget(self.info, stretch=1)
 
-        self.plot_temp = pg.PlotWidget(title="Temperatura")
+        self.plot_temp = pg.PlotWidget(title="Temperatura A0 / A1")
         self.plot_temp.setBackground("w")
         self.plot_temp.showGrid(x=True, y=True, alpha=0.25)
         self.plot_temp.setLabel("bottom", "Tiempo", units="s")
-        self.temp_curve = self.plot_temp.plot([], [], pen=pg.mkPen((180, 60, 60), width=2))
+        self.temp_a0_curve = self.plot_temp.plot([], [], pen=pg.mkPen((180, 60, 60), width=2), name="A0")
+        self.temp_a1_curve = self.plot_temp.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1")
+        self.plot_temp.addLegend()
         root.addWidget(self.plot_temp, stretch=1)
 
     def start_temperature_capture(self):
@@ -123,13 +146,41 @@ class TemperatureWindow(PPGSuite):
 
     def update_plots(self):
         t, _red, _ir = self.arrays()
-        temp_c, _raw = self.temp_arrays()
-        n = min(t.size, temp_c.size)
+        temp_a0_c, _temp_a0_raw, temp_a1_c, _temp_a1_raw = self.temp_dual_arrays()
+        n = min(t.size, temp_a0_c.size, temp_a1_c.size)
         if n < 2:
-            self.temp_curve.setData([], [])
+            self.temp_a0_curve.setData([], [])
+            self.temp_a1_curve.setData([], [])
             return
-        self.temp_curve.setData(t[:n], temp_c[:n])
+        self.temp_a0_curve.setData(t[:n], temp_a0_c[:n])
+        self.temp_a1_curve.setData(t[:n], temp_a1_c[:n])
         self.plot_temp.setXRange(float(t[0]), max(float(t[n - 1]), float(t[0]) + 1), padding=0.01)
+
+    def _temp_channel_status(self, name: str, temp_c: float, raw: float) -> str:
+        if not math.isfinite(raw):
+            return f"{name}: sin dato raw"
+        adc_max = 4095.0
+        if raw <= 5:
+            return f"{name}: ERROR raw casi 0 -> posible GND/cableado"
+        if raw >= adc_max - 5:
+            return f"{name}: ERROR raw casi max -> posible VCC/abierto"
+        if not math.isfinite(temp_c):
+            return f"{name}: raw {fmt(raw,0)} pero temp NaN -> revisar divisor/config temp"
+        if temp_c < -10 or temp_c > 80:
+            return f"{name}: temp rara ({fmt(temp_c,2)} C) raw {fmt(raw,0)}"
+        return f"{name}: OK probable ({fmt(temp_c,2)} C | raw {fmt(raw,0)})"
+
+    def _last_data_fields(self) -> int:
+        parts = self.state.last_line.split(",")
+        if len(parts) >= 3:
+            try:
+                int(parts[0].strip())
+                float(parts[1].strip())
+                float(parts[2].strip())
+                return len(parts)
+            except Exception:
+                return 0
+        return 0
 
     def update_info(self):
         st = self.state
@@ -141,6 +192,42 @@ class TemperatureWindow(PPGSuite):
             status = "READY | preparado"
         else:
             status = "esperando READY"
+        fields = self._last_data_fields()
+        format_status = "sin datos de temperatura"
+        if fields == 5:
+            format_status = "formato antiguo: solo A0 (5 campos)"
+        elif fields == 7:
+            format_status = "formato nuevo: A0 + A1 (7 campos)"
+        elif fields:
+            format_status = f"formato inesperado: {fields} campos"
+        a0_status = self._temp_channel_status("A0", float(temp["temp_a0_c_last"]), float(temp["temp_a0_raw_last"]))
+        a1_status = self._temp_channel_status("A1", float(temp["temp_a1_c_last"]), float(temp["temp_a1_raw_last"]))
+        self.info.setText(
+            f"MODO CAMPO - SOLO TEMPERATURA\n"
+            f"Puerto: {self.port_name}\n"
+            f"Estado: {status}\n"
+            f"Crotal: {st.crotal_id}\n"
+            f"Muestras A0: {temp['temp_a0_samples']} temp / {temp['temp_a0_raw_samples']} raw\n"
+            f"Muestras A1: {temp['temp_a1_samples']} temp / {temp['temp_a1_raw_samples']} raw\n"
+            f"Lineas OK: {st.valid_lines} | descartadas: {st.discarded_lines}\n"
+            f"Serial: {format_status}\n\n"
+            f"RT final: {fmt(temp['temp_rt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_rt_c_last'], 2)} C\n"
+            f"LT final: {fmt(temp['temp_lt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_lt_c_last'], 2)} C\n"
+            f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | final {fmt(temp['temp_a0_c_final_max_5s'], 2)} C\n"
+            f"A0 min/max: {fmt(temp['temp_a0_c_min'], 2)} / {fmt(temp['temp_a0_c_max'], 2)} C | raw {fmt(temp['temp_a0_raw_last'], 0)}\n"
+            f"A1 actual: {fmt(temp['temp_a1_c_last'], 2)} C | final {fmt(temp['temp_a1_c_final_max_5s'], 2)} C\n"
+            f"A1 min/max: {fmt(temp['temp_a1_c_min'], 2)} / {fmt(temp['temp_a1_c_max'], 2)} C | raw {fmt(temp['temp_a1_raw_last'], 0)}\n\n"
+            f"Diagnostico rapido:\n"
+            f"{a0_status}\n"
+            f"{a1_status}\n\n"
+            f"Conexiones:\n"
+            f"A0: 3.3V -> NTC 1 -> A0 -> R fija 10k -> GND\n"
+            f"A1: 3.3V -> NTC 2 -> A1 -> R fija 10k -> GND\n\n"
+            f"Ultima linea: {st.last_line[:110]}\n"
+            f"Ultimo control: {st.last_control[:110]}\n\n"
+            f"Raw: {st.raw_file.name if st.raw_file else '-'}\n"
+        )
+        return
         self.info.setText(
             f"MODO CAMPO - SOLO TEMPERATURA\n"
             f"Puerto: {self.port_name}\n"

@@ -4,3 +4,4 @@ pyserial
 PyQt6
 pyqtgraph
 sounddevice
+bleak

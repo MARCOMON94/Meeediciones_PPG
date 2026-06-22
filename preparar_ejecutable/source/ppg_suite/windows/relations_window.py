@@ -12,7 +12,9 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
+from ..models import AnalysisConfig, SensorConfig
 from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
+from ..processing import score_and_merge_metrics
 from ..utils import fmt
 
 
@@ -29,6 +31,84 @@ MODE_LABELS = {
     "scheduled": "Configuraciones",
     "marco": "Experimento 3M",
     "experimento_3m": "Experimento 3M",
+}
+
+HEADER_TOOLTIPS = {
+    "Sesion": "Archivo o grupo de tomas al que pertenece la medicion.",
+    "Fecha": "Fecha registrada para la sesion o toma.",
+    "Inicio": "Hora inicial registrada para la sesion.",
+    "Modos": "Tipos de medicion incluidos en la sesion.",
+    "Tomas": "Numero de capturas o raws visibles en esta sesion.",
+    "Animales": "Numero de identificadores de animal distintos dentro de la sesion.",
+    "Calidad media": "Media de la calidad guardada en las tomas visibles. Es orientativa y depende del cribado aplicado.",
+    "Hora": "Hora registrada para la toma.",
+    "Animal": "Identificador introducido para el animal o sujeto de la toma.",
+    "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
+    "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
+    "Ubre": "Lado indicado para la toma: RT derecha o LT izquierda.",
+    "Temp mapping": "Asignacion de canales analogicos a ubres usada al capturar.",
+    "Canal temp": "Canal analogico usado como temperatura primaria de la toma.",
+    "Medicion": "Indica si la toma se hizo con vacio o sin vacio. Es metadato, no entra en calculos.",
+    "Estado": "Lectura rapida de calidad: Buena, Aceptable o Dudosa segun la calidad calculada.",
+    "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
+    "Dif. BPM-ref": "Diferencia absoluta entre el BPM calculado por el sistema y el BPM de referencia manual.",
+    "BPM medio": "Estimacion final de frecuencia cardiaca tras combinar estimadores validos y aplicar cribado.",
+    "BPM picos": "BPM estimado detectando picos locales en la senal PPG procesada.",
+    "BPM FFT": "BPM estimado con transformada de Fourier sobre la senal IR procesada.",
+    "BPM autocorr": "BPM estimado con autocorrelacion: repeticion temporal del patron de pulso.",
+    "Oxigeno medio": "SpO2 estimada experimentalmente desde RED/IR. No esta calibrada clinicamente.",
+    "Ratio R": "Ratio AC/DC de RED dividido por AC/DC de IR usado para estimar SpO2.",
+    "Temp final": "Maximo del primer golpe de calor tras 1 s de estabilizacion y dentro de los 5 s siguientes.",
+    "Temp ult.": "Ultima temperatura registrada en la toma.",
+    "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG. Requiere validacion externa.",
+    "Calidad resp.": "Confianza interna de la respiracion experimental, de 0 a 100.",
+    "Temp raw": "Valor bruto del ADC de temperatura.",
+    "Temp RT final": "Maximo independiente de la ubre derecha en la ventana final 1-6 s.",
+    "Temp RT ult.": "Ultima temperatura calculada para la ubre derecha.",
+    "Temp RT raw": "Raw asociado a la ubre derecha.",
+    "Temp LT final": "Maximo independiente de la ubre izquierda en la ventana final 1-6 s.",
+    "Temp LT ult.": "Ultima temperatura calculada para la ubre izquierda.",
+    "Temp LT raw": "Raw asociado a la ubre izquierda.",
+    "Temp A0 final": "Maximo calculado desde la fuente analogica A0 en la ventana final 1-6 s.",
+    "Temp A0 ult.": "Ultima temperatura calculada desde la fuente analogica A0.",
+    "Temp A0 raw": "Ultimo valor bruto ADC de la fuente analogica A0.",
+    "Temp A1 final": "Maximo calculado desde la fuente analogica A1 en la ventana final 1-6 s.",
+    "Temp A1 ult.": "Ultima temperatura calculada desde la fuente analogica A1.",
+    "Temp A1 raw": "Ultimo valor bruto ADC de la fuente analogica A1.",
+    "Calidad": "Puntuacion global interna de la toma tras BPM, PI, artefactos, saturacion y cribado.",
+    "Contacto": "Etiqueta de contacto/perfusion derivada del nivel DC e indice de perfusion IR.",
+    "PI IR %": "Indice de perfusion IR: componente pulsatile AC respecto al nivel DC. Cuanto mayor, mas visible es el pulso.",
+    "PI RED %": "Indice de perfusion RED: componente pulsatile AC respecto al nivel DC.",
+    "Artef. IR %": "Porcentaje de muestras IR marcadas como artefacto o descartadas por cribado robusto.",
+    "Artef. RED %": "Porcentaje de muestras RED marcadas como artefacto por cribado robusto.",
+    "Sat. %": "Porcentaje de muestras cerca del techo digital del ADC. Si sube, hay riesgo de perder informacion.",
+    "RED": "Amplitud LED roja configurada en el MAX3010x, valor de registro 0-255.",
+    "IR": "Amplitud LED infrarroja configurada en el MAX3010x, valor de registro 0-255.",
+    "AVG": "Promedio FIFO configurado en el sensor. Valores mayores suavizan y retrasan mas.",
+    "RATE": "Frecuencia de muestreo configurada en el sensor.",
+    "WIDTH": "Ancho de pulso LED configurado; influye en resolucion y energia de cada muestra.",
+    "ADC": "Rango ADC configurado para el sensor.",
+    "Duracion": "Duracion real analizada tras descartes iniciales o de gaps.",
+    "Hz": "Frecuencia real estimada a partir de los tiempos guardados.",
+    "Muestras": "Numero de muestras disponibles o analizadas.",
+    "Pulso previo": "BPM manual anotado antes de la toma.",
+    "Pulso final pulsio": "BPM manual anotado al final con pulsioximetro.",
+    "Pulso final fonendo": "BPM manual anotado al final con fonendo.",
+    "tipo": "Tipo de archivo asociado a la toma: raw, processed, summary, plot, etc.",
+    "archivo": "Nombre del archivo asociado.",
+    "filas": "Numero de filas si el archivo asociado es CSV.",
+    "ruta": "Ruta completa del archivo asociado.",
+    "Tramo": "Intervalo temporal relativo a la toma seleccionada. Se fuerza el primer dato disponible como segundo 0.",
+    "Inicio s": "Inicio del tramo usando tiempo relativo: el primer dato disponible se considera 0 s.",
+    "Fin s": "Final real del tramo. En el ultimo tramo puede cortar antes de 10 s si la toma termina antes.",
+    "BPM 10s": "BPM medio guardado para ese bloque de 10 s.",
+    "BPM tramo": "BPM recalculado para el tramo desde raw RED/IR; si existe BPM rolling se usa como apoyo.",
+    "SpO2 tramo": "SpO2 recalculada para el tramo desde raw RED/IR cuando no exista rolling; experimental y no calibrada.",
+    "Calidad tramo": "Calidad recalculada para el tramo desde raw RED/IR cuando no exista rolling.",
+    "Temp max tramo": "Temperatura maxima primaria disponible dentro del tramo.",
+    "Temp RT max tramo": "Temperatura maxima de la ubre derecha dentro del tramo.",
+    "Temp LT max tramo": "Temperatura maxima de la ubre izquierda dentro del tramo.",
+    "Muestras tramo": "Numero de muestras dentro del tramo temporal.",
 }
 
 
@@ -116,6 +196,10 @@ def _cap_first(cap: "CaptureRecord", *keys: str) -> str:
     return ""
 
 
+def _cap_temp_final(cap: "CaptureRecord", final_key: str, legacy_key: str, *fallback_keys: str) -> str:
+    return _cap_first(cap, final_key, *fallback_keys, legacy_key)
+
+
 def _select_first_row(table: QtWidgets.QTableView):
     model = table.model()
     if model is not None and model.rowCount() > 0:
@@ -179,10 +263,15 @@ class DictTableModel(QtCore.QAbstractTableModel):
         return None
 
     def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
+        if orientation == QtCore.Qt.Orientation.Horizontal:
+            header = self.headers[section]
+            if role == QtCore.Qt.ItemDataRole.DisplayRole:
+                return header
+            if role == QtCore.Qt.ItemDataRole.ToolTipRole:
+                return HEADER_TOOLTIPS.get(header, header)
+            return None
         if role != QtCore.Qt.ItemDataRole.DisplayRole:
             return None
-        if orientation == QtCore.Qt.Orientation.Horizontal:
-            return self.headers[section]
         return str(section + 1)
 
     def set_rows(self, headers: list[str], rows: list[dict[str, str]]):
@@ -191,19 +280,38 @@ class DictTableModel(QtCore.QAbstractTableModel):
         self.rows = rows
         self.endResetModel()
 
+    def sort(self, column: int, order=QtCore.Qt.SortOrder.AscendingOrder):
+        if not (0 <= column < len(self.headers)):
+            return
+        key = self.headers[column]
+
+        def sort_key(row: dict[str, str]):
+            text = row.get(key, "")
+            number = _as_float(text)
+            if np.isfinite(number):
+                return (0, number)
+            return (1, text.lower())
+
+        self.layoutAboutToBeChanged.emit()
+        self.rows.sort(key=sort_key, reverse=order == QtCore.Qt.SortOrder.DescendingOrder)
+        self.layoutChanged.emit()
+
 
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
-        "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
+        "Hora", "Animal", "Modo", "Ubre", "Temp mapping", "Canal temp", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
+        "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp final", "Temp ult.",
+        "Temp RT final", "Temp RT ult.", "Temp RT raw", "Temp LT final", "Temp LT ult.", "Temp LT raw",
+        "Temp A0 final", "Temp A0 ult.", "Temp A0 raw", "Temp A1 final", "Temp A1 ult.", "Temp A1 raw",
         "Resp/min (experimental)", "Calidad resp.", "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
         "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
         "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final pulsio", "Pulso final fonendo",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
+    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp max tramo", "Temp RT max tramo", "Temp LT max tramo", "Muestras tramo"]
 
     def __init__(self):
         super().__init__()
@@ -214,6 +322,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.filtered_sessions: list[SessionGroup] = []
         self.current_session: SessionGroup | None = None
         self.current_capture: CaptureRecord | None = None
+        self.temporal_source_rows: list[dict[str, str]] = []
+        self.temporal_rel_t = np.asarray([], dtype=float)
         self._build_ui()
         self.reload_data()
 
@@ -236,6 +346,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.text_filter.setPlaceholderText("Animal, modo, configuracion, contacto...")
         self.mode_filter = QtWidgets.QComboBox()
         self.mode_filter.addItem("Todos")
+        self.udder_filter = QtWidgets.QComboBox()
+        self.udder_filter.addItem("Todos")
+        self.vacuum_filter = QtWidgets.QComboBox()
+        self.vacuum_filter.addItem("Todos")
         self.quality_min = QtWidgets.QDoubleSpinBox()
         self.quality_min.setRange(0, 100)
         self.quality_min.setValue(0)
@@ -245,13 +359,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.text_filter, 0, 1, 1, 4)
         fl.addWidget(QtWidgets.QLabel("Modo"), 0, 5)
         fl.addWidget(self.mode_filter, 0, 6)
-        fl.addWidget(QtWidgets.QLabel("Calidad min."), 0, 7)
-        fl.addWidget(self.quality_min, 0, 8)
-        fl.addWidget(self.btn_clear, 0, 9)
-        fl.addWidget(self.btn_import, 0, 10)
+        fl.addWidget(QtWidgets.QLabel("Ubre"), 0, 7)
+        fl.addWidget(self.udder_filter, 0, 8)
+        fl.addWidget(QtWidgets.QLabel("Medicion"), 0, 9)
+        fl.addWidget(self.vacuum_filter, 0, 10)
+        fl.addWidget(QtWidgets.QLabel("Calidad min."), 1, 0)
+        fl.addWidget(self.quality_min, 1, 1)
+        fl.addWidget(self.btn_clear, 1, 2)
+        fl.addWidget(self.btn_import, 1, 3)
         root.addWidget(filters)
         self.text_filter.textChanged.connect(self.apply_filters)
         self.mode_filter.currentTextChanged.connect(self.apply_filters)
+        self.udder_filter.currentTextChanged.connect(self.apply_filters)
+        self.vacuum_filter.currentTextChanged.connect(self.apply_filters)
         self.quality_min.valueChanged.connect(self.apply_filters)
         self.btn_clear.clicked.connect(self.clear_filters)
         self.btn_import.clicked.connect(self.pick_folder)
@@ -271,6 +391,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.sessions_table.setAlternatingRowColors(True)
         self.sessions_table.verticalHeader().setVisible(False)
+        self.sessions_table.setSortingEnabled(True)
         self.sessions_table.selectionModel().selectionChanged.connect(self.select_session)
         self.sessions_table.doubleClicked.connect(self.open_selected_session_file)
         sessions_layout.addWidget(self.sessions_table)
@@ -288,6 +409,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.captures_table.setAlternatingRowColors(True)
         self.captures_table.verticalHeader().setVisible(False)
+        self.captures_table.setSortingEnabled(True)
         self.captures_table.selectionModel().selectionChanged.connect(self.select_capture)
         self.captures_table.doubleClicked.connect(self.open_selected_capture_file)
         captures_layout.addWidget(self.captures_table)
@@ -322,6 +444,43 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         graph_layout.addWidget(self.plot_capture, stretch=1)
         self.detail_tabs.addTab(graph_page, "Graficas")
 
+        temporal_page = QtWidgets.QWidget()
+        temporal_layout = QtWidgets.QHBoxLayout(temporal_page)
+        self.temporal_model = DictTableModel(self.temporal_headers)
+        self.temporal_table = QtWidgets.QTableView()
+        self.temporal_table.setModel(self.temporal_model)
+        self.temporal_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.temporal_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.temporal_table.setAlternatingRowColors(True)
+        self.temporal_table.verticalHeader().setVisible(False)
+        self.temporal_table.setSortingEnabled(True)
+        self.temporal_table.setMinimumWidth(520)
+        self.temporal_table.selectionModel().selectionChanged.connect(self.update_selected_temporal_plot)
+        temporal_layout.addWidget(self.temporal_table, stretch=0)
+        temporal_right = QtWidgets.QVBoxLayout()
+        temporal_layout.addLayout(temporal_right, stretch=1)
+        temporal_controls = QtWidgets.QHBoxLayout()
+        temporal_right.addLayout(temporal_controls)
+        self.chk_temporal_signal = QtWidgets.QCheckBox("IR/RED")
+        self.chk_temporal_signal.setChecked(True)
+        self.chk_temporal_bpm = QtWidgets.QCheckBox("BPM")
+        self.chk_temporal_bpm.setChecked(True)
+        self.chk_temporal_spo2 = QtWidgets.QCheckBox("Oxigeno")
+        self.chk_temporal_spo2.setChecked(True)
+        self.chk_temporal_temp = QtWidgets.QCheckBox("Temperatura")
+        self.chk_temporal_temp.setChecked(True)
+        self.chk_temporal_blocks = QtWidgets.QCheckBox("Bloques BPM")
+        for chk in [self.chk_temporal_signal, self.chk_temporal_bpm, self.chk_temporal_spo2, self.chk_temporal_temp, self.chk_temporal_blocks]:
+            chk.toggled.connect(self.update_selected_temporal_plot)
+            temporal_controls.addWidget(chk)
+        temporal_controls.addStretch(1)
+        self.plot_temporal_signal = pg.PlotWidget(title="Senal del tramo seleccionado")
+        self.plot_temporal_signal.setBackground("w")
+        self.plot_temporal_signal.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
+        temporal_right.addWidget(self.plot_temporal_signal, stretch=1)
+        self.detail_tabs.addTab(temporal_page, "Temporalizacion")
+
         self.params = QtWidgets.QTextEdit()
         self.params.setReadOnly(True)
         self.detail_tabs.addTab(self.params, "Parametros dispositivo")
@@ -333,6 +492,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.files_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.files_table.setAlternatingRowColors(True)
         self.files_table.verticalHeader().setVisible(False)
+        self.files_table.setSortingEnabled(True)
         self.files_table.doubleClicked.connect(self.open_file_from_files_table)
         self.detail_tabs.addTab(self.files_table, "Archivos")
 
@@ -348,19 +508,37 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def clear_filters(self):
         self.text_filter.clear()
         self.mode_filter.setCurrentIndex(0)
+        self.udder_filter.setCurrentIndex(0)
+        self.vacuum_filter.setCurrentIndex(0)
         self.quality_min.setValue(0)
         self.apply_filters()
 
     def reload_data(self):
         self.sessions = self._discover_sessions()
         modes = sorted({_mode_label(cap.value("modo")) for session in self.sessions for cap in session.captures if cap.value("modo")})
+        udders = sorted({cap.value("ubre") for session in self.sessions for cap in session.captures if cap.value("ubre")})
+        vacuums = sorted({cap.value("medicion_vacio") for session in self.sessions for cap in session.captures if cap.value("medicion_vacio")})
         current = self.mode_filter.currentText()
+        current_udder = self.udder_filter.currentText()
+        current_vacuum = self.vacuum_filter.currentText()
         self.mode_filter.blockSignals(True)
+        self.udder_filter.blockSignals(True)
+        self.vacuum_filter.blockSignals(True)
         self.mode_filter.clear()
         self.mode_filter.addItem("Todos")
         self.mode_filter.addItems(modes)
         self.mode_filter.setCurrentText(current if current in ["Todos", *modes] else "Todos")
+        self.udder_filter.clear()
+        self.udder_filter.addItem("Todos")
+        self.udder_filter.addItems(udders)
+        self.udder_filter.setCurrentText(current_udder if current_udder in ["Todos", *udders] else "Todos")
+        self.vacuum_filter.clear()
+        self.vacuum_filter.addItem("Todos")
+        self.vacuum_filter.addItems(vacuums)
+        self.vacuum_filter.setCurrentText(current_vacuum if current_vacuum in ["Todos", *vacuums] else "Todos")
         self.mode_filter.blockSignals(False)
+        self.udder_filter.blockSignals(False)
+        self.vacuum_filter.blockSignals(False)
         self.apply_filters()
 
     def _find_files(self) -> dict[str, dict[str, Path]]:
@@ -394,6 +572,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         cap.row.setdefault("id", str(data.get("id") or ""))
         cap.row.setdefault("modo", str(data.get("mode") or ""))
         cap.row.setdefault("condiciones_medida", str(data.get("measurement_condition") or ""))
+        cap.row.setdefault("ubre", str(data.get("udder_side") or data.get("ubre") or ""))
+        cap.row.setdefault("temp_mapping", str(data.get("temp_mapping") or ""))
+        cap.row.setdefault("temp_primary_channel", str(data.get("temp_primary_channel") or ""))
+        cap.row.setdefault("medicion_vacio", str(data.get("vacuum_condition") or data.get("medicion_vacio") or ""))
         cap.row.setdefault("config_label", str(data.get("config_label") or ""))
         cap.row.setdefault("config_description", str(data.get("config_description") or ""))
         cap.row.setdefault("motivo_fin", str(data.get("reason") or ""))
@@ -418,11 +600,38 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "resp_rate_rpm": metrics.get("resp_rate_rpm"),
             "resp_quality": metrics.get("resp_quality"),
             "resp_reason": metrics.get("resp_reason"),
+            "temp_c_final_max_5s": temp.get("temp_c_final_max_5s"),
+            "temp_c_final_time_s": temp.get("temp_c_final_time_s"),
+            "temp_c_final_raw_at_max": temp.get("temp_c_final_raw_at_max"),
             "temp_c_media": temp.get("temp_c_mean"),
             "temp_c_ultima": temp.get("temp_c_last"),
             "temp_c_min": temp.get("temp_c_min"),
             "temp_c_max": temp.get("temp_c_max"),
             "temp_raw_ultima": temp.get("temp_raw_last"),
+            "temp_rt_c_final_max_5s": temp.get("temp_rt_c_final_max_5s"),
+            "temp_rt_c_final_time_s": temp.get("temp_rt_c_final_time_s"),
+            "temp_rt_c_final_raw_at_max": temp.get("temp_rt_c_final_raw_at_max"),
+            "temp_rt_c_media": temp.get("temp_rt_c_mean"),
+            "temp_rt_c_ultima": temp.get("temp_rt_c_last"),
+            "temp_rt_raw_ultima": temp.get("temp_rt_raw_last"),
+            "temp_lt_c_final_max_5s": temp.get("temp_lt_c_final_max_5s"),
+            "temp_lt_c_final_time_s": temp.get("temp_lt_c_final_time_s"),
+            "temp_lt_c_final_raw_at_max": temp.get("temp_lt_c_final_raw_at_max"),
+            "temp_lt_c_media": temp.get("temp_lt_c_mean"),
+            "temp_lt_c_ultima": temp.get("temp_lt_c_last"),
+            "temp_lt_raw_ultima": temp.get("temp_lt_raw_last"),
+            "temp_a0_c_final_max_5s": temp.get("temp_a0_c_final_max_5s"),
+            "temp_a0_c_final_time_s": temp.get("temp_a0_c_final_time_s"),
+            "temp_a0_c_final_raw_at_max": temp.get("temp_a0_c_final_raw_at_max"),
+            "temp_a0_c_media": temp.get("temp_a0_c_mean"),
+            "temp_a0_c_ultima": temp.get("temp_a0_c_last"),
+            "temp_a0_raw_ultima": temp.get("temp_a0_raw_last"),
+            "temp_a1_c_final_max_5s": temp.get("temp_a1_c_final_max_5s"),
+            "temp_a1_c_final_time_s": temp.get("temp_a1_c_final_time_s"),
+            "temp_a1_c_final_raw_at_max": temp.get("temp_a1_c_final_raw_at_max"),
+            "temp_a1_c_media": temp.get("temp_a1_c_mean"),
+            "temp_a1_c_ultima": temp.get("temp_a1_c_last"),
+            "temp_a1_raw_ultima": temp.get("temp_a1_raw_last"),
             "artefactos_ir_pct": metrics.get("artifact_ir_pct"),
             "artefactos_red_pct": metrics.get("artifact_red_pct"),
             "pi_ir_pct": metrics.get("pi_ir_pct"),
@@ -555,6 +764,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def apply_filters(self):
         text = self.text_filter.text().strip().lower()
         mode = self.mode_filter.currentText()
+        udder = self.udder_filter.currentText()
+        vacuum = self.vacuum_filter.currentText()
         quality_min = self.quality_min.value()
         filtered: list[SessionGroup] = []
         for session in self.sessions:
@@ -565,14 +776,23 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     continue
                 if mode != "Todos" and _mode_label(cap.value("modo")) != mode:
                     continue
+                if udder != "Todos" and cap.value("ubre") != udder:
+                    continue
+                if vacuum != "Todos" and cap.value("medicion_vacio") != vacuum:
+                    continue
                 quality = _as_float(cap.value("calidad"))
                 if np.isfinite(quality) and quality < quality_min:
                     continue
                 captures.append(cap)
-            if captures or (not session.captures and not text and mode == "Todos"):
+            if captures or (not session.captures and not text and mode == "Todos" and udder == "Todos" and vacuum == "Todos"):
                 filtered.append(SessionGroup(key=session.key, path=session.path, captures=captures))
         self.filtered_sessions = filtered
-        self.sessions_model.set_rows(self.session_headers, [self._session_row(session) for session in filtered])
+        session_rows = []
+        for idx, session in enumerate(filtered):
+            row = self._session_row(session)
+            row["_session_index"] = str(idx)
+            session_rows.append(row)
+        self.sessions_model.set_rows(self.session_headers, session_rows)
         self.sessions_table.resizeColumnsToContents()
         self.sessions_label.setText(f"{len(filtered)} sesiones | {sum(len(s.captures) for s in filtered)} tomas visibles")
         if filtered:
@@ -604,7 +824,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.set_session(None)
             return
         row = indexes[0].row()
-        self.set_session(self.filtered_sessions[row] if 0 <= row < len(self.filtered_sessions) else None)
+        model_row = self.sessions_model.rows[row] if 0 <= row < len(self.sessions_model.rows) else {}
+        source_row = int(model_row.get("_session_index", row) or row)
+        self.set_session(self.filtered_sessions[source_row] if 0 <= source_row < len(self.filtered_sessions) else None)
 
     def set_session(self, session: SessionGroup | None):
         self.current_session = session
@@ -615,7 +837,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.set_capture(None)
             return
         self.captures_label.setText(f"Raws / tomas dentro de {session.name}")
-        self.captures_model.set_rows(self.capture_headers, [self._capture_row(cap) for cap in session.captures])
+        capture_rows = []
+        for idx, cap in enumerate(session.captures):
+            row = self._capture_row(cap)
+            row["_capture_index"] = str(idx)
+            capture_rows.append(row)
+        self.captures_model.set_rows(self.capture_headers, capture_rows)
         self.captures_table.resizeColumnsToContents()
         if session.captures:
             _select_first_row(self.captures_table)
@@ -641,6 +868,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
             "Modo": _mode_label(cap.value("modo")),
+            "Ubre": cap.value("ubre"),
+            "Temp mapping": cap.value("temp_mapping"),
+            "Canal temp": cap.value("temp_primary_channel"),
+            "Medicion": cap.value("medicion_vacio"),
             "Configuracion": cap.value("config_label"),
             "Estado": state,
             "Pulso ref.": fmt(ref_avg, 1, ""),
@@ -653,8 +884,20 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Ratio R": fmt(_as_float(cap.value("ratio_r")), 4, ""),
             "Resp/min (experimental)": fmt(_as_float(_cap_first(cap, "resp_rate_rpm", "resp_min_exp")), 1, ""),
             "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
-            "Temp media": fmt(_as_float(cap.value("temp_c_media")), 1, ""),
+            "Temp final": fmt(_as_float(_cap_temp_final(cap, "temp_c_final_max_5s", "temp_c_media")), 1, ""),
             "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
+            "Temp RT final": fmt(_as_float(_cap_temp_final(cap, "temp_rt_c_final_max_5s", "temp_rt_c_media", "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s")), 1, ""),
+            "Temp RT ult.": fmt(_as_float(_cap_first(cap, "temp_rt_c_ultima", "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
+            "Temp RT raw": fmt(_as_float(_cap_first(cap, "temp_rt_raw_ultima", "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
+            "Temp LT final": fmt(_as_float(_cap_temp_final(cap, "temp_lt_c_final_max_5s", "temp_lt_c_media", "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
+            "Temp LT ult.": fmt(_as_float(_cap_first(cap, "temp_lt_c_ultima", "temp_a1_c_ultima")), 1, ""),
+            "Temp LT raw": fmt(_as_float(_cap_first(cap, "temp_lt_raw_ultima", "temp_a1_raw_ultima")), 0, ""),
+            "Temp A0 final": fmt(_as_float(_cap_temp_final(cap, "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s", "temp_c_media")), 1, ""),
+            "Temp A0 ult.": fmt(_as_float(_cap_first(cap, "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
+            "Temp A0 raw": fmt(_as_float(_cap_first(cap, "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
+            "Temp A1 final": fmt(_as_float(_cap_temp_final(cap, "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
+            "Temp A1 ult.": fmt(_as_float(cap.value("temp_a1_c_ultima")), 1, ""),
+            "Temp A1 raw": fmt(_as_float(cap.value("temp_a1_raw_ultima")), 0, ""),
             "Temp raw": fmt(_as_float(cap.value("temp_raw_ultima")), 0, ""),
             "Calidad": fmt(quality, 0, ""),
             "Contacto": cap.value("contacto"),
@@ -686,7 +929,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.set_capture(None)
             return
         row = indexes[0].row()
-        self.set_capture(self.current_session.captures[row] if 0 <= row < len(self.current_session.captures) else None)
+        model_row = self.captures_model.rows[row] if 0 <= row < len(self.captures_model.rows) else {}
+        source_row = int(model_row.get("_capture_index", row) or row)
+        self.set_capture(self.current_session.captures[source_row] if 0 <= source_row < len(self.current_session.captures) else None)
 
     def set_capture(self, cap: CaptureRecord | None):
         self.current_capture = cap
@@ -699,6 +944,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.params.clear()
             self.files_model.set_rows(self.files_headers, [])
             self.plot_capture.clear()
+            self.temporal_model.set_rows(self.temporal_headers, [])
+            self.temporal_source_rows = []
+            self.temporal_rel_t = np.asarray([], dtype=float)
+            self.plot_temporal_signal.clear()
             return
         self.summary.setHtml(self._summary_html(cap))
         self.params.setHtml(self._params_html(cap))
@@ -713,9 +962,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.files_model.set_rows(self.files_headers, file_rows)
         raw_rows = _read_csv(cap.files["raw"], limit=5000) if "raw" in cap.files else []
         proc_rows = _read_csv(cap.files["processed"], limit=5000) if "processed" in cap.files else []
+        raw_rows_full = _read_csv(cap.files["raw"]) if "raw" in cap.files else []
+        proc_rows_full = _read_csv(cap.files["processed"]) if "processed" in cap.files else []
         block_rows = _read_csv(cap.files["blocks"], limit=5000) if "blocks" in cap.files else []
         self.files_table.resizeColumnsToContents()
         self.update_capture_plot(raw_rows, proc_rows, block_rows)
+        self.update_temporalization(cap, raw_rows_full, proc_rows_full, block_rows)
 
     def open_path(self, path: Path | None):
         if path is None:
@@ -732,8 +984,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if not indexes:
             return
         row = indexes[0].row()
-        if 0 <= row < len(self.filtered_sessions):
-            self.open_path(self.filtered_sessions[row].path)
+        model_row = self.sessions_model.rows[row] if 0 <= row < len(self.sessions_model.rows) else {}
+        source_row = int(model_row.get("_session_index", row) or row)
+        if 0 <= source_row < len(self.filtered_sessions):
+            self.open_path(self.filtered_sessions[source_row].path)
 
     def open_selected_capture_file(self, *_args):
         cap = self.current_capture
@@ -782,6 +1036,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             warnings.append("Respiraciones calculadas de forma experimental desde modulaciones lentas de PPG; validar con referencia externa.")
         if np.isfinite(diff_ref) and diff_ref > 12:
             warnings.append(f"La BPM media queda a {diff_ref:.1f} BPM de la referencia manual; revisar contacto/configuracion o la anotacion manual.")
+        reason_text = cap.value("metrics_reason") or ""
+        if "cribado robusto" in reason_text.lower():
+            warnings.append("El calculo ya aplica cribado robusto: el raw se conserva completo, pero las muestras inestables no pesan en la estimacion.")
 
         if not warnings:
             warnings.append("Sin avisos tecnicos destacados en las metricas guardadas.")
@@ -795,6 +1052,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip() or "-"),
             ("Configuracion", cap.value("config_label") or "-"),
             ("Descripcion configuracion", cap.value("config_description") or "-"),
+            ("Ubre", cap.value("ubre") or "-"),
+            ("Asignacion termometros", cap.value("temp_mapping") or "-"),
+            ("Canal temp primario", cap.value("temp_primary_channel") or "-"),
+            ("Medicion", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
             ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
             ("Pulso previo / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
@@ -809,7 +1070,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
             ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
-            ("Temperatura media / ultima", f"{fmt(_as_float(cap.value('temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
+            ("Temperatura primaria final / ultima", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
+            ("Temperatura RT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_rt_c_final_max_5s', 'temp_rt_c_media', 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_rt_c_ultima', 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_rt_raw_ultima', 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
+            ("Temperatura LT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_lt_c_final_max_5s', 'temp_lt_c_media', 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_lt_c_ultima', 'temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_lt_raw_ultima', 'temp_a1_raw_ultima')), 0, '-')}"),
+            ("Temperatura A0 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
+            ("Temperatura A1 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a1_raw_ultima')), 0, '-')}"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
@@ -897,6 +1162,270 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             if np.any(mask):
                 self.plot_capture.plot(x[mask] + 5, y[mask], pen=pg.mkPen((20, 120, 110), width=2), symbol="o", name="Bloques BPM")
         self.plot_capture.setLabel("bottom", "Tiempo", units="s")
+
+    def update_temporalization(self, cap: CaptureRecord, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]], block_rows: list[dict[str, str]]):
+        rows = proc_rows or raw_rows
+        self.plot_temporal_signal.clear()
+        self.temporal_source_rows = rows
+        self.temporal_rel_t = np.asarray([], dtype=float)
+        if not rows and not block_rows:
+            self.temporal_model.set_rows(self.temporal_headers, [])
+            return
+
+        source_rows = rows
+        rel_t = np.asarray([], dtype=float)
+        if source_rows:
+            t = np.asarray([_as_float(r.get("tiempo_s", "")) for r in source_rows], dtype=float)
+            finite_t = t[np.isfinite(t)]
+            if finite_t.size:
+                rel_t = t - float(finite_t[0])
+        self.temporal_rel_t = rel_t
+        duration = self._temporal_duration(cap, rel_t, block_rows)
+        if not np.isfinite(duration) or duration <= 0:
+            self.temporal_model.set_rows(self.temporal_headers, [])
+            return
+
+        block_bpm = [_as_float(row.get("bpm_medio_10s", "")) for row in block_rows]
+        interval_count = max(int(math.ceil(duration / 10.0)), len(block_bpm), 1)
+        sensor_cfg = self._sensor_config_from_capture(cap)
+        analysis_cfg = self._analysis_config_from_capture(cap)
+        red_values = self._temporal_series(source_rows, "red_raw")
+        ir_values = self._temporal_series(source_rows, "ir_raw")
+        bpm_rolling = self._temporal_series(source_rows, "bpm_rolling_5s")
+        spo2_rolling = self._temporal_series(source_rows, "spo2_rolling_5s")
+        quality_rolling = self._temporal_series(source_rows, "quality_rolling_5s")
+        temp_values = self._temporal_series(source_rows, "temp_c")
+        temp_rt_values = self._temporal_series_with_fallback(source_rows, "temp_rt_c", "temp_a0_c", "temp_c")
+        temp_lt_values = self._temporal_series_with_fallback(source_rows, "temp_lt_c", "temp_a1_c")
+
+        table_rows: list[dict[str, str]] = []
+        centers: list[float] = []
+        bpm_block_values: list[float] = []
+        bpm_tramo_values: list[float] = []
+        spo2_values: list[float] = []
+        quality_values: list[float] = []
+        temp_plot_values: list[float] = []
+        temp_rt_plot_values: list[float] = []
+        temp_lt_plot_values: list[float] = []
+        sample_values: list[float] = []
+
+        for idx in range(interval_count):
+            start = idx * 10.0
+            end = min(duration, start + 10.0)
+            if end <= start:
+                continue
+            if rel_t.size:
+                if idx == interval_count - 1:
+                    mask = np.isfinite(rel_t) & (rel_t >= start) & (rel_t <= end)
+                else:
+                    mask = np.isfinite(rel_t) & (rel_t >= start) & (rel_t < end)
+                samples = int(np.sum(mask))
+                bpm_roll = self._masked_mean(bpm_rolling, mask)
+                spo2 = self._masked_mean(spo2_rolling, mask)
+                quality = self._masked_mean(quality_rolling, mask)
+                temp = self._masked_max(temp_values, mask)
+                temp_rt = self._masked_max(temp_rt_values, mask)
+                temp_lt = self._masked_max(temp_lt_values, mask)
+                metrics = self._metrics_for_temporal_mask(rel_t, red_values, ir_values, mask, sensor_cfg, analysis_cfg)
+                bpm_tramo = metrics.bpm if np.isfinite(metrics.bpm) else bpm_roll
+                spo2 = metrics.spo2 if np.isfinite(metrics.spo2) else spo2
+                quality = metrics.quality if np.isfinite(metrics.quality) and metrics.n else quality
+            else:
+                samples = 0
+                bpm_tramo = math.nan
+                spo2 = math.nan
+                quality = math.nan
+                temp = math.nan
+                temp_rt = math.nan
+                temp_lt = math.nan
+            bpm_10s = block_bpm[idx] if idx < len(block_bpm) else math.nan
+            if not np.isfinite(bpm_10s) and np.isfinite(bpm_tramo):
+                bpm_10s = bpm_tramo
+            center = (start + end) / 2.0
+            centers.append(center)
+            bpm_block_values.append(bpm_10s)
+            bpm_tramo_values.append(bpm_tramo)
+            spo2_values.append(spo2)
+            quality_values.append(quality)
+            temp_plot_values.append(temp)
+            temp_rt_plot_values.append(temp_rt)
+            temp_lt_plot_values.append(temp_lt)
+            sample_values.append(float(samples))
+            table_rows.append({
+                "Tramo": f"{idx + 1}",
+                "Inicio s": fmt(start, 1, ""),
+                "Fin s": fmt(end, 1, ""),
+                "BPM 10s": fmt(bpm_10s, 1, ""),
+                "BPM tramo": fmt(bpm_tramo, 1, ""),
+                "SpO2 tramo": fmt(spo2, 1, ""),
+                "Calidad tramo": fmt(quality, 1, ""),
+                "Temp max tramo": fmt(temp, 2, ""),
+                "Temp RT max tramo": fmt(temp_rt, 2, ""),
+                "Temp LT max tramo": fmt(temp_lt, 2, ""),
+                "Muestras tramo": str(samples),
+            })
+
+        self.temporal_model.set_rows(self.temporal_headers, table_rows)
+        self.temporal_table.resizeColumnsToContents()
+        if table_rows:
+            self.temporal_table.selectRow(0)
+        else:
+            self.plot_temporal_signal.clear()
+
+    def update_selected_temporal_plot(self):
+        indexes = self.temporal_table.selectionModel().selectedRows()
+        if not indexes:
+            self.plot_temporal_signal.clear()
+            return
+        row_index = indexes[0].row()
+        if not (0 <= row_index < len(self.temporal_model.rows)):
+            self.plot_temporal_signal.clear()
+            return
+        row = self.temporal_model.rows[row_index]
+        start = _as_float(row.get("Inicio s", ""))
+        end = _as_float(row.get("Fin s", ""))
+        self.plot_temporal_signal.clear()
+        rows = self.temporal_source_rows
+        rel_t = self.temporal_rel_t
+        if not rows or not rel_t.size or not np.isfinite(start) or not np.isfinite(end):
+            return
+        mask = np.isfinite(rel_t) & (rel_t >= start) & (rel_t <= end)
+        if not np.any(mask):
+            return
+        tt = rel_t[mask]
+        self.plot_temporal_signal.setTitle(f"Tramo {row.get('Tramo', '')}: {fmt(start, 1, '')}-{fmt(end, 1, '')} s")
+        if self.chk_temporal_signal.isChecked():
+            ir = np.asarray([_as_float(r.get("ir_proc_norm") or r.get("ir_raw", "")) for r in rows], dtype=float)
+            red = np.asarray([_as_float(r.get("red_proc_norm") or r.get("red_raw", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, ir[mask], (0, 80, 220), "IR")
+            self._plot_temporal_segment_series(tt, red[mask], (220, 40, 35), "RED")
+        if self.chk_temporal_bpm.isChecked():
+            bpm = np.asarray([_as_float(r.get("bpm_rolling_5s", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, bpm[mask], (40, 140, 50), "BPM")
+        if self.chk_temporal_spo2.isChecked():
+            spo2 = np.asarray([_as_float(r.get("spo2_rolling_5s", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, spo2[mask], (150, 70, 160), "SpO2")
+        if self.chk_temporal_temp.isChecked():
+            temp = np.asarray([_as_float(r.get("temp_c", "")) for r in rows], dtype=float)
+            self._plot_temporal_segment_series(tt, temp[mask], (220, 120, 30), "Temp")
+        if self.chk_temporal_blocks.isChecked():
+            bpm_10s = _as_float(row.get("BPM 10s", ""))
+            if np.isfinite(bpm_10s):
+                self.plot_temporal_signal.plot(
+                    [float(start), float(end)],
+                    [bpm_10s, bpm_10s],
+                    pen=pg.mkPen((20, 120, 110), width=2, style=QtCore.Qt.PenStyle.DashLine),
+                    name="BPM 10s",
+                )
+        self.plot_temporal_signal.setXRange(float(start), max(float(end), float(start) + 1.0), padding=0.01)
+        self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
+
+    def _temporal_duration(self, cap: CaptureRecord, rel_t: np.ndarray, block_rows: list[dict[str, str]]) -> float:
+        if rel_t.size:
+            finite_t = rel_t[np.isfinite(rel_t)]
+            if finite_t.size:
+                return float(np.max(finite_t))
+        duration = _as_float(cap.value("duracion_real_s"))
+        if np.isfinite(duration) and duration > 0:
+            return duration
+        ends = [_as_float(row.get("fin_s", "")) for row in block_rows]
+        ends = [value for value in ends if np.isfinite(value)]
+        return max(ends) if ends else math.nan
+
+    def _temporal_series(self, rows: list[dict[str, str]], key: str) -> np.ndarray:
+        if not rows:
+            return np.asarray([], dtype=float)
+        return np.asarray([_as_float(row.get(key, "")) for row in rows], dtype=float)
+
+    def _temporal_series_with_fallback(self, rows: list[dict[str, str]], *keys: str) -> np.ndarray:
+        if not rows:
+            return np.asarray([], dtype=float)
+        values = []
+        for row in rows:
+            value = math.nan
+            for key in keys:
+                value = _as_float(row.get(key, ""))
+                if np.isfinite(value):
+                    break
+            values.append(value)
+        return np.asarray(values, dtype=float)
+
+    def _masked_mean(self, values: np.ndarray, mask: np.ndarray) -> float:
+        if values.size != mask.size:
+            return math.nan
+        selected = values[mask]
+        selected = selected[np.isfinite(selected)]
+        if not selected.size:
+            return math.nan
+        return float(np.mean(selected))
+
+    def _masked_max(self, values: np.ndarray, mask: np.ndarray) -> float:
+        if values.size != mask.size:
+            return math.nan
+        selected = values[mask]
+        selected = selected[np.isfinite(selected)]
+        if not selected.size:
+            return math.nan
+        return float(np.max(selected))
+
+    def _metrics_for_temporal_mask(
+        self,
+        rel_t: np.ndarray,
+        red_values: np.ndarray,
+        ir_values: np.ndarray,
+        mask: np.ndarray,
+        sensor_cfg: SensorConfig,
+        analysis_cfg: AnalysisConfig,
+    ):
+        if rel_t.size != mask.size or red_values.size != mask.size or ir_values.size != mask.size:
+            return self._empty_temporal_metrics()
+        valid = mask & np.isfinite(rel_t) & np.isfinite(red_values) & np.isfinite(ir_values)
+        if int(np.sum(valid)) < 80:
+            return self._empty_temporal_metrics()
+        t = rel_t[valid]
+        return score_and_merge_metrics(t - float(t[0]), red_values[valid], ir_values[valid], sensor_cfg, analysis_cfg)
+
+    def _empty_temporal_metrics(self):
+        from ..models import Metrics
+
+        return Metrics()
+
+    def _sensor_config_from_capture(self, cap: CaptureRecord) -> SensorConfig:
+        return SensorConfig(
+            red=self._int_cap(cap, "cfg_red", 63),
+            ir=self._int_cap(cap, "cfg_ir", 63),
+            avg=self._int_cap(cap, "cfg_avg", 4),
+            rate=self._int_cap(cap, "cfg_rate", 800),
+            width=self._int_cap(cap, "cfg_width", 411),
+            adc=self._int_cap(cap, "cfg_adc", 16384),
+            skip=self._int_cap(cap, "cfg_skip", 50),
+            debug=str(cap.value("cfg_debug")).strip().lower() in {"1", "true", "si", "yes"},
+        ).clean()
+
+    def _analysis_config_from_capture(self, cap: CaptureRecord) -> AnalysisConfig:
+        cfg = AnalysisConfig()
+        cfg.bpm_min = self._int_cap(cap, "analysis_bpm_min", cfg.bpm_min)
+        cfg.bpm_max = self._int_cap(cap, "analysis_bpm_max", cfg.bpm_max)
+        cfg.detrend_seconds = self._float_cap(cap, "analysis_detrend_seconds", cfg.detrend_seconds)
+        cfg.smooth_seconds = self._float_cap(cap, "analysis_smooth_seconds", cfg.smooth_seconds)
+        cfg.ignore_initial_seconds = self._float_cap(cap, "analysis_ignore_initial_seconds", cfg.ignore_initial_seconds)
+        formula = cap.value("analysis_spo2_formula")
+        if formula:
+            cfg.spo2_formula = formula
+        return cfg
+
+    def _int_cap(self, cap: CaptureRecord, key: str, default: int) -> int:
+        value = _as_float(cap.value(key))
+        return int(value) if np.isfinite(value) else int(default)
+
+    def _float_cap(self, cap: CaptureRecord, key: str, default: float) -> float:
+        value = _as_float(cap.value(key))
+        return float(value) if np.isfinite(value) else float(default)
+
+    def _plot_temporal_segment_series(self, x: np.ndarray, y: np.ndarray, color: tuple[int, int, int], name: str):
+        mask = np.isfinite(x) & np.isfinite(y)
+        if np.any(mask):
+            self.plot_temporal_signal.plot(x[mask], y[mask], pen=pg.mkPen(color, width=1 if name in {"IR", "RED"} else 2), name=name)
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         event.accept()

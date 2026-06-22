@@ -1,34 +1,62 @@
 #include <Wire.h>
 #include "MAX30105.h"
 
+#if defined(ARDUINO_SAMD_NANO_33_IOT)
+  #include <ArduinoBLE.h>
+#endif
+
 MAX30105 sensor;
 
 // ======================================================
 // Firmware mtestv2
-// MAX3010x + NTC A0
+// MAX3010x + NTC A0/A1
 //
 // Comandos desde Python:
 //   STATUS
-//   CONFIG RED=31 IR=31 AVG=1 RATE=100 WIDTH=411 ADC=16384 SKIP=10 DEBUG=0
+//   CONFIG RED=63 IR=63 AVG=4 RATE=800 WIDTH=411 ADC=16384 SKIP=50 DEBUG=0
 //   CONFIG_TEMP VCC=3.30 RFIX=10000 RN=10000 BETA=3435 OFFSET=0.0 ADCBITS=12
 //   START_CONTINUOUS
 //   START_TEMP
 //   STOP
 //
 // Datos enviados:
-//   micros,red,ir,tempC,tempRaw
+//   micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw
 // ======================================================
+
+#if defined(ARDUINO_SAMD_NANO_33_IOT)
+  #define MTEST_BOARD_PROFILE "NANO_33_IOT"
+  #define MTEST_BLE_AVAILABLE 1
+  #define MTEST_BLE_TRANSPORT_ENABLED 1
+#else
+  #define MTEST_BOARD_PROFILE "GENERIC_SERIAL"
+  #define MTEST_BLE_AVAILABLE 0
+  #define MTEST_BLE_TRANSPORT_ENABLED 0
+#endif
+
+// Nano 33 IoT usa BLE via modulo u-blox NINA-W102. No crea un puerto COM
+// Bluetooth clasico: la app se conecta por GATT usando estas caracteristicas.
+#define MTEST_USB_SERIAL_ENABLED 1
+
+#if MTEST_BLE_TRANSPORT_ENABLED
+BLEService mtestService("7f510001-1b15-4b91-9f4b-3a4d5f6e0001");
+BLEStringCharacteristic bleRxChar("7f510002-1b15-4b91-9f4b-3a4d5f6e0001", BLEWrite, 180);
+BLEStringCharacteristic bleTxChar("7f510003-1b15-4b91-9f4b-3a4d5f6e0001", BLERead | BLENotify, 244);
+bool bleReady = false;
+#endif
+
+unsigned long lastBleDataMs = 0;
+const unsigned long BLE_DATA_PERIOD_MS = 20;
 
 
 // ---------- MAX3010x ----------
 struct SensorConfig {
-  uint8_t red = 31;
-  uint8_t ir = 31;
-  uint8_t avg = 1;
-  uint16_t rate = 100;
+  uint8_t red = 63;
+  uint8_t ir = 63;
+  uint8_t avg = 4;
+  uint16_t rate = 800;
   uint16_t width = 411;
   uint16_t adc = 16384;
-  uint16_t skip = 10;
+  uint16_t skip = 50;
   bool debug = false;
 };
 
@@ -36,7 +64,8 @@ SensorConfig cfg;
 
 
 // ---------- NTC TEMPERATURA ----------
-const int PIN_TEMP = A0;
+const int PIN_TEMP_A0 = A0;
+const int PIN_TEMP_A1 = A1;
 
 // Montaje asumido:
 // 3.3V ---- NTC ---- A0 ---- R_FIJA ---- GND
@@ -67,6 +96,29 @@ String rxLine = "";
 
 unsigned long lastTempOnlyMs = 0;
 const unsigned long TEMP_ONLY_PERIOD_MS = 100;
+
+void handleCommand(const String &cmd);
+
+
+void bleSendLine(const String &line) {
+#if MTEST_BLE_TRANSPORT_ENABLED
+  if (!bleReady) return;
+  BLEDevice central = BLE.central();
+  if (!central || !central.connected()) return;
+  bleTxChar.writeValue((line + "\n").c_str());
+#else
+  (void)line;
+#endif
+}
+
+void emitLine(const String &line) {
+  Serial.println(line);
+  bleSendLine(line);
+}
+
+void emitFlashLine(const __FlashStringHelper *line) {
+  Serial.println(line);
+}
 
 
 // ======================================================
@@ -123,23 +175,36 @@ float readFloatAfterKey(const String &line, const String &key, float fallback) {
 // ======================================================
 
 void printSensorConfig() {
-  Serial.print(F("CFG RED=")); Serial.print(cfg.red);
-  Serial.print(F(" IR=")); Serial.print(cfg.ir);
-  Serial.print(F(" AVG=")); Serial.print(cfg.avg);
-  Serial.print(F(" RATE=")); Serial.print(cfg.rate);
-  Serial.print(F(" WIDTH=")); Serial.print(cfg.width);
-  Serial.print(F(" ADC=")); Serial.print(cfg.adc);
-  Serial.print(F(" SKIP=")); Serial.print(cfg.skip);
-  Serial.print(F(" DEBUG=")); Serial.println(cfg.debug ? 1 : 0);
+  String line = "CFG RED=" + String(cfg.red);
+  line += " IR=" + String(cfg.ir);
+  line += " AVG=" + String(cfg.avg);
+  line += " RATE=" + String(cfg.rate);
+  line += " WIDTH=" + String(cfg.width);
+  line += " ADC=" + String(cfg.adc);
+  line += " SKIP=" + String(cfg.skip);
+  line += " DEBUG=" + String(cfg.debug ? 1 : 0);
+  emitLine(line);
 }
 
 void printTempConfig() {
-  Serial.print(F("TEMP_CFG VCC=")); Serial.print(tempCfg.vcc, 4);
-  Serial.print(F(" RFIX=")); Serial.print(tempCfg.rFixed, 1);
-  Serial.print(F(" RN=")); Serial.print(tempCfg.rNominal, 1);
-  Serial.print(F(" BETA=")); Serial.print(tempCfg.beta, 1);
-  Serial.print(F(" OFFSET=")); Serial.print(tempCfg.offsetC, 3);
-  Serial.print(F(" ADCBITS=")); Serial.println(tempCfg.adcBits);
+  String line = "TEMP_CFG VCC=" + String(tempCfg.vcc, 4);
+  line += " RFIX=" + String(tempCfg.rFixed, 1);
+  line += " RN=" + String(tempCfg.rNominal, 1);
+  line += " BETA=" + String(tempCfg.beta, 1);
+  line += " OFFSET=" + String(tempCfg.offsetC, 3);
+  line += " ADCBITS=" + String(tempCfg.adcBits);
+  emitLine(line);
+}
+
+void printBoardConfig() {
+  String line = "BOARD PROFILE=" + String(MTEST_BOARD_PROFILE);
+  line += " USB_SERIAL=" + String(MTEST_USB_SERIAL_ENABLED);
+  line += " BLE_AVAILABLE=" + String(MTEST_BLE_AVAILABLE);
+  line += " BLE_TRANSPORT=" + String(MTEST_BLE_TRANSPORT_ENABLED);
+#if MTEST_BLE_TRANSPORT_ENABLED
+  line += " BLE_NAME=mtestv2 Nano33IoT";
+#endif
+  emitLine(line);
 }
 
 void applySensorConfig() {
@@ -159,6 +224,8 @@ void applyTempConfig() {
 #if defined(ARDUINO_ARCH_SAMD) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_MBED)
   analogReadResolution(tempCfg.adcBits);
 #endif
+  pinMode(PIN_TEMP_A0, INPUT);
+  pinMode(PIN_TEMP_A1, INPUT);
 }
 
 void handleConfig(const String &line) {
@@ -173,8 +240,8 @@ void handleConfig(const String &line) {
 
   cfg.red = constrain(red, 0, 255);
   cfg.ir = constrain(ir, 0, 255);
-  cfg.avg = validAvg(avg) ? avg : 1;
-  cfg.rate = validRate(rate) ? rate : 100;
+  cfg.avg = validAvg(avg) ? avg : 4;
+  cfg.rate = validRate(rate) ? rate : 800;
   cfg.width = validWidth(width) ? width : 411;
   cfg.adc = validAdc(adc) ? adc : 16384;
   cfg.skip = constrain(skip, 0, 200);
@@ -182,7 +249,7 @@ void handleConfig(const String &line) {
 
   applySensorConfig();
 
-  Serial.println(F("OK_CONFIG"));
+  emitLine("OK_CONFIG");
   printSensorConfig();
 }
 
@@ -201,7 +268,7 @@ void handleTempConfig(const String &line) {
 
   applyTempConfig();
 
-  Serial.println(F("OK_CONFIG_TEMP"));
+  emitLine("OK_CONFIG_TEMP");
   printTempConfig();
 }
 
@@ -215,8 +282,10 @@ uint32_t adcMaxValue() {
   return (1UL << tempCfg.adcBits) - 1UL;
 }
 
-uint16_t leerTempRaw() {
-  return analogRead(PIN_TEMP);
+uint16_t leerTempRaw(int pin) {
+  analogRead(pin);
+  delayMicroseconds(250);
+  return analogRead(pin);
 }
 
 float leerTemperaturaC(uint16_t raw) {
@@ -241,19 +310,33 @@ float leerTemperaturaC(uint16_t raw) {
 }
 
 void printDataLine(uint32_t red, uint32_t ir) {
-  uint16_t rawTemp = leerTempRaw();
-  float tempC = leerTemperaturaC(rawTemp);
+  uint16_t rawTempA0 = leerTempRaw(PIN_TEMP_A0);
+  uint16_t rawTempA1 = leerTempRaw(PIN_TEMP_A1);
+  float tempA0C = leerTemperaturaC(rawTempA0);
+  float tempA1C = leerTemperaturaC(rawTempA1);
 
-  Serial.print(micros());
-  Serial.print(",");
-  Serial.print(red);
-  Serial.print(",");
-  Serial.print(ir);
-  Serial.print(",");
-  if (isnan(tempC)) Serial.print("nan");
-  else Serial.print(tempC, 2);
-  Serial.print(",");
-  Serial.println(rawTemp);
+  String line = String(micros());
+  line += ",";
+  line += String(red);
+  line += ",";
+  line += String(ir);
+  line += ",";
+  line += isnan(tempA0C) ? "nan" : String(tempA0C, 2);
+  line += ",";
+  line += String(rawTempA0);
+  line += ",";
+  line += isnan(tempA1C) ? "nan" : String(tempA1C, 2);
+  line += ",";
+  line += String(rawTempA1);
+
+  Serial.println(line);
+#if MTEST_BLE_TRANSPORT_ENABLED
+  unsigned long nowMs = millis();
+  if (nowMs - lastBleDataMs >= BLE_DATA_PERIOD_MS) {
+    lastBleDataMs = nowMs;
+    bleSendLine(line);
+  }
+#endif
 }
 
 // ======================================================
@@ -369,13 +452,10 @@ void diagnosticoMax3010x(bool maxFound) {
   Serial.println(F("MAX3010X_FIN"));
 }
 
-void diagnosticoTemperatura() {
-  Serial.println(F("TEMP_INICIO"));
-
+void diagnosticoPinTemperatura(int pin, const __FlashStringHelper *label) {
   const byte muestras = 20;
 
-  // Lectura normal
-  pinMode(PIN_TEMP, INPUT);
+  pinMode(pin, INPUT);
   delay(5);
 
   uint32_t rawSum = 0;
@@ -383,7 +463,116 @@ void diagnosticoTemperatura() {
   uint16_t rawMax = 0;
 
   for (byte i = 0; i < muestras; i++) {
-    uint16_t raw = leerTempRaw();
+    uint16_t raw = leerTempRaw(pin);
+    rawSum += raw;
+    if (raw < rawMin) rawMin = raw;
+    if (raw > rawMax) rawMax = raw;
+    delay(2);
+  }
+
+  uint16_t rawAvg = rawSum / muestras;
+
+  pinMode(pin, INPUT_PULLUP);
+  delay(20);
+
+  uint32_t rawPullupSum = 0;
+  for (byte i = 0; i < muestras; i++) {
+    rawPullupSum += leerTempRaw(pin);
+    delay(2);
+  }
+
+  uint16_t rawPullupAvg = rawPullupSum / muestras;
+
+  pinMode(pin, INPUT);
+  delay(5);
+
+  uint32_t adcMax = adcMaxValue();
+  float tempC = leerTemperaturaC(rawAvg);
+  uint16_t variacion = rawMax - rawMin;
+  uint16_t diferenciaPullup = rawPullupAvg > rawAvg ? rawPullupAvg - rawAvg : rawAvg - rawPullupAvg;
+
+  Serial.print(F("TEMP_SENSOR "));
+  Serial.println(label);
+
+  Serial.print(F("TEMP_RAW_AVG "));
+  Serial.print(rawAvg);
+  Serial.print(F("/"));
+  Serial.println(adcMax);
+
+  Serial.print(F("TEMP_RAW_MIN "));
+  Serial.println(rawMin);
+
+  Serial.print(F("TEMP_RAW_MAX "));
+  Serial.println(rawMax);
+
+  Serial.print(F("TEMP_RAW_PULLUP "));
+  Serial.println(rawPullupAvg);
+
+  Serial.print(F("TEMP_DIF_PULLUP "));
+  Serial.println(diferenciaPullup);
+
+  Serial.print(F("TEMP_C "));
+  if (isnan(tempC)) Serial.println(F("nan"));
+  else Serial.println(tempC, 2);
+
+  if (diferenciaPullup > adcMax / 4) {
+    Serial.print(F("TEMP_RESULTADO ERROR_FLOTANTE "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION Cambia mucho al activar pullup interno. Probablemente no hay divisor NTC-resistencia conectado."));
+  }
+  else if (rawAvg <= 5) {
+    Serial.print(F("TEMP_RESULTADO ERROR_CASI_0V "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La entrada esta casi a GND."));
+  }
+  else if (rawAvg >= adcMax - 5) {
+    Serial.print(F("TEMP_RESULTADO ERROR_CASI_VCC "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La entrada esta casi a VCC."));
+  }
+  else if (variacion > adcMax / 10) {
+    Serial.print(F("TEMP_RESULTADO AVISO_INESTABLE "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La lectura varia demasiado. Puede haber mala conexion o pin flotando."));
+  }
+  else if (isnan(tempC)) {
+    Serial.print(F("TEMP_RESULTADO ERROR_CALCULO_NAN "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION El calculo de temperatura no es valido."));
+  }
+  else if (tempC < -10.0 || tempC > 80.0) {
+    Serial.print(F("TEMP_RESULTADO AVISO_TEMPERATURA_RARA "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La temperatura calculada esta fuera de rango razonable para una prueba normal."));
+  }
+  else {
+    Serial.print(F("TEMP_RESULTADO OK_PROBABLEMENTE_CONECTADA "));
+    Serial.println(label);
+    Serial.println(F("TEMP_EXPLICACION La lectura parece estable y no reacciona como un pin flotante."));
+  }
+}
+
+void diagnosticoTemperatura() {
+  Serial.println(F("TEMP_INICIO"));
+
+  diagnosticoPinTemperatura(PIN_TEMP_A0, F("NTC_A0"));
+  diagnosticoPinTemperatura(PIN_TEMP_A1, F("NTC_A1"));
+  Serial.println(F("TEMP_NOTA Para deteccion fiable, cada entrada debe tener su divisor NTC-resistencia: 3.3V -> NTC -> Ax -> resistencia fija 10k -> GND."));
+  Serial.println(F("TEMP_FIN"));
+  return;
+
+  const byte muestras = 20;
+
+  // Lectura normal
+  pinMode(PIN_TEMP_A0, INPUT);
+  delay(5);
+
+  uint32_t rawSum = 0;
+  uint16_t rawMin = 65535;
+  uint16_t rawMax = 0;
+
+  for (byte i = 0; i < muestras; i++) {
+    uint16_t raw = leerTempRaw(PIN_TEMP_A0);
 
     rawSum += raw;
 
@@ -397,20 +586,20 @@ void diagnosticoTemperatura() {
 
   // Prueba con pullup interno para detectar pin flotante.
   // Si A0 no esta conectado a nada, al activar pullup suele subir mucho.
-  pinMode(PIN_TEMP, INPUT_PULLUP);
+  pinMode(PIN_TEMP_A0, INPUT_PULLUP);
   delay(20);
 
   uint32_t rawPullupSum = 0;
 
   for (byte i = 0; i < muestras; i++) {
-    rawPullupSum += leerTempRaw();
+    rawPullupSum += leerTempRaw(PIN_TEMP_A0);
     delay(2);
   }
 
   uint16_t rawPullupAvg = rawPullupSum / muestras;
 
   // Volvemos a dejarlo como entrada normal para no afectar al resto del programa.
-  pinMode(PIN_TEMP, INPUT);
+  pinMode(PIN_TEMP_A0, INPUT);
   delay(5);
 
   uint32_t adcMax = adcMaxValue();
@@ -510,10 +699,46 @@ void diagnosticoCompleto() {
 
   printSensorConfig();
   printTempConfig();
+  printBoardConfig();
 
   Serial.println(F("DIAGNOSTICO_FIN"));
 }
 
+
+void setupBle() {
+#if MTEST_BLE_TRANSPORT_ENABLED
+  if (!BLE.begin()) {
+    bleReady = false;
+    Serial.println(F("BLE_RESULTADO ERROR_BEGIN"));
+    return;
+  }
+
+  BLE.setLocalName("mtestv2 Nano33IoT");
+  BLE.setDeviceName("mtestv2 Nano33IoT");
+  BLE.setAdvertisedService(mtestService);
+  mtestService.addCharacteristic(bleRxChar);
+  mtestService.addCharacteristic(bleTxChar);
+  BLE.addService(mtestService);
+  bleTxChar.writeValue("BOOT\n");
+  BLE.advertise();
+  bleReady = true;
+  Serial.println(F("BLE_RESULTADO OK_ADVERTISING mtestv2 Nano33IoT"));
+#endif
+}
+
+void pollBleCommands() {
+#if MTEST_BLE_TRANSPORT_ENABLED
+  if (!bleReady) return;
+  BLE.poll();
+  if (bleRxChar.written()) {
+    String cmd = bleRxChar.value();
+    cmd.trim();
+    if (cmd.length() > 0) {
+      handleCommand(cmd);
+    }
+  }
+#endif
+}
 
 
 // ======================================================
@@ -529,9 +754,10 @@ void handleCommand(const String &cmd) {
   }
 
   if (cmd == "STATUS") {
-    Serial.println(sensorOk ? F("STATUS SENSOR_OK") : F("STATUS SENSOR_ERROR"));
+    emitLine(sensorOk ? "STATUS SENSOR_OK" : "STATUS SENSOR_ERROR");
     printSensorConfig();
     printTempConfig();
+    printBoardConfig();
     return;
   }
 
@@ -547,16 +773,17 @@ void handleCommand(const String &cmd) {
 
   if (cmd == "START_CONTINUOUS" || cmd == "START") {
     if (!sensorOk) {
-      Serial.println(F("ERR_SENSOR_NOT_READY"));
+      emitLine("ERR_SENSOR_NOT_READY");
       return;
     }
 
     tempOnlyMode = false;
     streaming = true;
     skipRemaining = cfg.skip;
+    lastBleDataMs = 0;
     sensor.clearFIFO();
 
-    Serial.println(F("OK_START_CONTINUOUS"));
+    emitLine("OK_START_CONTINUOUS");
     return;
   }
 
@@ -564,8 +791,9 @@ void handleCommand(const String &cmd) {
     tempOnlyMode = true;
     streaming = true;
     lastTempOnlyMs = 0;
+    lastBleDataMs = 0;
 
-    Serial.println(F("OK_START_TEMP"));
+    emitLine("OK_START_TEMP");
     return;
   }
 
@@ -576,12 +804,11 @@ void handleCommand(const String &cmd) {
 
     if (sensorOk) sensor.clearFIFO();
 
-    Serial.println(F("OK_STOP"));
+    emitLine("OK_STOP");
     return;
   }
 
-  Serial.print(F("WARN_UNKNOWN_CMD "));
-  Serial.println(cmd);
+  emitLine("WARN_UNKNOWN_CMD " + cmd);
 }
 
 
@@ -593,6 +820,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 5000);
 
+  setupBle();
   applyTempConfig();
 
   Wire.begin();
@@ -600,18 +828,21 @@ void setup() {
 
   if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
     sensorOk = false;
-    Serial.println(F("ERROR_SENSOR"));
+    emitLine("ERROR_SENSOR");
   } else {
     sensorOk = true;
     applySensorConfig();
   }
 
-  Serial.println(F("READY"));
+  emitLine("READY");
   printSensorConfig();
   printTempConfig();
+  printBoardConfig();
 }
 
 void loop() {
+  pollBleCommands();
+
   while (Serial.available()) {
     char c = (char)Serial.read();
 

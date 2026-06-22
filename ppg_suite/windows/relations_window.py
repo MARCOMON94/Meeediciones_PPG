@@ -45,7 +45,9 @@ HEADER_TOOLTIPS = {
     "Animal": "Identificador introducido para el animal o sujeto de la toma.",
     "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
     "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
-    "Ubre": "Lado o zona indicada para la toma: ubre, right o left. Es metadato, no entra en calculos.",
+    "Ubre": "Lado indicado para la toma: RT derecha o LT izquierda.",
+    "Temp mapping": "Asignacion de canales analogicos a ubres usada al capturar.",
+    "Canal temp": "Canal analogico usado como temperatura primaria de la toma.",
     "Medicion": "Indica si la toma se hizo con vacio o sin vacio. Es metadato, no entra en calculos.",
     "Estado": "Lectura rapida de calidad: Buena, Aceptable o Dudosa segun la calidad calculada.",
     "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
@@ -56,15 +58,21 @@ HEADER_TOOLTIPS = {
     "BPM autocorr": "BPM estimado con autocorrelacion: repeticion temporal del patron de pulso.",
     "Oxigeno medio": "SpO2 estimada experimentalmente desde RED/IR. No esta calibrada clinicamente.",
     "Ratio R": "Ratio AC/DC de RED dividido por AC/DC de IR usado para estimar SpO2.",
-    "Temp media": "Temperatura media registrada durante la toma.",
+    "Temp final": "Maximo del primer golpe de calor tras 1 s de estabilizacion y dentro de los 5 s siguientes.",
     "Temp ult.": "Ultima temperatura registrada en la toma.",
     "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG. Requiere validacion externa.",
     "Calidad resp.": "Confianza interna de la respiracion experimental, de 0 a 100.",
     "Temp raw": "Valor bruto del ADC de temperatura.",
-    "Temp A0 media": "Temperatura media calculada desde la fuente analogica A0.",
+    "Temp RT final": "Maximo independiente de la ubre derecha en la ventana final 1-6 s.",
+    "Temp RT ult.": "Ultima temperatura calculada para la ubre derecha.",
+    "Temp RT raw": "Raw asociado a la ubre derecha.",
+    "Temp LT final": "Maximo independiente de la ubre izquierda en la ventana final 1-6 s.",
+    "Temp LT ult.": "Ultima temperatura calculada para la ubre izquierda.",
+    "Temp LT raw": "Raw asociado a la ubre izquierda.",
+    "Temp A0 final": "Maximo calculado desde la fuente analogica A0 en la ventana final 1-6 s.",
     "Temp A0 ult.": "Ultima temperatura calculada desde la fuente analogica A0.",
     "Temp A0 raw": "Ultimo valor bruto ADC de la fuente analogica A0.",
-    "Temp A1 media": "Temperatura media calculada desde la fuente analogica A1.",
+    "Temp A1 final": "Maximo calculado desde la fuente analogica A1 en la ventana final 1-6 s.",
     "Temp A1 ult.": "Ultima temperatura calculada desde la fuente analogica A1.",
     "Temp A1 raw": "Ultimo valor bruto ADC de la fuente analogica A1.",
     "Calidad": "Puntuacion global interna de la toma tras BPM, PI, artefactos, saturacion y cribado.",
@@ -97,7 +105,9 @@ HEADER_TOOLTIPS = {
     "BPM tramo": "BPM recalculado para el tramo desde raw RED/IR; si existe BPM rolling se usa como apoyo.",
     "SpO2 tramo": "SpO2 recalculada para el tramo desde raw RED/IR cuando no exista rolling; experimental y no calibrada.",
     "Calidad tramo": "Calidad recalculada para el tramo desde raw RED/IR cuando no exista rolling.",
-    "Temp tramo": "Temperatura media disponible dentro del tramo.",
+    "Temp max tramo": "Temperatura maxima primaria disponible dentro del tramo.",
+    "Temp RT max tramo": "Temperatura maxima de la ubre derecha dentro del tramo.",
+    "Temp LT max tramo": "Temperatura maxima de la ubre izquierda dentro del tramo.",
     "Muestras tramo": "Numero de muestras dentro del tramo temporal.",
 }
 
@@ -184,6 +194,10 @@ def _cap_first(cap: "CaptureRecord", *keys: str) -> str:
         if value:
             return value
     return ""
+
+
+def _cap_temp_final(cap: "CaptureRecord", final_key: str, legacy_key: str, *fallback_keys: str) -> str:
+    return _cap_first(cap, final_key, *fallback_keys, legacy_key)
 
 
 def _select_first_row(table: QtWidgets.QTableView):
@@ -288,15 +302,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Ubre", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
-        "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp media", "Temp ult.",
-        "Temp A0 media", "Temp A0 ult.", "Temp A0 raw", "Temp A1 media", "Temp A1 ult.", "Temp A1 raw",
+        "Hora", "Animal", "Modo", "Ubre", "Temp mapping", "Canal temp", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
+        "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp final", "Temp ult.",
+        "Temp RT final", "Temp RT ult.", "Temp RT raw", "Temp LT final", "Temp LT ult.", "Temp LT raw",
+        "Temp A0 final", "Temp A0 ult.", "Temp A0 raw", "Temp A1 final", "Temp A1 ult.", "Temp A1 raw",
         "Resp/min (experimental)", "Calidad resp.", "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
         "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
         "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final pulsio", "Pulso final fonendo",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
-    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp tramo", "Muestras tramo"]
+    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp max tramo", "Temp RT max tramo", "Temp LT max tramo", "Muestras tramo"]
 
     def __init__(self):
         super().__init__()
@@ -558,6 +573,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         cap.row.setdefault("modo", str(data.get("mode") or ""))
         cap.row.setdefault("condiciones_medida", str(data.get("measurement_condition") or ""))
         cap.row.setdefault("ubre", str(data.get("udder_side") or data.get("ubre") or ""))
+        cap.row.setdefault("temp_mapping", str(data.get("temp_mapping") or ""))
+        cap.row.setdefault("temp_primary_channel", str(data.get("temp_primary_channel") or ""))
         cap.row.setdefault("medicion_vacio", str(data.get("vacuum_condition") or data.get("medicion_vacio") or ""))
         cap.row.setdefault("config_label", str(data.get("config_label") or ""))
         cap.row.setdefault("config_description", str(data.get("config_description") or ""))
@@ -583,14 +600,35 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "resp_rate_rpm": metrics.get("resp_rate_rpm"),
             "resp_quality": metrics.get("resp_quality"),
             "resp_reason": metrics.get("resp_reason"),
+            "temp_c_final_max_5s": temp.get("temp_c_final_max_5s"),
+            "temp_c_final_time_s": temp.get("temp_c_final_time_s"),
+            "temp_c_final_raw_at_max": temp.get("temp_c_final_raw_at_max"),
             "temp_c_media": temp.get("temp_c_mean"),
             "temp_c_ultima": temp.get("temp_c_last"),
             "temp_c_min": temp.get("temp_c_min"),
             "temp_c_max": temp.get("temp_c_max"),
             "temp_raw_ultima": temp.get("temp_raw_last"),
+            "temp_rt_c_final_max_5s": temp.get("temp_rt_c_final_max_5s"),
+            "temp_rt_c_final_time_s": temp.get("temp_rt_c_final_time_s"),
+            "temp_rt_c_final_raw_at_max": temp.get("temp_rt_c_final_raw_at_max"),
+            "temp_rt_c_media": temp.get("temp_rt_c_mean"),
+            "temp_rt_c_ultima": temp.get("temp_rt_c_last"),
+            "temp_rt_raw_ultima": temp.get("temp_rt_raw_last"),
+            "temp_lt_c_final_max_5s": temp.get("temp_lt_c_final_max_5s"),
+            "temp_lt_c_final_time_s": temp.get("temp_lt_c_final_time_s"),
+            "temp_lt_c_final_raw_at_max": temp.get("temp_lt_c_final_raw_at_max"),
+            "temp_lt_c_media": temp.get("temp_lt_c_mean"),
+            "temp_lt_c_ultima": temp.get("temp_lt_c_last"),
+            "temp_lt_raw_ultima": temp.get("temp_lt_raw_last"),
+            "temp_a0_c_final_max_5s": temp.get("temp_a0_c_final_max_5s"),
+            "temp_a0_c_final_time_s": temp.get("temp_a0_c_final_time_s"),
+            "temp_a0_c_final_raw_at_max": temp.get("temp_a0_c_final_raw_at_max"),
             "temp_a0_c_media": temp.get("temp_a0_c_mean"),
             "temp_a0_c_ultima": temp.get("temp_a0_c_last"),
             "temp_a0_raw_ultima": temp.get("temp_a0_raw_last"),
+            "temp_a1_c_final_max_5s": temp.get("temp_a1_c_final_max_5s"),
+            "temp_a1_c_final_time_s": temp.get("temp_a1_c_final_time_s"),
+            "temp_a1_c_final_raw_at_max": temp.get("temp_a1_c_final_raw_at_max"),
             "temp_a1_c_media": temp.get("temp_a1_c_mean"),
             "temp_a1_c_ultima": temp.get("temp_a1_c_last"),
             "temp_a1_raw_ultima": temp.get("temp_a1_raw_last"),
@@ -831,6 +869,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Animal": cap.value("id"),
             "Modo": _mode_label(cap.value("modo")),
             "Ubre": cap.value("ubre"),
+            "Temp mapping": cap.value("temp_mapping"),
+            "Canal temp": cap.value("temp_primary_channel"),
             "Medicion": cap.value("medicion_vacio"),
             "Configuracion": cap.value("config_label"),
             "Estado": state,
@@ -844,12 +884,18 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Ratio R": fmt(_as_float(cap.value("ratio_r")), 4, ""),
             "Resp/min (experimental)": fmt(_as_float(_cap_first(cap, "resp_rate_rpm", "resp_min_exp")), 1, ""),
             "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
-            "Temp media": fmt(_as_float(cap.value("temp_c_media")), 1, ""),
+            "Temp final": fmt(_as_float(_cap_temp_final(cap, "temp_c_final_max_5s", "temp_c_media")), 1, ""),
             "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
-            "Temp A0 media": fmt(_as_float(_cap_first(cap, "temp_a0_c_media", "temp_c_media")), 1, ""),
+            "Temp RT final": fmt(_as_float(_cap_temp_final(cap, "temp_rt_c_final_max_5s", "temp_rt_c_media", "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s")), 1, ""),
+            "Temp RT ult.": fmt(_as_float(_cap_first(cap, "temp_rt_c_ultima", "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
+            "Temp RT raw": fmt(_as_float(_cap_first(cap, "temp_rt_raw_ultima", "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
+            "Temp LT final": fmt(_as_float(_cap_temp_final(cap, "temp_lt_c_final_max_5s", "temp_lt_c_media", "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
+            "Temp LT ult.": fmt(_as_float(_cap_first(cap, "temp_lt_c_ultima", "temp_a1_c_ultima")), 1, ""),
+            "Temp LT raw": fmt(_as_float(_cap_first(cap, "temp_lt_raw_ultima", "temp_a1_raw_ultima")), 0, ""),
+            "Temp A0 final": fmt(_as_float(_cap_temp_final(cap, "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s", "temp_c_media")), 1, ""),
             "Temp A0 ult.": fmt(_as_float(_cap_first(cap, "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
             "Temp A0 raw": fmt(_as_float(_cap_first(cap, "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
-            "Temp A1 media": fmt(_as_float(cap.value("temp_a1_c_media")), 1, ""),
+            "Temp A1 final": fmt(_as_float(_cap_temp_final(cap, "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
             "Temp A1 ult.": fmt(_as_float(cap.value("temp_a1_c_ultima")), 1, ""),
             "Temp A1 raw": fmt(_as_float(cap.value("temp_a1_raw_ultima")), 0, ""),
             "Temp raw": fmt(_as_float(cap.value("temp_raw_ultima")), 0, ""),
@@ -1007,6 +1053,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Configuracion", cap.value("config_label") or "-"),
             ("Descripcion configuracion", cap.value("config_description") or "-"),
             ("Ubre", cap.value("ubre") or "-"),
+            ("Asignacion termometros", cap.value("temp_mapping") or "-"),
+            ("Canal temp primario", cap.value("temp_primary_channel") or "-"),
             ("Medicion", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
             ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
@@ -1022,9 +1070,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
             ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
-            ("Temperatura media / ultima", f"{fmt(_as_float(cap.value('temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
-            ("Temperatura A0 media / ultima / raw", f"{fmt(_as_float(_cap_first(cap, 'temp_a0_c_media', 'temp_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
-            ("Temperatura A1 media / ultima / raw", f"{fmt(_as_float(cap.value('temp_a1_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a1_raw_ultima')), 0, '-')}"),
+            ("Temperatura primaria final / ultima", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
+            ("Temperatura RT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_rt_c_final_max_5s', 'temp_rt_c_media', 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_rt_c_ultima', 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_rt_raw_ultima', 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
+            ("Temperatura LT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_lt_c_final_max_5s', 'temp_lt_c_media', 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_lt_c_ultima', 'temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_lt_raw_ultima', 'temp_a1_raw_ultima')), 0, '-')}"),
+            ("Temperatura A0 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
+            ("Temperatura A1 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a1_raw_ultima')), 0, '-')}"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
@@ -1145,6 +1195,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         spo2_rolling = self._temporal_series(source_rows, "spo2_rolling_5s")
         quality_rolling = self._temporal_series(source_rows, "quality_rolling_5s")
         temp_values = self._temporal_series(source_rows, "temp_c")
+        temp_rt_values = self._temporal_series_with_fallback(source_rows, "temp_rt_c", "temp_a0_c", "temp_c")
+        temp_lt_values = self._temporal_series_with_fallback(source_rows, "temp_lt_c", "temp_a1_c")
 
         table_rows: list[dict[str, str]] = []
         centers: list[float] = []
@@ -1153,6 +1205,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         spo2_values: list[float] = []
         quality_values: list[float] = []
         temp_plot_values: list[float] = []
+        temp_rt_plot_values: list[float] = []
+        temp_lt_plot_values: list[float] = []
         sample_values: list[float] = []
 
         for idx in range(interval_count):
@@ -1169,7 +1223,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 bpm_roll = self._masked_mean(bpm_rolling, mask)
                 spo2 = self._masked_mean(spo2_rolling, mask)
                 quality = self._masked_mean(quality_rolling, mask)
-                temp = self._masked_mean(temp_values, mask)
+                temp = self._masked_max(temp_values, mask)
+                temp_rt = self._masked_max(temp_rt_values, mask)
+                temp_lt = self._masked_max(temp_lt_values, mask)
                 metrics = self._metrics_for_temporal_mask(rel_t, red_values, ir_values, mask, sensor_cfg, analysis_cfg)
                 bpm_tramo = metrics.bpm if np.isfinite(metrics.bpm) else bpm_roll
                 spo2 = metrics.spo2 if np.isfinite(metrics.spo2) else spo2
@@ -1180,6 +1236,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 spo2 = math.nan
                 quality = math.nan
                 temp = math.nan
+                temp_rt = math.nan
+                temp_lt = math.nan
             bpm_10s = block_bpm[idx] if idx < len(block_bpm) else math.nan
             if not np.isfinite(bpm_10s) and np.isfinite(bpm_tramo):
                 bpm_10s = bpm_tramo
@@ -1190,6 +1248,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             spo2_values.append(spo2)
             quality_values.append(quality)
             temp_plot_values.append(temp)
+            temp_rt_plot_values.append(temp_rt)
+            temp_lt_plot_values.append(temp_lt)
             sample_values.append(float(samples))
             table_rows.append({
                 "Tramo": f"{idx + 1}",
@@ -1199,7 +1259,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 "BPM tramo": fmt(bpm_tramo, 1, ""),
                 "SpO2 tramo": fmt(spo2, 1, ""),
                 "Calidad tramo": fmt(quality, 1, ""),
-                "Temp tramo": fmt(temp, 2, ""),
+                "Temp max tramo": fmt(temp, 2, ""),
+                "Temp RT max tramo": fmt(temp_rt, 2, ""),
+                "Temp LT max tramo": fmt(temp_lt, 2, ""),
                 "Muestras tramo": str(samples),
             })
 
@@ -1275,6 +1337,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return np.asarray([], dtype=float)
         return np.asarray([_as_float(row.get(key, "")) for row in rows], dtype=float)
 
+    def _temporal_series_with_fallback(self, rows: list[dict[str, str]], *keys: str) -> np.ndarray:
+        if not rows:
+            return np.asarray([], dtype=float)
+        values = []
+        for row in rows:
+            value = math.nan
+            for key in keys:
+                value = _as_float(row.get(key, ""))
+                if np.isfinite(value):
+                    break
+            values.append(value)
+        return np.asarray(values, dtype=float)
+
     def _masked_mean(self, values: np.ndarray, mask: np.ndarray) -> float:
         if values.size != mask.size:
             return math.nan
@@ -1283,6 +1358,15 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if not selected.size:
             return math.nan
         return float(np.mean(selected))
+
+    def _masked_max(self, values: np.ndarray, mask: np.ndarray) -> float:
+        if values.size != mask.size:
+            return math.nan
+        selected = values[mask]
+        selected = selected[np.isfinite(selected)]
+        if not selected.size:
+            return math.nan
+        return float(np.max(selected))
 
     def _metrics_for_temporal_mask(
         self,

@@ -11,13 +11,13 @@ import numpy as np
 
 @dataclass
 class SensorConfig:
-    red: int = 31
-    ir: int = 31
-    avg: int = 1
-    rate: int = 100
+    red: int = 63
+    ir: int = 63
+    avg: int = 4
+    rate: int = 800
     width: int = 411
     adc: int = 16384
-    skip: int = 10
+    skip: int = 50
     debug: bool = False
 
     def command(self) -> str:
@@ -29,8 +29,8 @@ class SensorConfig:
     def clean(self) -> "SensorConfig":
         self.red = int(np.clip(self.red, 0, 255))
         self.ir = int(np.clip(self.ir, 0, 255))
-        self.avg = int(self.avg if self.avg in (1, 2, 4, 8, 16, 32) else 1)
-        self.rate = int(self.rate if self.rate in (50, 100, 200, 400, 800, 1000, 1600, 3200) else 100)
+        self.avg = int(self.avg if self.avg in (1, 2, 4, 8, 16, 32) else 4)
+        self.rate = int(self.rate if self.rate in (50, 100, 200, 400, 800, 1000, 1600, 3200) else 800)
         self.width = int(self.width if self.width in (69, 118, 215, 411) else 411)
         self.adc = int(self.adc if self.adc in (2048, 4096, 8192, 16384) else 16384)
         self.skip = int(np.clip(self.skip, 0, 200))
@@ -82,7 +82,7 @@ class Metrics:
 
 @dataclass
 class CaptureState:
-    mode: Literal["idle", "normal", "long", "scheduled", "configurations", "experimento_3m", "temp", "temp_ajuste"] = "idle"
+    mode: Literal["idle", "normal", "long", "scheduled", "configurations", "experimento_3m", "experimento_vacio", "temp", "temp_ajuste"] = "idle"
     capturing: bool = False
     finished: bool = False
     sensor_ready: bool = False
@@ -93,12 +93,20 @@ class CaptureState:
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
     measurement_condition: str = ""
+    udder_side: str = ""
+    temp_mapping: str = "A0_RT_A1_LT"
+    temp_primary_channel: str = "A0"
+    vacuum_condition: str = ""
     first_micro: Optional[int] = None
     t: list[float] = field(default_factory=list)
     red: list[float] = field(default_factory=list)
     ir: list[float] = field(default_factory=list)
     temp_c: list[float] = field(default_factory=list)
     temp_raw: list[float] = field(default_factory=list)
+    temp_a0_c: list[float] = field(default_factory=list)
+    temp_a0_raw: list[float] = field(default_factory=list)
+    temp_a1_c: list[float] = field(default_factory=list)
+    temp_a1_raw: list[float] = field(default_factory=list)
     config_label: str = ""
     valid_lines: int = 0
     discarded_lines: int = 0

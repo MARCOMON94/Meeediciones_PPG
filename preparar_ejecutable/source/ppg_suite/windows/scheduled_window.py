@@ -11,12 +11,12 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from ..models import SensorConfig
-from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics
+from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR
 from ..utils import open_folder
-from .measurement_window import PPGSuite
+from .measurement_window import PPGSuite, TEMP_MAPPING_INVERTED, temperature_channel_summary
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ def build_64_config_steps() -> list[ScheduledStep]:
                 for red in (31, 63, 95, 127):
                     label = f"CONFIG {idx:02d} - RED{red} IR{ir} AVG{avg} ADC{adc}"
                     desc = f"Barrido 64 configuraciones: RED={red}, IR={ir}, AVG={avg}, ADC={adc}"
-                    steps.append(ScheduledStep(label, desc, SensorConfig(red=red, ir=ir, avg=avg, rate=100, width=411, adc=adc, skip=50)))
+                    steps.append(ScheduledStep(label, desc, SensorConfig(red=red, ir=ir, avg=avg, rate=800, width=411, adc=adc, skip=50)))
                     idx += 1
     return steps
 
@@ -69,7 +69,7 @@ def build_12_config_steps() -> list[ScheduledStep]:
     steps: list[ScheduledStep] = []
     for idx, (name, brightness, avg, adc, desc) in enumerate(specs, start=1):
         label = f"CONFIG {idx:02d} - {name}"
-        cfg = SensorConfig(red=brightness, ir=brightness, avg=avg, rate=100, width=411, adc=adc, skip=50)
+        cfg = SensorConfig(red=brightness, ir=brightness, avg=avg, rate=800, width=411, adc=adc, skip=50)
         steps.append(ScheduledStep(label, desc, cfg))
     return steps
 
@@ -82,7 +82,7 @@ def build_3m_search_space() -> list[SensorConfig]:
             for ir in (24, 31, 47, 63, 95, 127, 159):
                 red_values = [ir, int(round(ir * 0.75)), int(round(ir * 1.25))]
                 for red in red_values:
-                    cfg = SensorConfig(red=red, ir=ir, avg=avg, rate=100, width=411, adc=adc, skip=50).clean()
+                    cfg = SensorConfig(red=red, ir=ir, avg=avg, rate=800, width=411, adc=adc, skip=50).clean()
                     key = (cfg.red, cfg.ir, cfg.avg, cfg.adc)
                     if key in seen:
                         continue
@@ -159,6 +159,12 @@ class ScheduledConfigWindow(PPGSuite):
         form = QtWidgets.QFormLayout(capture_group)
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.udder_combo = QtWidgets.QComboBox()
+        self.configure_udder_combo(self.udder_combo)
+        self.temp_mapping_combo = QtWidgets.QComboBox()
+        self.configure_temp_mapping_combo(self.temp_mapping_combo)
+        self.vacuum_combo = QtWidgets.QComboBox()
+        self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit(self.scheduled_condition)
         self.duration_spin = NoWheelDoubleSpinBox()
         self.duration_spin.setRange(1, 120)
@@ -167,6 +173,9 @@ class ScheduledConfigWindow(PPGSuite):
         self.duration_spin.setSuffix(" min")
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
+        form.addRow("Ubre:", self.udder_combo)
+        form.addRow("Asignacion termometros:", self.temp_mapping_combo)
+        form.addRow("Medicion:", self.vacuum_combo)
         form.addRow("Condiciones:", self.condition_edit)
         form.addRow("Duración total:", self.duration_spin)
         self.duration_warning = QtWidgets.QLabel(
@@ -239,6 +248,10 @@ class ScheduledConfigWindow(PPGSuite):
             return
         st.pulse_prev = pulse_prev
         st.measurement_condition = self.current_condition_text() or self.scheduled_condition
+        st.udder_side = self.current_udder_text()
+        st.temp_mapping = self.current_temp_mapping()
+        st.temp_primary_channel = self.current_temp_primary_channel()
+        st.vacuum_condition = self.current_vacuum_text()
         st.base_name = f"BLOQUE_{len(self.scheduled_steps)}CFG_{st.crotal_id}_{now_stamp()}"
         st.session_id = st.base_name
         st.capture_start_wall = time.time()
@@ -392,7 +405,7 @@ class ScheduledConfigWindow(PPGSuite):
             )
         self.info.setText(self.info.text() + f"\nGuardadas {written} tomas independientes en la sesion.\n")
 
-    def segment_arrays(self, segment: ScheduledSegment) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def segment_arrays(self, segment: ScheduledSegment) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         st = self.state
         start = max(0, segment.start_sample)
         end = min(segment.end_sample if segment.end_sample is not None else len(st.t), len(st.t))
@@ -401,20 +414,81 @@ class ScheduledConfigWindow(PPGSuite):
         ir = np.asarray(st.ir[start:end], dtype=float)
         temp_c = np.asarray(st.temp_c[start:end], dtype=float)
         temp_raw = np.asarray(st.temp_raw[start:end], dtype=float)
+        temp_a0_c = np.asarray(st.temp_a0_c[start:end], dtype=float)
+        temp_a0_raw = np.asarray(st.temp_a0_raw[start:end], dtype=float)
+        temp_a1_c = np.asarray(st.temp_a1_c[start:end], dtype=float)
+        temp_a1_raw = np.asarray(st.temp_a1_raw[start:end], dtype=float)
         if t.size:
             t = t - t[0]
-        return t, red, ir, temp_c, temp_raw
+        return t, red, ir, temp_c, temp_raw, temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw
 
-    def temp_summary_for_arrays(self, temp_c: np.ndarray, temp_raw: np.ndarray) -> dict[str, float | int]:
-        finite_temp = temp_c[np.isfinite(temp_c)] if temp_c.size else np.asarray([], dtype=float)
-        finite_raw = temp_raw[np.isfinite(temp_raw)] if temp_raw.size else np.asarray([], dtype=float)
+    def temp_summary_for_arrays(self, t: np.ndarray, temp_c: np.ndarray, temp_raw: np.ndarray, temp_a0_c: np.ndarray | None = None, temp_a0_raw: np.ndarray | None = None, temp_a1_c: np.ndarray | None = None, temp_a1_raw: np.ndarray | None = None) -> dict[str, float | int]:
+        temp_a0_c = temp_c if temp_a0_c is None else temp_a0_c
+        temp_a0_raw = temp_raw if temp_a0_raw is None else temp_a0_raw
+        temp_a1_c = np.asarray([], dtype=float) if temp_a1_c is None else temp_a1_c
+        temp_a1_raw = np.asarray([], dtype=float) if temp_a1_raw is None else temp_a1_raw
+        primary = temperature_channel_summary(t, temp_c, temp_raw)
+        a0 = temperature_channel_summary(t, temp_a0_c, temp_a0_raw)
+        a1 = temperature_channel_summary(t, temp_a1_c, temp_a1_raw)
+        if self.state.temp_mapping == TEMP_MAPPING_INVERTED:
+            rt, lt = a1, a0
+        else:
+            rt, lt = a0, a1
         return {
-            "temp_samples": int(finite_temp.size),
-            "temp_c_last": float(finite_temp[-1]) if finite_temp.size else math.nan,
-            "temp_c_mean": float(np.mean(finite_temp)) if finite_temp.size else math.nan,
-            "temp_c_min": float(np.min(finite_temp)) if finite_temp.size else math.nan,
-            "temp_c_max": float(np.max(finite_temp)) if finite_temp.size else math.nan,
-            "temp_raw_last": float(finite_raw[-1]) if finite_raw.size else math.nan,
+            "temp_samples": primary["samples"],
+            "temp_raw_samples": primary["raw_samples"],
+            "temp_a0_samples": a0["samples"],
+            "temp_a0_raw_samples": a0["raw_samples"],
+            "temp_a1_samples": a1["samples"],
+            "temp_a1_raw_samples": a1["raw_samples"],
+            "temp_c_last": primary["last"],
+            "temp_c_mean": primary["mean"],
+            "temp_c_min": primary["min"],
+            "temp_c_max": primary["max"],
+            "temp_c_final_max_5s": primary["final_max_5s"],
+            "temp_c_final_time_s": primary["final_time_s"],
+            "temp_c_final_raw_at_max": primary["final_raw_at_max"],
+            "temp_c_final_samples": primary["final_samples"],
+            "temp_final_window_start_s": primary["final_window_start_s"],
+            "temp_final_window_end_s": primary["final_window_end_s"],
+            "temp_final_window_used": primary["final_window_used"],
+            "temp_raw_last": primary["raw_last"],
+            "temp_a0_c_last": a0["last"],
+            "temp_a0_c_mean": a0["mean"],
+            "temp_a0_c_min": a0["min"],
+            "temp_a0_c_max": a0["max"],
+            "temp_a0_c_final_max_5s": a0["final_max_5s"],
+            "temp_a0_c_final_time_s": a0["final_time_s"],
+            "temp_a0_c_final_raw_at_max": a0["final_raw_at_max"],
+            "temp_a0_c_final_samples": a0["final_samples"],
+            "temp_a0_raw_last": a0["raw_last"],
+            "temp_a1_c_last": a1["last"],
+            "temp_a1_c_mean": a1["mean"],
+            "temp_a1_c_min": a1["min"],
+            "temp_a1_c_max": a1["max"],
+            "temp_a1_c_final_max_5s": a1["final_max_5s"],
+            "temp_a1_c_final_time_s": a1["final_time_s"],
+            "temp_a1_c_final_raw_at_max": a1["final_raw_at_max"],
+            "temp_a1_c_final_samples": a1["final_samples"],
+            "temp_a1_raw_last": a1["raw_last"],
+            "temp_rt_c_last": rt["last"],
+            "temp_rt_c_mean": rt["mean"],
+            "temp_rt_c_min": rt["min"],
+            "temp_rt_c_max": rt["max"],
+            "temp_rt_c_final_max_5s": rt["final_max_5s"],
+            "temp_rt_c_final_time_s": rt["final_time_s"],
+            "temp_rt_c_final_raw_at_max": rt["final_raw_at_max"],
+            "temp_rt_c_final_samples": rt["final_samples"],
+            "temp_rt_raw_last": rt["raw_last"],
+            "temp_lt_c_last": lt["last"],
+            "temp_lt_c_mean": lt["mean"],
+            "temp_lt_c_min": lt["min"],
+            "temp_lt_c_max": lt["max"],
+            "temp_lt_c_final_max_5s": lt["final_max_5s"],
+            "temp_lt_c_final_time_s": lt["final_time_s"],
+            "temp_lt_c_final_raw_at_max": lt["final_raw_at_max"],
+            "temp_lt_c_final_samples": lt["final_samples"],
+            "temp_lt_raw_last": lt["raw_last"],
         }
 
     def save_signal_plot(self, path, t: np.ndarray, red: np.ndarray, ir: np.ndarray, analysis_cfg, title: str):
@@ -495,7 +569,7 @@ class ScheduledConfigWindow(PPGSuite):
 
     def save_segment_capture(self, segment: ScheduledSegment, reason: str) -> bool:
         st = self.state
-        t, red, ir, temp_c, temp_raw = self.segment_arrays(segment)
+        t, red, ir, temp_c, temp_raw, temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw = self.segment_arrays(segment)
         if t.size < 2:
             return False
         step = segment.step
@@ -505,14 +579,15 @@ class ScheduledConfigWindow(PPGSuite):
         analysis_cfg = self.analysis_widget.get_config()
         metrics = score_and_merge_metrics(t, red, ir, step.config, analysis_cfg)
         blocks = block_bpm(t, ir, step.config, analysis_cfg, block_s=10)
-        temp = self.temp_summary_for_arrays(temp_c, temp_raw)
+        temp = self.temp_summary_for_arrays(t, temp_c, temp_raw, temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw)
 
         raw_file = RAW_DIR / f"raw_{base_name}.csv"
         with open(raw_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
-                "red_raw", "ir_raw", "temp_c", "temp_raw",
+                "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
+                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw",
                 "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
                 "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
                 "cfg_confirmacion", "system_time",
@@ -520,9 +595,19 @@ class ScheduledConfigWindow(PPGSuite):
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
+                ta0c = temp_a0_c[i] if i < temp_a0_c.size else math.nan
+                ta0r = temp_a0_raw[i] if i < temp_a0_raw.size else math.nan
+                ta1c = temp_a1_c[i] if i < temp_a1_c.size else math.nan
+                ta1r = temp_a1_raw[i] if i < temp_a1_raw.size else math.nan
+                if st.temp_mapping == TEMP_MAPPING_INVERTED:
+                    trtc, trtr, tltc, tltr = ta1c, ta1r, ta0c, ta0r
+                else:
+                    trtc, trtr, tltc, tltr = ta0c, ta0r, ta1c, ta1r
                 w.writerow([
-                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.measurement_condition, step.label, i + 1, f"{t[i]:.6f}",
+                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
+                    fmt(ta0c, 2, ""), fmt(ta0r, 0, ""), fmt(ta1c, 2, ""), fmt(ta1r, 0, ""),
+                    fmt(trtc, 2, ""), fmt(trtr, 0, ""), fmt(tltc, 2, ""), fmt(tltr, 0, ""),
                     step.config.red, step.config.ir, step.config.avg, step.config.rate, step.config.width, step.config.adc,
                     step.config.skip, 1 if step.config.debug else 0,
                     segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo,
@@ -533,8 +618,8 @@ class ScheduledConfigWindow(PPGSuite):
         hz = estimate_hz(t)
         red_proc = processed_for_plot(red, hz, analysis_cfg)
         ir_proc = processed_for_plot(ir, hz, analysis_cfg)
-        art_red = detect_artifacts(red)
-        art_ir = detect_artifacts(ir)
+        art_red = detect_artifacts(red, strict=True)
+        art_ir = detect_artifacts(ir, strict=True)
         peak_flags = np.zeros(t.size, dtype=int)
         _, _, _, _, peaks, peak_t = estimate_bpm_peaks(t, ir, analysis_cfg)
         if peaks.size and peak_t.size:
@@ -544,17 +629,28 @@ class ScheduledConfigWindow(PPGSuite):
         with open(processed_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "session_id", "id", "base_name", "modo", "condiciones_medida", "config_label", "sample_index", "tiempo_s",
-                "red_raw", "ir_raw", "temp_c", "temp_raw",
+                "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
+                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
+                ta0c = temp_a0_c[i] if i < temp_a0_c.size else math.nan
+                ta0r = temp_a0_raw[i] if i < temp_a0_raw.size else math.nan
+                ta1c = temp_a1_c[i] if i < temp_a1_c.size else math.nan
+                ta1r = temp_a1_raw[i] if i < temp_a1_raw.size else math.nan
+                if st.temp_mapping == TEMP_MAPPING_INVERTED:
+                    trtc, trtr, tltc, tltr = ta1c, ta1r, ta0c, ta0r
+                else:
+                    trtc, trtr, tltc, tltr = ta0c, ta0r, ta1c, ta1r
                 w.writerow([
-                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.measurement_condition, step.label, i + 1, f"{t[i]:.6f}",
+                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
+                    fmt(ta0c, 2, ""), fmt(ta0r, 0, ""), fmt(ta1c, 2, ""), fmt(ta1r, 0, ""),
+                    fmt(trtc, 2, ""), fmt(trtr, 0, ""), fmt(tltc, 2, ""), fmt(tltr, 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     "", "", "", "",
                 ])
@@ -576,6 +672,10 @@ class ScheduledConfigWindow(PPGSuite):
                 "base_name": base_name,
                 "mode": self.capture_mode_name(),
                 "measurement_condition": st.measurement_condition,
+                "udder_side": st.udder_side,
+                "temp_mapping": st.temp_mapping,
+                "temp_primary_channel": st.temp_primary_channel,
+                "vacuum_condition": st.vacuum_condition,
                 "config_label": step.label,
                 "config_description": step.description,
                 "reason": reason,
@@ -603,12 +703,16 @@ class ScheduledConfigWindow(PPGSuite):
         now = datetime.now()
         self.session_writer.writerow([
             session_id, st.crotal_id, base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
-            self.capture_mode_name(), st.measurement_condition, step.label, reason, fmt(self.scheduled_step_duration_s, 1, ""),
+            self.capture_mode_name(), st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, reason, fmt(self.scheduled_step_duration_s, 1, ""),
             int(t.size), fmt(metrics.duration_s, 3, ""), fmt(metrics.hz, 2, ""), fmt(metrics.bpm, 1, ""),
             fmt(metrics.bpm_peak, 1, ""), fmt(metrics.bpm_fft, 1, ""), fmt(metrics.bpm_autocorr, 1, ""),
             fmt(metrics.quality, 1, ""), metrics.quality_label, fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
             fmt(metrics.resp_rate_rpm, 1, ""), fmt(metrics.resp_quality, 0, ""), metrics.resp_reason,
-            fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),
+            fmt(temp["temp_c_final_max_5s"], 2, ""), fmt(temp["temp_c_final_time_s"], 3, ""), fmt(temp["temp_c_final_raw_at_max"], 0, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),
+            fmt(temp["temp_rt_c_final_max_5s"], 2, ""), fmt(temp["temp_rt_c_final_time_s"], 3, ""), fmt(temp["temp_rt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rt_c_last"], 2, ""), fmt(temp["temp_rt_c_mean"], 2, ""), fmt(temp["temp_rt_raw_last"], 0, ""),
+            fmt(temp["temp_lt_c_final_max_5s"], 2, ""), fmt(temp["temp_lt_c_final_time_s"], 3, ""), fmt(temp["temp_lt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_lt_c_last"], 2, ""), fmt(temp["temp_lt_c_mean"], 2, ""), fmt(temp["temp_lt_raw_last"], 0, ""),
+            fmt(temp["temp_a0_c_final_max_5s"], 2, ""), fmt(temp["temp_a0_c_final_time_s"], 3, ""), fmt(temp["temp_a0_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a0_c_last"], 2, ""), fmt(temp["temp_a0_c_mean"], 2, ""), fmt(temp["temp_a0_raw_last"], 0, ""),
+            fmt(temp["temp_a1_c_final_max_5s"], 2, ""), fmt(temp["temp_a1_c_final_time_s"], 3, ""), fmt(temp["temp_a1_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a1_c_last"], 2, ""), fmt(temp["temp_a1_c_mean"], 2, ""), fmt(temp["temp_a1_raw_last"], 0, ""),
             fmt(metrics.pi_ir_pct, 4, ""), fmt(metrics.pi_red_pct, 4, ""), fmt(metrics.artifact_ir_pct, 1, ""),
             fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, segment.pulse_prev,
             segment.pulse_final_pulsio, segment.pulse_final_fonendo, raw_file.name, processed_file.name, plot_file.name,
@@ -638,6 +742,8 @@ class ScheduledConfigWindow(PPGSuite):
         st = self.state
         m = st.metrics
         temp = self.temperature_summary()
+        spo2_warning = spo2_support_message(m)
+        spo2_warning_line = f"{spo2_warning}\n" if spo2_warning else ""
         elapsed = time.time() - st.capture_start_wall if st.capturing else 0.0
         step_elapsed = time.time() - self.scheduled_step_start_wall if st.capturing else 0.0
         step = self.scheduled_steps[self.scheduled_step_index]
@@ -657,6 +763,7 @@ class ScheduledConfigWindow(PPGSuite):
             f"Muestras: {len(st.t)} | descartadas: {st.discarded_lines}\n"
             f"BPM: {fmt(m.bpm,0)} | calidad {fmt(m.quality,0)} ({m.quality_label})\n"
             f"SpO2 estimada: {fmt(m.spo2,1)} % | R={fmt(m.ratio_r,4)}\n"
+            f"{spo2_warning_line}"
             f"PI IR/RED: {fmt(m.pi_ir_pct,3)} / {fmt(m.pi_red_pct,3)} %\n"
             f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} % | Saturacion ADC: {fmt(m.saturation_pct,1)} %\n"
             f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
@@ -772,7 +879,7 @@ class ConfigurationsWindow(ScheduledConfigWindow):
         old = self.config_table.rowCount()
         self.config_table.setRowCount(count)
         for row in range(old, count):
-            defaults = [f"CONFIG {row + 1:02d}", "31", "31", "1", "100", "411", "16384", "50", "0", ""]
+            defaults = [f"CONFIG {row + 1:02d}", "63", "63", "4", "800", "411", "16384", "50", "0", ""]
             for col, value in enumerate(defaults):
                 self.config_table.setItem(row, col, QtWidgets.QTableWidgetItem(value))
 
@@ -806,10 +913,10 @@ class ConfigurationsWindow(ScheduledConfigWindow):
             label = vals[0] or f"CONFIG {row + 1:02d}"
             try:
                 cfg = SensorConfig(
-                    red=int(vals[1] or 31),
-                    ir=int(vals[2] or 31),
-                    avg=int(vals[3] or 1),
-                    rate=int(vals[4] or 100),
+                    red=int(vals[1] or 63),
+                    ir=int(vals[2] or 63),
+                    avg=int(vals[3] or 4),
+                    rate=int(vals[4] or 800),
                     width=int(vals[5] or 411),
                     adc=int(vals[6] or 16384),
                     skip=int(vals[7] or 50),
@@ -849,7 +956,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         self.experiment_history: list[dict[str, float | str | int]] = []
         self.experiment_decisions: list[dict[str, str]] = []
         self.experiment_last_decision = "Inicio: RED/IR bajos, AVG1 y ADC amplio para evitar saturacion."
-        first_cfg = SensorConfig(red=31, ir=31, avg=1, rate=100, width=411, adc=16384, skip=50)
+        first_cfg = SensorConfig(red=63, ir=63, avg=4, rate=800, width=411, adc=16384, skip=50)
         placeholder = make_3m_step(1, first_cfg, "inicio conservador")
         steps = [placeholder]
         for idx in range(2, self.experiment_max_steps + 1):
@@ -874,7 +981,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         )
 
     def start_scheduled_capture(self):
-        first_cfg = SensorConfig(red=31, ir=31, avg=1, rate=100, width=411, adc=16384, skip=50)
+        first_cfg = SensorConfig(red=63, ir=63, avg=4, rate=800, width=411, adc=16384, skip=50)
         self.scheduled_steps = [make_3m_step(1, first_cfg, "inicio conservador")]
         for idx in range(2, self.experiment_max_steps + 1):
             self.scheduled_steps.append(make_3m_step(idx, first_cfg, "pendiente de decision adaptativa"))
@@ -910,7 +1017,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         return "; ".join(notes)
 
     def _evaluate_experiment_segment(self, segment: ScheduledSegment) -> dict[str, float | str | int]:
-        t, red, ir, _temp_c, _temp_raw = self.segment_arrays(segment)
+        t, red, ir, _temp_c, _temp_raw, _temp_a0_c, _temp_a0_raw, _temp_a1_c, _temp_a1_raw = self.segment_arrays(segment)
         metrics = score_and_merge_metrics(t, red, ir, segment.step.config, self.analysis_widget.get_config())
         ref_avg, ref_count = _ref_average(segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo)
         bpm = metrics.bpm_fft if math.isfinite(metrics.bpm_fft) else metrics.bpm
@@ -1016,7 +1123,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         if not remaining:
             return None, "No quedan configuraciones sin probar en el espacio 3M."
         if not self.experiment_history:
-            cfg = SensorConfig(red=31, ir=31, avg=1, rate=100, width=411, adc=16384, skip=50)
+            cfg = SensorConfig(red=63, ir=63, avg=4, rate=800, width=411, adc=16384, skip=50)
             return make_3m_step(index + 1, cfg, "primera configuracion adaptativa"), "Primera configuracion del protocolo 3M."
         last = self.experiment_history[-1]
         best = self._best_experiment_result() or last

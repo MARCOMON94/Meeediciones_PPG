@@ -94,6 +94,8 @@ class CaptureState:
     pulse_final_fonendo: str = ""
     measurement_condition: str = ""
     udder_side: str = ""
+    temp_mapping: str = "A0_RT_A1_LT"
+    temp_primary_channel: str = "A0"
     vacuum_condition: str = ""
     first_micro: Optional[int] = None
     t: list[float] = field(default_factory=list)

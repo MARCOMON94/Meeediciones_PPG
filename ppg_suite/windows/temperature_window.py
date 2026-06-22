@@ -53,13 +53,16 @@ class TemperatureWindow(PPGSuite):
         self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.udder_combo = QtWidgets.QComboBox()
-        self.udder_combo.addItems(["", "ubre", "right", "left"])
+        self.configure_udder_combo(self.udder_combo)
+        self.temp_mapping_combo = QtWidgets.QComboBox()
+        self.configure_temp_mapping_combo(self.temp_mapping_combo)
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit("solo temperatura en campo")
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Duración:", self.duration_spin)
         form.addRow("Ubre:", self.udder_combo)
+        form.addRow("Asignacion termometros:", self.temp_mapping_combo)
         form.addRow("Medicion:", self.vacuum_combo)
         form.addRow("Condiciones:", self.condition_edit)
         left.addWidget(capture_group)
@@ -208,9 +211,11 @@ class TemperatureWindow(PPGSuite):
             f"Muestras A1: {temp['temp_a1_samples']} temp / {temp['temp_a1_raw_samples']} raw\n"
             f"Lineas OK: {st.valid_lines} | descartadas: {st.discarded_lines}\n"
             f"Serial: {format_status}\n\n"
-            f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | media {fmt(temp['temp_a0_c_mean'], 2)} C\n"
+            f"RT final: {fmt(temp['temp_rt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_rt_c_last'], 2)} C\n"
+            f"LT final: {fmt(temp['temp_lt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_lt_c_last'], 2)} C\n"
+            f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | final {fmt(temp['temp_a0_c_final_max_5s'], 2)} C\n"
             f"A0 min/max: {fmt(temp['temp_a0_c_min'], 2)} / {fmt(temp['temp_a0_c_max'], 2)} C | raw {fmt(temp['temp_a0_raw_last'], 0)}\n"
-            f"A1 actual: {fmt(temp['temp_a1_c_last'], 2)} C | media {fmt(temp['temp_a1_c_mean'], 2)} C\n"
+            f"A1 actual: {fmt(temp['temp_a1_c_last'], 2)} C | final {fmt(temp['temp_a1_c_final_max_5s'], 2)} C\n"
             f"A1 min/max: {fmt(temp['temp_a1_c_min'], 2)} / {fmt(temp['temp_a1_c_max'], 2)} C | raw {fmt(temp['temp_a1_raw_last'], 0)}\n\n"
             f"Diagnostico rapido:\n"
             f"{a0_status}\n"

@@ -147,6 +147,17 @@ El firmware esta en:
 arduino/ppg_max3010x_firmware/ppg_max3010x_firmware.ino
 ```
 
+Configuracion recomendada para Arduino Nano 33 IoT:
+
+- Placa en Arduino IDE: `Arduino SAMD Boards` -> `Arduino Nano 33 IoT`.
+- Librerias Arduino desde `Sketch` -> `Include Library` -> `Manage Libraries...`:
+  - `ArduinoBLE` by Arduino, necesaria para `ArduinoBLE.h` y Bluetooth BLE.
+  - `SparkFun MAX3010x Pulse and Proximity Sensor Library`, necesaria para `MAX30105.h`.
+- Conexiones: MAX3010x por I2C en `SDA/A4` y `SCL/A5`; NTC derecha/izquierda en `A0/A1` segun el mapeo elegido en la app.
+- ADC de temperatura: `12 bits`, ya configurado por defecto en placas SAMD como Nano 33 IoT.
+- Bluetooth: el Nano 33 IoT tiene BLE mediante el modulo u-blox NINA-W102. Este firmware activa un servicio BLE `mtestv2 Nano33IoT` cuando compila como Nano 33 IoT. La app puede conectarse desde el selector de puertos con `Bluetooth BLE | Arduino Nano 33 IoT mtestv2`.
+- BLE no aparece como puerto COM clasico. La app usa `bleak` y caracteristicas GATT propias para enviar comandos y recibir lineas. Por limite de ancho de banda BLE, USB Serial sigue siendo la opcion con mas muestras por segundo; por BLE se notifican datos a ritmo limitado para mantener estabilidad.
+
 La aplicacion se comunica por serie mediante comandos de texto como:
 
 - `STATUS`

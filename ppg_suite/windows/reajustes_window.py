@@ -61,7 +61,9 @@ class ReajustesWindow(PPGSuite):
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.udder_combo = QtWidgets.QComboBox()
-        self.udder_combo.addItems(["", "ubre", "right", "left"])
+        self.configure_udder_combo(self.udder_combo)
+        self.temp_mapping_combo = QtWidgets.QComboBox()
+        self.configure_temp_mapping_combo(self.temp_mapping_combo)
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit()
@@ -75,6 +77,7 @@ class ReajustesWindow(PPGSuite):
         identity.addRow("Crotal:", self.crotal_edit)
         identity.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         identity.addRow("Ubre:", self.udder_combo)
+        identity.addRow("Asignacion termometros:", self.temp_mapping_combo)
         identity.addRow("Medicion:", self.vacuum_combo)
         identity.addRow("Condiciones:", self.condition_edit)
         left.addWidget(identity_group)
@@ -198,7 +201,7 @@ class ReajustesWindow(PPGSuite):
             f"SpO2 estimada: {fmt(met.spo2, 1)} % | R={fmt(met.ratio_r, 4)}\n"
             f"{spo2_warning_line}"
             f"Respiraciones (experimental): {fmt(met.resp_rate_rpm, 1)} resp/min | calidad {fmt(met.resp_quality, 0)}\n"
-            f"Temp: {fmt(temp['temp_c_last'], 1)} °C | media {fmt(temp['temp_c_mean'], 1)} °C | raw {fmt(temp['temp_raw_last'], 0)}\n"
+            f"Temp RT/LT final: {fmt(temp['temp_rt_c_final_max_5s'], 1)} / {fmt(temp['temp_lt_c_final_max_5s'], 1)} C | canal {st.temp_primary_channel} {fmt(temp['temp_c_final_max_5s'], 1)} C\n"
             f"AC/DC IR: {fmt(met.ac_ir, 2)} / {fmt(met.dc_ir, 0)} | PI IR={fmt(met.pi_ir_pct, 3)} %\n"
             f"AC/DC RED: {fmt(met.ac_red, 2)} / {fmt(met.dc_red, 0)} | PI RED={fmt(met.pi_red_pct, 3)} %\n"
             f"Artefactos IR/RED: {fmt(met.artifact_ir_pct, 1)} / {fmt(met.artifact_red_pct, 1)} %\n"

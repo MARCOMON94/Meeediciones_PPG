@@ -1,6 +1,10 @@
 #include <Wire.h>
 #include "MAX30105.h"
 
+#if defined(ARDUINO_SAMD_NANO_33_IOT)
+  #include <ArduinoBLE.h>
+#endif
+
 MAX30105 sensor;
 
 // ======================================================
@@ -18,6 +22,30 @@ MAX30105 sensor;
 // Datos enviados:
 //   micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw
 // ======================================================
+
+#if defined(ARDUINO_SAMD_NANO_33_IOT)
+  #define MTEST_BOARD_PROFILE "NANO_33_IOT"
+  #define MTEST_BLE_AVAILABLE 1
+  #define MTEST_BLE_TRANSPORT_ENABLED 1
+#else
+  #define MTEST_BOARD_PROFILE "GENERIC_SERIAL"
+  #define MTEST_BLE_AVAILABLE 0
+  #define MTEST_BLE_TRANSPORT_ENABLED 0
+#endif
+
+// Nano 33 IoT usa BLE via modulo u-blox NINA-W102. No crea un puerto COM
+// Bluetooth clasico: la app se conecta por GATT usando estas caracteristicas.
+#define MTEST_USB_SERIAL_ENABLED 1
+
+#if MTEST_BLE_TRANSPORT_ENABLED
+BLEService mtestService("7f510001-1b15-4b91-9f4b-3a4d5f6e0001");
+BLEStringCharacteristic bleRxChar("7f510002-1b15-4b91-9f4b-3a4d5f6e0001", BLEWrite, 180);
+BLEStringCharacteristic bleTxChar("7f510003-1b15-4b91-9f4b-3a4d5f6e0001", BLERead | BLENotify, 244);
+bool bleReady = false;
+#endif
+
+unsigned long lastBleDataMs = 0;
+const unsigned long BLE_DATA_PERIOD_MS = 20;
 
 
 // ---------- MAX3010x ----------
@@ -68,6 +96,29 @@ String rxLine = "";
 
 unsigned long lastTempOnlyMs = 0;
 const unsigned long TEMP_ONLY_PERIOD_MS = 100;
+
+void handleCommand(const String &cmd);
+
+
+void bleSendLine(const String &line) {
+#if MTEST_BLE_TRANSPORT_ENABLED
+  if (!bleReady) return;
+  BLEDevice central = BLE.central();
+  if (!central || !central.connected()) return;
+  bleTxChar.writeValue((line + "\n").c_str());
+#else
+  (void)line;
+#endif
+}
+
+void emitLine(const String &line) {
+  Serial.println(line);
+  bleSendLine(line);
+}
+
+void emitFlashLine(const __FlashStringHelper *line) {
+  Serial.println(line);
+}
 
 
 // ======================================================
@@ -124,23 +175,36 @@ float readFloatAfterKey(const String &line, const String &key, float fallback) {
 // ======================================================
 
 void printSensorConfig() {
-  Serial.print(F("CFG RED=")); Serial.print(cfg.red);
-  Serial.print(F(" IR=")); Serial.print(cfg.ir);
-  Serial.print(F(" AVG=")); Serial.print(cfg.avg);
-  Serial.print(F(" RATE=")); Serial.print(cfg.rate);
-  Serial.print(F(" WIDTH=")); Serial.print(cfg.width);
-  Serial.print(F(" ADC=")); Serial.print(cfg.adc);
-  Serial.print(F(" SKIP=")); Serial.print(cfg.skip);
-  Serial.print(F(" DEBUG=")); Serial.println(cfg.debug ? 1 : 0);
+  String line = "CFG RED=" + String(cfg.red);
+  line += " IR=" + String(cfg.ir);
+  line += " AVG=" + String(cfg.avg);
+  line += " RATE=" + String(cfg.rate);
+  line += " WIDTH=" + String(cfg.width);
+  line += " ADC=" + String(cfg.adc);
+  line += " SKIP=" + String(cfg.skip);
+  line += " DEBUG=" + String(cfg.debug ? 1 : 0);
+  emitLine(line);
 }
 
 void printTempConfig() {
-  Serial.print(F("TEMP_CFG VCC=")); Serial.print(tempCfg.vcc, 4);
-  Serial.print(F(" RFIX=")); Serial.print(tempCfg.rFixed, 1);
-  Serial.print(F(" RN=")); Serial.print(tempCfg.rNominal, 1);
-  Serial.print(F(" BETA=")); Serial.print(tempCfg.beta, 1);
-  Serial.print(F(" OFFSET=")); Serial.print(tempCfg.offsetC, 3);
-  Serial.print(F(" ADCBITS=")); Serial.println(tempCfg.adcBits);
+  String line = "TEMP_CFG VCC=" + String(tempCfg.vcc, 4);
+  line += " RFIX=" + String(tempCfg.rFixed, 1);
+  line += " RN=" + String(tempCfg.rNominal, 1);
+  line += " BETA=" + String(tempCfg.beta, 1);
+  line += " OFFSET=" + String(tempCfg.offsetC, 3);
+  line += " ADCBITS=" + String(tempCfg.adcBits);
+  emitLine(line);
+}
+
+void printBoardConfig() {
+  String line = "BOARD PROFILE=" + String(MTEST_BOARD_PROFILE);
+  line += " USB_SERIAL=" + String(MTEST_USB_SERIAL_ENABLED);
+  line += " BLE_AVAILABLE=" + String(MTEST_BLE_AVAILABLE);
+  line += " BLE_TRANSPORT=" + String(MTEST_BLE_TRANSPORT_ENABLED);
+#if MTEST_BLE_TRANSPORT_ENABLED
+  line += " BLE_NAME=mtestv2 Nano33IoT";
+#endif
+  emitLine(line);
 }
 
 void applySensorConfig() {
@@ -185,7 +249,7 @@ void handleConfig(const String &line) {
 
   applySensorConfig();
 
-  Serial.println(F("OK_CONFIG"));
+  emitLine("OK_CONFIG");
   printSensorConfig();
 }
 
@@ -204,7 +268,7 @@ void handleTempConfig(const String &line) {
 
   applyTempConfig();
 
-  Serial.println(F("OK_CONFIG_TEMP"));
+  emitLine("OK_CONFIG_TEMP");
   printTempConfig();
 }
 
@@ -251,21 +315,28 @@ void printDataLine(uint32_t red, uint32_t ir) {
   float tempA0C = leerTemperaturaC(rawTempA0);
   float tempA1C = leerTemperaturaC(rawTempA1);
 
-  Serial.print(micros());
-  Serial.print(",");
-  Serial.print(red);
-  Serial.print(",");
-  Serial.print(ir);
-  Serial.print(",");
-  if (isnan(tempA0C)) Serial.print("nan");
-  else Serial.print(tempA0C, 2);
-  Serial.print(",");
-  Serial.print(rawTempA0);
-  Serial.print(",");
-  if (isnan(tempA1C)) Serial.print("nan");
-  else Serial.print(tempA1C, 2);
-  Serial.print(",");
-  Serial.println(rawTempA1);
+  String line = String(micros());
+  line += ",";
+  line += String(red);
+  line += ",";
+  line += String(ir);
+  line += ",";
+  line += isnan(tempA0C) ? "nan" : String(tempA0C, 2);
+  line += ",";
+  line += String(rawTempA0);
+  line += ",";
+  line += isnan(tempA1C) ? "nan" : String(tempA1C, 2);
+  line += ",";
+  line += String(rawTempA1);
+
+  Serial.println(line);
+#if MTEST_BLE_TRANSPORT_ENABLED
+  unsigned long nowMs = millis();
+  if (nowMs - lastBleDataMs >= BLE_DATA_PERIOD_MS) {
+    lastBleDataMs = nowMs;
+    bleSendLine(line);
+  }
+#endif
 }
 
 // ======================================================
@@ -628,10 +699,46 @@ void diagnosticoCompleto() {
 
   printSensorConfig();
   printTempConfig();
+  printBoardConfig();
 
   Serial.println(F("DIAGNOSTICO_FIN"));
 }
 
+
+void setupBle() {
+#if MTEST_BLE_TRANSPORT_ENABLED
+  if (!BLE.begin()) {
+    bleReady = false;
+    Serial.println(F("BLE_RESULTADO ERROR_BEGIN"));
+    return;
+  }
+
+  BLE.setLocalName("mtestv2 Nano33IoT");
+  BLE.setDeviceName("mtestv2 Nano33IoT");
+  BLE.setAdvertisedService(mtestService);
+  mtestService.addCharacteristic(bleRxChar);
+  mtestService.addCharacteristic(bleTxChar);
+  BLE.addService(mtestService);
+  bleTxChar.writeValue("BOOT\n");
+  BLE.advertise();
+  bleReady = true;
+  Serial.println(F("BLE_RESULTADO OK_ADVERTISING mtestv2 Nano33IoT"));
+#endif
+}
+
+void pollBleCommands() {
+#if MTEST_BLE_TRANSPORT_ENABLED
+  if (!bleReady) return;
+  BLE.poll();
+  if (bleRxChar.written()) {
+    String cmd = bleRxChar.value();
+    cmd.trim();
+    if (cmd.length() > 0) {
+      handleCommand(cmd);
+    }
+  }
+#endif
+}
 
 
 // ======================================================
@@ -647,9 +754,10 @@ void handleCommand(const String &cmd) {
   }
 
   if (cmd == "STATUS") {
-    Serial.println(sensorOk ? F("STATUS SENSOR_OK") : F("STATUS SENSOR_ERROR"));
+    emitLine(sensorOk ? "STATUS SENSOR_OK" : "STATUS SENSOR_ERROR");
     printSensorConfig();
     printTempConfig();
+    printBoardConfig();
     return;
   }
 
@@ -665,16 +773,17 @@ void handleCommand(const String &cmd) {
 
   if (cmd == "START_CONTINUOUS" || cmd == "START") {
     if (!sensorOk) {
-      Serial.println(F("ERR_SENSOR_NOT_READY"));
+      emitLine("ERR_SENSOR_NOT_READY");
       return;
     }
 
     tempOnlyMode = false;
     streaming = true;
     skipRemaining = cfg.skip;
+    lastBleDataMs = 0;
     sensor.clearFIFO();
 
-    Serial.println(F("OK_START_CONTINUOUS"));
+    emitLine("OK_START_CONTINUOUS");
     return;
   }
 
@@ -682,8 +791,9 @@ void handleCommand(const String &cmd) {
     tempOnlyMode = true;
     streaming = true;
     lastTempOnlyMs = 0;
+    lastBleDataMs = 0;
 
-    Serial.println(F("OK_START_TEMP"));
+    emitLine("OK_START_TEMP");
     return;
   }
 
@@ -694,12 +804,11 @@ void handleCommand(const String &cmd) {
 
     if (sensorOk) sensor.clearFIFO();
 
-    Serial.println(F("OK_STOP"));
+    emitLine("OK_STOP");
     return;
   }
 
-  Serial.print(F("WARN_UNKNOWN_CMD "));
-  Serial.println(cmd);
+  emitLine("WARN_UNKNOWN_CMD " + cmd);
 }
 
 
@@ -711,6 +820,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 5000);
 
+  setupBle();
   applyTempConfig();
 
   Wire.begin();
@@ -718,18 +828,21 @@ void setup() {
 
   if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
     sensorOk = false;
-    Serial.println(F("ERROR_SENSOR"));
+    emitLine("ERROR_SENSOR");
   } else {
     sensorOk = true;
     applySensorConfig();
   }
 
-  Serial.println(F("READY"));
+  emitLine("READY");
   printSensorConfig();
   printTempConfig();
+  printBoardConfig();
 }
 
 void loop() {
+  pollBleCommands();
+
   while (Serial.available()) {
     char c = (char)Serial.read();
 
