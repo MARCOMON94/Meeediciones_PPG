@@ -33,8 +33,6 @@ from ..animal_config import (
     animal_label,
     default_mapping_for_animal,
     default_position_for_animal,
-    display_mapping,
-    display_position,
     inverted_mapping_for_animal,
     mapping_from_assignments,
     normalize_animal_type,
@@ -50,7 +48,7 @@ from ..processing import (
     block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, find_local_peaks,
     processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, uniform_resample,
 )
-from ..utils import fmt, now_stamp, open_folder, safe_float_text, sanitize_id
+from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
 
 
@@ -224,6 +222,7 @@ class BleSerialAdapter:
 
 class PPGSuite(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
+    open_statistics_requested = QtCore.pyqtSignal()
 
     def __init__(self, app_mode: AppMode = "real"):
         super().__init__()
@@ -328,7 +327,6 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit()
-        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion animal")
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         self.condition_edit.setPlaceholderText("Ej.: campo, ordeño activo, sensor reajustado, animal inquieto...")
         cap.addRow("Crotal:", self.crotal_edit)
@@ -338,14 +336,15 @@ class PPGSuite(QtWidgets.QMainWindow):
         cap.addRow("Sensor:", self.udder_combo)
         cap.addRow("Termometros:", self.temp_mapping_widget)
         cap.addRow("Medicion:", self.vacuum_combo)
-        cap.addRow("Condiciones:", self.condition_edit)
-        cap.addRow("", self.btn_save_animal_config)
+        cap.addRow("Anotaciones inicio:", self.condition_edit)
         left.addWidget(capture_group)
-        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.refresh_animal_dependent_controls()
 
         self.sensor_widget = SensorConfigWidget()
         left.addWidget(self.sensor_widget)
+        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion especie")
+        left.addWidget(self.btn_save_animal_config)
+        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.analysis_widget = AnalysisConfigWidget()
         left.addWidget(self.analysis_widget)
 
@@ -355,10 +354,12 @@ class PPGSuite(QtWidgets.QMainWindow):
 
         if self.app_mode == "real":
             self.sensor_widget.setVisible(False)
+            self.btn_save_animal_config.setVisible(False)
             self.analysis_widget.setVisible(False)
             self.btn_toggle_advanced.setVisible(True)
         else:
             self.sensor_widget.setVisible(False)
+            self.btn_save_animal_config.setVisible(False)
             self.analysis_widget.setVisible(False)
             self.btn_toggle_advanced.setVisible(True)
 
@@ -366,7 +367,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.btn_start = QtWidgets.QPushButton("Iniciar medición real" if self.app_mode == "real" else "Iniciar toma")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
+        self.btn_open_base = QtWidgets.QPushButton("Mostrar resultados")
         for b in [self.btn_apply_config, self.btn_start, self.btn_stop, self.btn_open_base, self.btn_back_menu]:
             left.addWidget(b)
         if self.app_mode == "real":
@@ -377,7 +378,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.btn_start.clicked.connect(self.start_normal_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_open_base.clicked.connect(lambda: open_folder(self.results_dir))
+        self.btn_open_base.clicked.connect(self.open_statistics_window)
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 9))
@@ -420,6 +421,7 @@ class PPGSuite(QtWidgets.QMainWindow):
     def toggle_advanced_controls(self):
         visible = not self.sensor_widget.isVisible()
         self.sensor_widget.setVisible(visible)
+        self.btn_save_animal_config.setVisible(visible)
         self.analysis_widget.setVisible(visible)
         self.btn_apply_config.setVisible(visible)
 
@@ -540,43 +542,36 @@ class PPGSuite(QtWidgets.QMainWindow):
             json.dump(profiles, f, indent=2, ensure_ascii=False)
 
     def current_animal_profile(self) -> dict:
+        animal_type = self.current_animal_type()
         return {
-            "id": sanitize_id(self.crotal_edit.text()),
-            "animal_type": self.current_animal_type(),
-            "animal_label": animal_label(self.current_animal_type()),
-            "sensor_position": self.current_udder_text(),
-            "temp_mapping": self.current_temp_mapping(),
-            "temp_assignments": self.current_temp_assignments(),
+            "profile_type": "species_sensor_config",
+            "animal_type": animal_type,
+            "animal_label": animal_label(animal_type),
             "sensor_config": asdict(self.sensor_widget.get_config()),
-            "analysis_config": asdict(self.analysis_widget.get_config()),
             "updated": datetime.now().isoformat(),
         }
 
     def profile_summary_text(self, profile: dict) -> str:
         sensor_cfg = profile.get("sensor_config") or {}
-        analysis_cfg = profile.get("analysis_config") or {}
         animal_type = normalize_animal_type(str(profile.get("animal_type") or ""))
-        mapping = str(profile.get("temp_mapping") or "")
         return (
-            f"Animal: {profile.get('animal_label') or animal_label(animal_type)}\n"
-            f"Sensor: {display_position(str(profile.get('sensor_position') or ''))}\n"
-            f"Termometros: {display_mapping(mapping, animal_type)}\n"
+            f"Especie: {profile.get('animal_label') or animal_label(animal_type)}\n"
             f"RED={sensor_cfg.get('red', '-')} IR={sensor_cfg.get('ir', '-')} AVG={sensor_cfg.get('avg', '-')} "
-            f"RATE={sensor_cfg.get('rate', '-')} WIDTH={sensor_cfg.get('width', '-')} ADC={sensor_cfg.get('adc', '-')} SKIP={sensor_cfg.get('skip', '-')}\n"
-            f"BPM {analysis_cfg.get('bpm_min', '-')}-{analysis_cfg.get('bpm_max', '-')} | "
-            f"detrend={analysis_cfg.get('detrend_seconds', '-')}s | smooth={analysis_cfg.get('smooth_seconds', '-')}s"
+            f"RATE={sensor_cfg.get('rate', '-')} WIDTH={sensor_cfg.get('width', '-')} ADC={sensor_cfg.get('adc', '-')} "
+            f"SKIP={sensor_cfg.get('skip', '-')} DEBUG={sensor_cfg.get('debug', '-')}"
         )
 
     def save_animal_profile_clicked(self):
         profile = self.current_animal_profile()
-        animal_id = profile["id"] or "SIN_CROTAL"
+        animal_key = normalize_animal_type(str(profile.get("animal_type") or ""))
+        animal_name = profile.get("animal_label") or animal_label(animal_key)
         profiles = self.load_animal_profiles()
-        previous = profiles.get(animal_id)
+        previous = profiles.get(animal_key)
         if previous:
             msg = QtWidgets.QMessageBox(self)
             msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
-            msg.setWindowTitle("Cambiar configuracion animal")
-            msg.setText("La configuracion anterior predefinida es esta:")
+            msg.setWindowTitle("Cambiar configuracion de especie")
+            msg.setText(f"La configuracion anterior predefinida para {animal_name} es esta:")
             msg.setInformativeText(
                 f"{self.profile_summary_text(previous)}\n\n"
                 f"La configuracion seleccionada ahora es esta:\n"
@@ -588,9 +583,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             msg.exec()
             if msg.clickedButton() != change_btn:
                 return
-        profiles[animal_id] = profile
+        profiles[animal_key] = profile
         self.save_animal_profiles(profiles)
-        QtWidgets.QMessageBox.information(self, "Configuracion animal", f"Configuracion guardada para {animal_id}.")
+        QtWidgets.QMessageBox.information(self, "Configuracion de especie", f"Configuracion guardada para {animal_name}.")
 
     def is_bluetooth_port(self, port_info) -> bool:
         txt = f"{getattr(port_info, 'device', '')} {getattr(port_info, 'description', '')} {getattr(port_info, 'hwid', '')}".upper()
@@ -1091,7 +1086,9 @@ class PPGSuite(QtWidgets.QMainWindow):
                     st.pulse_final_pulsio,
                     st.pulse_final_fonendo,
                     self.last_config_ack,
-                    datetime.now().isoformat(timespec="milliseconds")
+                    datetime.now().isoformat(timespec="milliseconds"),
+                    st.measurement_condition,
+                    st.final_annotations,
                 ])
 
         except Exception as exc:
@@ -1108,11 +1105,13 @@ class PPGSuite(QtWidgets.QMainWindow):
         temp_mapping = old.temp_mapping if keep_identity else self.current_temp_mapping()
         temp_primary_channel = temp_primary_channel_for(udder, temp_mapping, animal_type)
         vacuum = old.vacuum_condition if keep_identity else self.current_vacuum_text()
+        final_annotations = old.final_annotations if keep_identity else ""
         self.state = CaptureState(
             crotal_id=crotal,
             animal_type=animal_type,
             pulse_prev=prev,
             measurement_condition=condition,
+            final_annotations=final_annotations,
             udder_side=udder,
             temp_mapping=temp_mapping,
             temp_primary_channel=temp_primary_channel,
@@ -1133,7 +1132,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
             "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
-            "cfg_confirmacion", "system_time"
+            "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales"
         ])
         st.raw_handle.flush()
 
@@ -1384,8 +1383,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.metrics = score_and_merge_metrics(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config())
             st.bpm_blocks = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=2)
             st.bpm_blocks_10s = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=10)
-        if st.mode in ("normal", "long", "experimento_vacio"):
-            self.ask_final_reference()
+        self.ask_final_reference(include_pulse=st.mode in ("normal", "long", "experimento_vacio"))
         self.update_raw_manual_reference()
         self.save_processed()
         self.save_blocks_file()
@@ -1394,20 +1392,25 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.write_session_row(reason)
         log.info("Captura finalizada: %s muestras=%s motivo=%s", st.base_name, len(st.t), reason)
 
-    def ask_final_reference(self):
+    def ask_final_reference(self, include_pulse: bool = True):
         st = self.state
-        dialog = QtWidgets.QDialog(self); dialog.setWindowTitle("Datos finales de la toma")
+        dialog = QtWidgets.QDialog(self); dialog.setWindowTitle("Datos finales y anotaciones")
         form = QtWidgets.QFormLayout(dialog)
         pulsio = QtWidgets.QLineEdit(st.pulse_final_pulsio)
         fonendo = QtWidgets.QLineEdit(st.pulse_final_fonendo)
         form.addRow("Pulsaciones finales pulsioxímetro:", pulsio)
         form.addRow("Pulsaciones finales fonendo:", fonendo)
+        notes = QtWidgets.QPlainTextEdit(st.final_annotations)
+        notes.setPlaceholderText("Ej.: animal se movio al final, sensor recolocado, tos, retirada parcial, incidencia...")
+        notes.setMinimumHeight(74)
+        form.addRow("Anotaciones finales:", notes)
         buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept); buttons.rejected.connect(dialog.reject)
         form.addRow(buttons)
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             st.pulse_final_pulsio = safe_float_text(pulsio.text())
             st.pulse_final_fonendo = safe_float_text(fonendo.text())
+            st.final_annotations = notes.toPlainText().strip()
 
     def update_raw_manual_reference(self):
         st = self.state
@@ -1424,13 +1427,15 @@ class PPGSuite(QtWidgets.QMainWindow):
         if not rows:
             return
         fieldnames = list(rows[0].keys())
-        for field in ("pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo"):
+        for field in ("pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales"):
             if field not in fieldnames:
                 fieldnames.append(field)
         for row in rows:
             row["pulso_previo"] = st.pulse_prev
             row["pulso_final_pulsio"] = st.pulse_final_pulsio
             row["pulso_final_fonendo"] = st.pulse_final_fonendo
+            row["anotaciones_inicio"] = st.measurement_condition
+            row["anotaciones_finales"] = st.final_annotations
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";", extrasaction="ignore")
@@ -1581,6 +1586,10 @@ class PPGSuite(QtWidgets.QMainWindow):
                 "pulso_final_pulsio": st.pulse_final_pulsio,
                 "pulso_final_fonendo": st.pulse_final_fonendo,
             },
+            "annotations": {
+                "initial": st.measurement_condition,
+                "final": st.final_annotations,
+            },
             "files": {
                 "raw": str(st.raw_file) if st.raw_file else "",
                 "processed": str(st.processed_file) if st.processed_file else "",
@@ -1613,7 +1622,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_rlt_c_final_max_5s", "temp_rlt_c_final_time_s", "temp_rlt_c_final_raw_at_max", "temp_rlt_c_ultima", "temp_rlt_c_media", "temp_rlt_raw_ultima",
             "temp_rrt_c_final_max_5s", "temp_rrt_c_final_time_s", "temp_rrt_c_final_raw_at_max", "temp_rrt_c_ultima", "temp_rrt_c_media", "temp_rrt_raw_ultima",
             "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto",
-            "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
+            "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_finales",
             "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file",
         ]
         self.session_writer.writerow(header); self.session_handle.flush()
@@ -1641,6 +1650,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""),
             m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo,
+            st.final_annotations,
             st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "",
             st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "",
             st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "",
@@ -1789,6 +1799,11 @@ class PPGSuite(QtWidgets.QMainWindow):
         if self.state.capturing:
             self.stop_capture("VOLVER_MENU")
         self.back_to_menu.emit()
+
+    def open_statistics_window(self):
+        if self.state.capturing:
+            self.stop_capture("ABRIR_ESTADISTICAS")
+        self.open_statistics_requested.emit()
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         try:

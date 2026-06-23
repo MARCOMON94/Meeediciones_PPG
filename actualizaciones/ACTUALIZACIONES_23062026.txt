@@ -31,20 +31,23 @@ Esta actualizacion agrupa los cambios de temperatura, sensores, Bluetooth, anima
 - Para oveja/cabra basta con A0/A1.
 - Para vaca se pueden usar los cuatro termometros y asignarlos a FLT/FRT/RLT/RRT.
 
-4. Configuracion por animal
-- Se anade boton `Guardar configuracion animal`.
-- Guarda una configuracion local por crotal/animal en `resultados/configs/animal_profiles.json`.
-- La configuracion incluye:
-  - especie
-  - sensor/posicion
-  - asignacion de termometros
-  - parametros del sensor MAX3010x
-  - parametros principales de analisis
-- Si ya existe una configuracion previa para ese crotal, la app muestra:
+4. Configuracion por especie
+- Se anade boton `Guardar configuracion especie` bajo el bloque MAX3010x/sensor en toma normal, temperatura y reajustes.
+- Guarda una configuracion MAX3010x local por especie (`oveja`, `cabra`, `vaca`) en `resultados/configs/animal_profiles.json`.
+- La configuracion guardada incluye solo la especie y los parametros del sensor MAX3010x. No guarda crotal, posicion, medicion, condiciones ni analisis porque esos datos pueden variar en cada toma.
+- En Configuraciones/3M no hay boton de guardar configuracion: el bloque MAX3010x queda como referencia visual de la fila/configuracion actual.
+- Si ya existe una configuracion previa para esa especie, la app muestra:
   - configuracion anterior predefinida
   - configuracion seleccionada ahora
   - pregunta si se quiere cambiar por la seleccionada
 - Si se cancela, no se sobrescribe.
+
+4b. Anotaciones en recogidas
+- El campo inicial pasa a verse como `Anotaciones inicio`.
+- Al terminar una medicion, la ventana final permite anadir `Anotaciones finales` junto a las pulsaciones manuales.
+- En Configuraciones/3M, cada ventana entre configuraciones incluye anotaciones del tramo que acaba de terminar.
+- Los raws nuevos guardan las columnas finales `anotaciones_inicio` y `anotaciones_finales`; los summaries y sessions tambien conservan la anotacion final.
+- Estadisticas muestra las anotaciones finales en el detalle de la toma, sin anadir otra columna principal.
 
 5. Bluetooth Nano 33 IoT
 - El firmware mantiene soporte BLE para Arduino Nano 33 IoT usando `ArduinoBLE`.
@@ -84,6 +87,8 @@ Recomendacion de uso
 
 - Seleccionar primero animal y sensor/posicion.
 - Revisar la asignacion A0-A3 antes de iniciar.
-- Guardar configuracion animal si se quiere dejarla como predefinida para ese crotal.
+- Guardar configuracion especie bajo el bloque MAX3010x si se quiere dejar ese ajuste como predefinido para oveja, cabra o vaca.
+- En las pantallas de recogida, `Mostrar resultados` cierra la ventana actual y abre `Estadisticas`.
+- Usar `Anotaciones inicio` antes de empezar y completar `Anotaciones finales` al cerrar la toma para que queden dentro del raw.
 - En vaca, usar los cuatro termometros cuando se quiera diferenciar delantero/trasero e izquierda/derecha.
 - Para enviar datos, entrar en Estadisticas, marcar los raws con las casillas y usar el boton superior `Preparar correo`.

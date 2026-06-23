@@ -15,8 +15,7 @@ from ..models import SensorConfig
 from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
-from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR
-from ..utils import open_folder
+from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR
 from .measurement_window import PPGSuite, temperature_channel_summary
 
 
@@ -36,6 +35,7 @@ class ScheduledSegment:
     pulse_prev: str = ""
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
+    final_annotations: str = ""
 
 
 def build_64_config_steps() -> list[ScheduledStep]:
@@ -151,8 +151,8 @@ class ScheduledConfigWindow(PPGSuite):
         self.btn_refresh_ports.clicked.connect(self.refresh_ports)
         self.btn_connect.clicked.connect(self.connect_selected_port)
 
-        self.sensor_widget = SensorConfigWidget()
-        self.sensor_widget.setVisible(False)
+        self.sensor_widget = SensorConfigWidget("Configuracion MAX3010x actual")
+        left.addWidget(self.sensor_widget)
         self.analysis_widget = AnalysisConfigWidget()
         self.analysis_widget.setVisible(False)
 
@@ -173,7 +173,6 @@ class ScheduledConfigWindow(PPGSuite):
         self.duration_spin.setDecimals(1)
         self.duration_spin.setValue(self.scheduled_total_duration_s / 60.0)
         self.duration_spin.setSuffix(" min")
-        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion animal")
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Animal:", self.animal_combo)
@@ -181,7 +180,7 @@ class ScheduledConfigWindow(PPGSuite):
         form.addRow("Sensor:", self.udder_combo)
         form.addRow("Termometros:", self.temp_mapping_widget)
         form.addRow("Medicion:", self.vacuum_combo)
-        form.addRow("Condiciones:", self.condition_edit)
+        form.addRow("Anotaciones inicio:", self.condition_edit)
         form.addRow("Duración total:", self.duration_spin)
         self.duration_warning = QtWidgets.QLabel(
             "Aviso: para comparar configuraciones, usa al menos 10-15 s por fila. "
@@ -190,21 +189,19 @@ class ScheduledConfigWindow(PPGSuite):
         self.duration_warning.setWordWrap(True)
         self.duration_warning.setStyleSheet("color: #8a5a00; font-weight: bold;")
         form.addRow("", self.duration_warning)
-        form.addRow("", self.btn_save_animal_config)
         left.addWidget(capture_group)
-        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.refresh_animal_dependent_controls()
 
         self.btn_start = QtWidgets.QPushButton("Iniciar bloque")
         self.btn_stop = QtWidgets.QPushButton("Parar")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
+        self.btn_open_base = QtWidgets.QPushButton("Mostrar resultados")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
         for b in [self.btn_start, self.btn_stop, self.btn_open_base, self.btn_back_menu]:
             b.setMinimumHeight(42)
             left.addWidget(b)
         self.btn_start.clicked.connect(self.start_scheduled_capture)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_BLOQUE_MANUAL"))
-        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
+        self.btn_open_base.clicked.connect(self.open_statistics_window)
         self.btn_back_menu.clicked.connect(self.return_to_menu)
 
         self.info = QtWidgets.QLabel()
@@ -288,7 +285,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.scheduled_step_start_wall = time.time()
         st.capturing = True
 
-    def ask_transition_reference(self, previous_step: ScheduledStep, next_step: ScheduledStep | None) -> tuple[str, str]:
+    def ask_transition_reference(self, previous_step: ScheduledStep, next_step: ScheduledStep | None) -> tuple[str, str, str]:
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("Pulso entre configuraciones")
         form = QtWidgets.QFormLayout(dialog)
@@ -303,20 +300,24 @@ class ScheduledConfigWindow(PPGSuite):
         pulsio.setPlaceholderText("Ej.: 72")
         fonendo = QtWidgets.QLineEdit()
         fonendo.setPlaceholderText("Opcional. Ej.: 74")
+        notes = QtWidgets.QPlainTextEdit()
+        notes.setPlaceholderText("Anotaciones de esta configuracion: movimiento, recolocacion, cambio de apoyo, incidencia...")
+        notes.setMinimumHeight(74)
         form.addRow(info)
         form.addRow("Pulsioximetro:", pulsio)
         form.addRow("Fonendo:", fonendo)
+        form.addRow("Anotaciones:", notes)
         buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         form.addRow(buttons)
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            return safe_float_text(pulsio.text()), safe_float_text(fonendo.text())
-        return "", ""
+            return safe_float_text(pulsio.text()), safe_float_text(fonendo.text()), notes.toPlainText().strip()
+        return "", "", ""
 
-    def ask_last_segment_reference(self) -> tuple[str, str]:
+    def ask_last_segment_reference(self) -> tuple[str, str, str]:
         if not self.scheduled_segments:
-            return "", ""
+            return "", "", ""
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("Pulso final de la ultima configuracion")
         form = QtWidgets.QFormLayout(dialog)
@@ -330,16 +331,20 @@ class ScheduledConfigWindow(PPGSuite):
         pulsio.setPlaceholderText("Ej.: 72")
         fonendo = QtWidgets.QLineEdit(self.scheduled_segments[-1].pulse_final_fonendo)
         fonendo.setPlaceholderText("Opcional. Ej.: 74")
+        notes = QtWidgets.QPlainTextEdit(self.scheduled_segments[-1].final_annotations)
+        notes.setPlaceholderText("Anotaciones finales de esta ultima configuracion.")
+        notes.setMinimumHeight(74)
         form.addRow(info)
         form.addRow("Pulsioximetro final:", pulsio)
         form.addRow("Fonendo final:", fonendo)
+        form.addRow("Anotaciones:", notes)
         buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         form.addRow(buttons)
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            return safe_float_text(pulsio.text()), safe_float_text(fonendo.text())
-        return "", ""
+            return safe_float_text(pulsio.text()), safe_float_text(fonendo.text()), notes.toPlainText().strip()
+        return "", "", ""
 
     def apply_scheduled_step(self, index: int):
         if self.scheduled_segments and self.scheduled_segments[-1].end_sample is None:
@@ -352,9 +357,10 @@ class ScheduledConfigWindow(PPGSuite):
             if self.state.raw_handle:
                 self.state.raw_handle.flush()
             QtWidgets.QApplication.processEvents()
-            pulse_between, fonendo_between = self.ask_transition_reference(previous, step)
+            pulse_between, fonendo_between, annotations_between = self.ask_transition_reference(previous, step)
             self.scheduled_segments[-1].pulse_final_pulsio = pulse_between
             self.scheduled_segments[-1].pulse_final_fonendo = fonendo_between
+            self.scheduled_segments[-1].final_annotations = annotations_between
             self.state.pulse_prev = pulse_between or fonendo_between
             self.prev_pulse_edit.setText(self.state.pulse_prev)
         self.scheduled_step_index = index
@@ -392,9 +398,10 @@ class ScheduledConfigWindow(PPGSuite):
             not math.isfinite(_ref_pulse(self.scheduled_segments[-1].pulse_final_pulsio))
             and not math.isfinite(_ref_pulse(self.scheduled_segments[-1].pulse_final_fonendo))
         ):
-            pulse_final, fonendo_final = self.ask_last_segment_reference()
+            pulse_final, fonendo_final, annotations_final = self.ask_last_segment_reference()
             self.scheduled_segments[-1].pulse_final_pulsio = pulse_final
             self.scheduled_segments[-1].pulse_final_fonendo = fonendo_final
+            self.scheduled_segments[-1].final_annotations = annotations_final
         written = 0
         for segment in self.scheduled_segments:
             if self.save_segment_capture(segment, reason):
@@ -613,7 +620,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
                 "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
-                "cfg_confirmacion", "system_time",
+                "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -634,6 +641,7 @@ class ScheduledConfigWindow(PPGSuite):
                     step.config.skip, 1 if step.config.debug else 0,
                     segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo,
                     self.last_config_ack, datetime.now().isoformat(timespec="milliseconds"),
+                    st.measurement_condition, segment.final_annotations,
                 ])
 
         processed_file = PROCESSED_DIR / f"proc_{base_name}.csv"
@@ -721,6 +729,10 @@ class ScheduledConfigWindow(PPGSuite):
                     "pulso_final_pulsio": segment.pulse_final_pulsio,
                     "pulso_final_fonendo": segment.pulse_final_fonendo,
                 },
+                "annotations": {
+                    "initial": st.measurement_condition,
+                    "final": segment.final_annotations,
+                },
                 "created": datetime.now().isoformat(),
             }, f, indent=2, ensure_ascii=False)
 
@@ -745,7 +757,7 @@ class ScheduledConfigWindow(PPGSuite):
             fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(metrics.pi_ir_pct, 4, ""), fmt(metrics.pi_red_pct, 4, ""), fmt(metrics.artifact_ir_pct, 1, ""),
             fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, segment.pulse_prev,
-            segment.pulse_final_pulsio, segment.pulse_final_fonendo, raw_file.name, processed_file.name, plot_file.name,
+            segment.pulse_final_pulsio, segment.pulse_final_fonendo, segment.final_annotations, raw_file.name, processed_file.name, plot_file.name,
             "", summary_file.name, st.config_file.name if st.config_file else "", json.dumps(blocks, ensure_ascii=False),
             blocks_file.name,
         ])
@@ -1481,9 +1493,10 @@ class Experiment3MWindow(ScheduledConfigWindow):
         if self.state.raw_handle:
             self.state.raw_handle.flush()
         QtWidgets.QApplication.processEvents()
-        pulse_between, fonendo_between = self.ask_transition_reference(previous_segment.step, None)
+        pulse_between, fonendo_between, annotations_between = self.ask_transition_reference(previous_segment.step, None)
         previous_segment.pulse_final_pulsio = pulse_between
         previous_segment.pulse_final_fonendo = fonendo_between
+        previous_segment.final_annotations = annotations_between
         self.state.pulse_prev = pulse_between or fonendo_between
         self.prev_pulse_edit.setText(self.state.pulse_prev)
         self.experiment_history.append(self._evaluate_experiment_segment(previous_segment))

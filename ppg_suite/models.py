@@ -94,6 +94,7 @@ class CaptureState:
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
     measurement_condition: str = ""
+    final_annotations: str = ""
     udder_side: str = ""
     temp_mapping: str = "A0_RT_A1_LT"
     temp_primary_channel: str = "A0"

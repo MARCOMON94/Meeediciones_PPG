@@ -658,6 +658,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         sensor = data.get("sensor_config") or {}
         analysis = data.get("analysis_config") or {}
         manual = data.get("manual_reference") or {}
+        annotations = data.get("annotations") or {}
         values = {
             "duracion_real_s": metrics.get("duration_s"),
             "hz_real": metrics.get("hz"),
@@ -761,6 +762,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "pulso_previo": manual.get("pulso_previo"),
             "pulso_final_pulsio": manual.get("pulso_final_pulsio"),
             "pulso_final_fonendo": manual.get("pulso_final_fonendo"),
+            "anotaciones_finales": annotations.get("final"),
         }
         for key, value in values.items():
             if value is not None and not cap.row.get(key):
@@ -1277,6 +1279,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Canal temp primario", cap.value("temp_primary_channel") or "-"),
             ("Medicion", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
+            ("Anotaciones finales", cap.value("anotaciones_finales") or "-"),
             ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
             ("Pulso previo / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
             ("Diferencia BPM medio - ref.", f"{fmt(diff_ref, 1, '-')} BPM"),

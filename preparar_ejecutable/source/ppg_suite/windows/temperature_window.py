@@ -6,8 +6,7 @@ import time
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
-from ..paths import RESULTS_DIR
-from ..utils import fmt, now_stamp, open_folder, safe_float_text, sanitize_id
+from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite
 
@@ -38,8 +37,11 @@ class TemperatureWindow(PPGSuite):
         self.btn_refresh_ports.clicked.connect(self.refresh_ports)
         self.btn_connect.clicked.connect(self.connect_selected_port)
 
-        self.sensor_widget = SensorConfigWidget()
-        self.sensor_widget.setVisible(False)
+        self.sensor_widget = SensorConfigWidget("Configuracion MAX3010x")
+        left.addWidget(self.sensor_widget)
+        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion especie")
+        left.addWidget(self.btn_save_animal_config)
+        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.analysis_widget = AnalysisConfigWidget()
         self.analysis_widget.setVisible(False)
 
@@ -60,7 +62,6 @@ class TemperatureWindow(PPGSuite):
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit("solo temperatura en campo")
-        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion animal")
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Animal:", self.animal_combo)
@@ -68,10 +69,8 @@ class TemperatureWindow(PPGSuite):
         form.addRow("Sensor:", self.udder_combo)
         form.addRow("Termometros:", self.temp_mapping_widget)
         form.addRow("Medicion:", self.vacuum_combo)
-        form.addRow("Condiciones:", self.condition_edit)
-        form.addRow("", self.btn_save_animal_config)
+        form.addRow("Anotaciones inicio:", self.condition_edit)
         left.addWidget(capture_group)
-        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.refresh_animal_dependent_controls()
 
         wiring = QtWidgets.QLabel(
@@ -87,7 +86,7 @@ class TemperatureWindow(PPGSuite):
         self.btn_diagnostic = QtWidgets.QPushButton("Diagnostico Arduino")
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
+        self.btn_open_base = QtWidgets.QPushButton("Mostrar resultados")
         for b in [self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_back_menu, self.btn_open_base]:
             b.setMinimumHeight(42)
             left.addWidget(b)
@@ -95,7 +94,7 @@ class TemperatureWindow(PPGSuite):
         self.btn_diagnostic.clicked.connect(self.send_diagnostic_command)
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_TEMP_MANUAL"))
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
+        self.btn_open_base.clicked.connect(self.open_statistics_window)
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 10))
@@ -269,5 +268,7 @@ class TemperatureWindow(PPGSuite):
         return
 
     def finalize_capture(self, reason: str):
+        self.ask_final_reference(include_pulse=False)
+        self.update_raw_manual_reference()
         self.save_summary(reason)
         self.write_session_row(reason)

@@ -57,6 +57,8 @@ class AppController(QtCore.QObject):
 
     def _wire_common_signals(self, win):
         win.back_to_menu.connect(self.show_menu)
+        if hasattr(win, "open_statistics_requested"):
+            win.open_statistics_requested.connect(self.show_relations)
 
     def show_real(self):
         self.close_current_window()

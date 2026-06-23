@@ -10,6 +10,7 @@ from ppg_suite.windows.scheduled_window import ConfigurationsWindow, Experiment3
 from ppg_suite.windows.temperature_window import TemperatureWindow
 from ppg_suite.windows.relations_window import RelationExplorerWindow
 from ppg_suite.windows.fourier_window import FourierAnalysisWindow
+from ppg_suite.windows.vacuum_window import VacuumExperimentWindow
 
 
 class AppController(QtCore.QObject):
@@ -45,6 +46,8 @@ class AppController(QtCore.QObject):
             self.show_configurations()
         elif dialog.selected_mode == "experimento_3m":
             self.show_experiment_3m()
+        elif dialog.selected_mode == "experimento_vacio":
+            self.show_vacuum_experiment()
         elif dialog.selected_mode == "temp":
             self.show_temperature()
         elif dialog.selected_mode == "relations":
@@ -54,6 +57,8 @@ class AppController(QtCore.QObject):
 
     def _wire_common_signals(self, win):
         win.back_to_menu.connect(self.show_menu)
+        if hasattr(win, "open_statistics_requested"):
+            win.open_statistics_requested.connect(self.show_relations)
 
     def show_real(self):
         self.close_current_window()
@@ -86,6 +91,13 @@ class AppController(QtCore.QObject):
     def show_experiment_3m(self):
         self.close_current_window()
         win = Experiment3MWindow()
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.show()
+
+    def show_vacuum_experiment(self):
+        self.close_current_window()
+        win = VacuumExperimentWindow()
         self._wire_common_signals(win)
         self.current_window = win
         win.show()

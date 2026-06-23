@@ -8,9 +8,9 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
 from ..models import CaptureState, Metrics
-from ..paths import FIGURES_DIR, RESULTS_DIR, SCREENSHOT_DIR
+from ..paths import FIGURES_DIR, SCREENSHOT_DIR
 from ..processing import estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
-from ..utils import fmt, now_stamp, open_folder
+from ..utils import fmt, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite
 
@@ -75,7 +75,6 @@ class ReajustesWindow(PPGSuite):
         self.duration_spin.setValue(20.0)
         self.duration_spin.setSuffix(" s")
         self.duration_spin.setVisible(False)
-        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion animal")
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         identity.addRow("Crotal:", self.crotal_edit)
         identity.addRow("Animal:", self.animal_combo)
@@ -83,10 +82,8 @@ class ReajustesWindow(PPGSuite):
         identity.addRow("Sensor:", self.udder_combo)
         identity.addRow("Termometros:", self.temp_mapping_widget)
         identity.addRow("Medicion:", self.vacuum_combo)
-        identity.addRow("Condiciones:", self.condition_edit)
-        identity.addRow("", self.btn_save_animal_config)
+        identity.addRow("Anotaciones inicio:", self.condition_edit)
         left.addWidget(identity_group)
-        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.refresh_animal_dependent_controls()
 
         live_group = QtWidgets.QGroupBox("Ventanas de reajuste")
@@ -103,6 +100,9 @@ class ReajustesWindow(PPGSuite):
 
         self.sensor_widget = SensorConfigWidget("Sensor en vivo")
         left.addWidget(self.sensor_widget)
+        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion especie")
+        left.addWidget(self.btn_save_animal_config)
+        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.analysis_widget = AnalysisConfigWidget("Análisis en vivo")
         left.addWidget(self.analysis_widget)
 
@@ -112,7 +112,7 @@ class ReajustesWindow(PPGSuite):
         self.btn_stop = QtWidgets.QPushButton("Parar")
         self.btn_snapshot = QtWidgets.QPushButton("Guardar snapshot")
         self.btn_back_menu = QtWidgets.QPushButton("Volver al menú inicial")
-        self.btn_open_base = QtWidgets.QPushButton("Abrir resultados")
+        self.btn_open_base = QtWidgets.QPushButton("Mostrar resultados")
 
         for b in [self.btn_apply_config, self.btn_start, self.btn_diagnostic, self.btn_stop, self.btn_snapshot, self.btn_open_base, self.btn_back_menu]:
             left.addWidget(b)
@@ -123,7 +123,7 @@ class ReajustesWindow(PPGSuite):
         self.btn_stop.clicked.connect(lambda: self.stop_capture("STOP_LONG_MANUAL"))
         self.btn_snapshot.clicked.connect(self.save_snapshot)
         self.btn_back_menu.clicked.connect(self.return_to_menu)
-        self.btn_open_base.clicked.connect(lambda: open_folder(RESULTS_DIR))
+        self.btn_open_base.clicked.connect(self.open_statistics_window)
 
         self.info = QtWidgets.QLabel()
         self.info.setFont(QtGui.QFont("Consolas", 9))

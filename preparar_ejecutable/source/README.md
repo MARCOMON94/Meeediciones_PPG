@@ -141,7 +141,7 @@ Subcarpetas habituales:
 - `documentos_generados/`: informes PDF.
 - `figures/`: graficas.
 - `screenshots/`: capturas.
-- `configs/`: configuraciones aplicadas y `animal_profiles.json` con configuraciones predefinidas por crotal/animal.
+- `configs/`: configuraciones aplicadas y `animal_profiles.json` con configuraciones MAX3010x predefinidas por especie.
 - `logs/`: logs de ejecucion.
 
 ## Animales, sensores y temperatura
@@ -154,7 +154,10 @@ Las pantallas de recogida permiten elegir `Oveja`, `Cabra` o `Vaca`.
 - Por defecto, oveja/cabra usan `A0 derecha / A1 izquierda`.
 - Por defecto, vaca usa `A0 FRT / A1 FLT / A2 RRT / A3 RLT`.
 - La asignacion puede cambiarse desde la app antes de capturar.
-- Cada crotal puede guardar una configuracion predefinida local. Si ya existe una previa, la app muestra la configuracion antigua y pide confirmacion antes de sustituirla.
+- Oveja, cabra y vaca pueden guardar una configuracion MAX3010x predefinida por especie. El boton aparece bajo el bloque del sensor en las pantallas de toma normal, temperatura y reajustes; en Configuraciones/3M el bloque MAX3010x es solo orientativo porque cambia por fila.
+- Si ya existe una configuracion previa para esa especie, la app muestra la configuracion antigua y pide confirmacion antes de sustituirla.
+- El boton `Mostrar resultados` de las pantallas de recogida cierra la ventana actual y abre `Estadisticas`.
+- Las recogidas guardan anotaciones de inicio y anotaciones finales. En Configuraciones/3M, cada cambio de configuracion permite anotar lo ocurrido en el tramo que acaba de terminar.
 
 La temperatura final de sesiones y Estadisticas es el maximo independiente de cada termometro/posicion durante el primer golpe de calor. La app ignora el primer segundo de estabilizacion y busca el maximo en los 5 segundos siguientes; las medias antiguas se mantienen solo como referencia tecnica.
 
