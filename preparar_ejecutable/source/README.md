@@ -15,7 +15,7 @@ El proyecto combina adquisicion en tiempo real, configuracion del sensor, analis
 - Calcula metricas de calidad, BPM, SpO2 estimada, perfusion, artefactos y saturacion.
 - Incluye analisis experimental con Fourier, autocorrelacion e Hilbert para comparar configuraciones.
 - Genera CSV, JSON, graficas, capturas y PDFs de informe.
-- Estadisticas permite revisar sesiones, limpiar columnas visibles y preparar raws seleccionados para Gmail.
+- Estadisticas permite revisar sesiones, marcar raws de varias sesiones y preparar un ZIP en el Escritorio para correo.
 - Puede empaquetarse como `.exe` portable para uso en Windows sin entorno de desarrollo visible.
 
 ## Tecnologias
@@ -119,7 +119,7 @@ Tambien se puede lanzar manualmente:
 - Reajustes: medicion larga con controles completos, diagnostico Arduino y snapshots.
 - Configuraciones: ejecucion de bloques de parametros del sensor.
 - Experimento 3M: busqueda adaptativa de una configuracion util del sensor con ranking final.
-- Estadisticas: explorador de sesiones, raws, procesados, informes, graficas, capturas y preparacion de ZIP para Gmail.
+- Estadisticas: explorador de sesiones, raws, procesados, informes, graficas, capturas y preparacion de ZIP para correo.
 - Analisis Fourier + Hilbert: comparacion de raws para estudiar que configuracion separa mejor el pulso.
 
 ## Datos generados

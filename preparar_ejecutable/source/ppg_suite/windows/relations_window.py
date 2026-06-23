@@ -4,9 +4,6 @@ import csv
 import html
 import json
 import math
-import shutil
-import subprocess
-import urllib.parse
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -19,7 +16,7 @@ import pyqtgraph as pg
 
 from ..animal_config import animal_label, display_mapping
 from ..models import AnalysisConfig, SensorConfig
-from ..paths import CONFIG_DIR, DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
+from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..processing import score_and_merge_metrics
 from ..utils import fmt
 
@@ -250,6 +247,7 @@ class DictTableModel(QtCore.QAbstractTableModel):
         super().__init__()
         self.headers = headers
         self.rows = rows or []
+        self.check_changed_callback = None
 
     def rowCount(self, parent=QtCore.QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self.rows)
@@ -262,6 +260,12 @@ class DictTableModel(QtCore.QAbstractTableModel):
             return None
         row = self.rows[index.row()]
         key = self.headers[index.column()]
+        if key == "Correo" and role == QtCore.Qt.ItemDataRole.CheckStateRole:
+            return QtCore.Qt.CheckState.Checked if row.get("_mail_checked") == "1" else QtCore.Qt.CheckState.Unchecked
+        if key == "Correo" and role == QtCore.Qt.ItemDataRole.ToolTipRole:
+            return row.get("_mail_tooltip", "Marcar raw para preparar correo")
+        if key == "Correo" and role == QtCore.Qt.ItemDataRole.DisplayRole:
+            return ""
         if role in (QtCore.Qt.ItemDataRole.DisplayRole, QtCore.Qt.ItemDataRole.ToolTipRole):
             return row.get(key, "")
         if role == QtCore.Qt.ItemDataRole.BackgroundRole and key == "Estado":
@@ -277,6 +281,35 @@ class DictTableModel(QtCore.QAbstractTableModel):
             if state in {"Buena", "Aceptable", "Dudosa"}:
                 return QtGui.QBrush(QtGui.QColor("#17202a"))
         return None
+
+    def flags(self, index: QtCore.QModelIndex):
+        base = super().flags(index)
+        if not index.isValid():
+            return base
+        key = self.headers[index.column()]
+        if key == "Correo":
+            row = self.rows[index.row()] if 0 <= index.row() < len(self.rows) else {}
+            if not row.get("_mail_key"):
+                return base | QtCore.Qt.ItemFlag.ItemIsSelectable
+            return base | QtCore.Qt.ItemFlag.ItemIsUserCheckable | QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable
+        return base
+
+    def setData(self, index: QtCore.QModelIndex, value, role=QtCore.Qt.ItemDataRole.EditRole):
+        if not index.isValid() or not (0 <= index.row() < len(self.rows)):
+            return False
+        key = self.headers[index.column()]
+        if key != "Correo" or role != QtCore.Qt.ItemDataRole.CheckStateRole:
+            return False
+        checked_value = getattr(QtCore.Qt.CheckState.Checked, "value", 2)
+        checked = value == QtCore.Qt.CheckState.Checked or value == checked_value
+        row = self.rows[index.row()]
+        if not row.get("_mail_key"):
+            return False
+        row["_mail_checked"] = "1" if checked else "0"
+        if self.check_changed_callback:
+            self.check_changed_callback(row, checked)
+        self.dataChanged.emit(index, index, [QtCore.Qt.ItemDataRole.CheckStateRole])
+        return True
 
     def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
         if orientation == QtCore.Qt.Orientation.Horizontal:
@@ -318,7 +351,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
+        "Correo", "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
         "Pulso ref.", "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
         "Temp final", "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
         "Duracion", "Hz", "Muestras", "Raw",
@@ -337,7 +370,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_capture: CaptureRecord | None = None
         self.temporal_source_rows: list[dict[str, str]] = []
         self.temporal_rel_t = np.asarray([], dtype=float)
+        self.mail_raw_paths: dict[str, Path] = {}
         self._build_ui()
+        self.update_mail_status()
         self.reload_data()
 
     def _build_ui(self):
@@ -350,8 +385,18 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_back = QtWidgets.QPushButton("Volver al menu inicial")
         self.btn_back.setMinimumHeight(42)
         top.addWidget(self.btn_back)
+        self.mail_status = QtWidgets.QLabel("0 raws seleccionados")
+        self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
+        self.btn_clear_mail = QtWidgets.QPushButton("Limpiar seleccion")
+        self.btn_prepare_mail.setMinimumHeight(42)
+        self.btn_clear_mail.setMinimumHeight(42)
         top.addStretch(1)
+        top.addWidget(self.mail_status)
+        top.addWidget(self.btn_prepare_mail)
+        top.addWidget(self.btn_clear_mail)
         self.btn_back.clicked.connect(self.back_to_menu.emit)
+        self.btn_prepare_mail.clicked.connect(self.prepare_mail_zip)
+        self.btn_clear_mail.clicked.connect(self.clear_mail_selection)
 
         filters = QtWidgets.QGroupBox("Buscar en sesiones")
         fl = QtWidgets.QGridLayout(filters)
@@ -416,6 +461,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         captures_layout.addWidget(self.captures_label)
         self.captures_model = DictTableModel(self.capture_headers)
+        self.captures_model.check_changed_callback = self.on_capture_mail_checked
         self.captures_table = QtWidgets.QTableView()
         self.captures_table.setModel(self.captures_model)
         self.captures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -504,10 +550,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         files_buttons = QtWidgets.QHBoxLayout()
         self.btn_open_selected_files = QtWidgets.QPushButton("Abrir seleccion")
         self.btn_copy_file_paths = QtWidgets.QPushButton("Copiar rutas")
-        self.btn_prepare_gmail = QtWidgets.QPushButton("Preparar Gmail")
         files_buttons.addWidget(self.btn_open_selected_files)
         files_buttons.addWidget(self.btn_copy_file_paths)
-        files_buttons.addWidget(self.btn_prepare_gmail)
         files_buttons.addStretch(1)
         files_layout.addLayout(files_buttons)
         self.files_table = QtWidgets.QTableView()
@@ -521,7 +565,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         files_layout.addWidget(self.files_table)
         self.btn_open_selected_files.clicked.connect(self.open_selected_files)
         self.btn_copy_file_paths.clicked.connect(self.copy_selected_file_paths)
-        self.btn_prepare_gmail.clicked.connect(self.prepare_gmail_for_selected_files)
         self.detail_tabs.addTab(files_page, "Archivos")
 
     def pick_folder(self):
@@ -875,6 +918,78 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Calidad media": fmt(float(np.mean(qualities)) if qualities else math.nan, 0, ""),
         }
 
+    def capture_raw_path(self, cap: CaptureRecord) -> Path | None:
+        path = cap.files.get("raw")
+        if path and path.exists():
+            return path
+        path = self._resolve_file_from_row(cap.row, "raw", RAW_DIR)
+        return path if path and path.exists() else None
+
+    def raw_mail_key(self, path: Path | None) -> str:
+        if path is None:
+            return ""
+        try:
+            return str(path.resolve())
+        except OSError:
+            return str(path)
+
+    def on_capture_mail_checked(self, row: dict[str, str], checked: bool):
+        key = row.get("_mail_key", "")
+        path_text = row.get("_mail_path", "")
+        if not key or not path_text:
+            return
+        path = Path(path_text)
+        if checked:
+            self.mail_raw_paths[key] = path
+        else:
+            self.mail_raw_paths.pop(key, None)
+        self.update_mail_status()
+
+    def update_mail_status(self):
+        count = len(self.mail_raw_paths)
+        self.mail_status.setText(f"{count} raw{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
+
+    def clear_mail_selection(self):
+        if not self.mail_raw_paths:
+            return
+        self.mail_raw_paths.clear()
+        self.update_mail_status()
+        if self.current_session is not None:
+            self.set_session(self.current_session)
+
+    def desktop_dir(self) -> Path:
+        desktop = Path.home() / "Desktop"
+        if not desktop.exists():
+            desktop = Path.home() / "Escritorio"
+        return desktop if desktop.exists() else Path.home()
+
+    def prepare_mail_zip(self):
+        paths = [path for path in self.mail_raw_paths.values() if path.exists()]
+        if not paths:
+            QtWidgets.QMessageBox.information(self, "Preparar correo", "Marca primero uno o varios raws en la tabla de tomas.")
+            return
+        desktop = self.desktop_dir()
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_path = desktop / f"mtestv2_raws_para_correo_{stamp}.zip"
+        used_names: dict[str, int] = {}
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in paths:
+                name = path.name
+                if name in used_names:
+                    used_names[name] += 1
+                    stem = path.stem
+                    suffix = path.suffix
+                    name = f"{stem}_{used_names[path.name]}{suffix}"
+                else:
+                    used_names[name] = 1
+                zf.write(path, arcname=name)
+        QtWidgets.QApplication.clipboard().setText(str(zip_path))
+        QtWidgets.QMessageBox.information(
+            self,
+            "Preparar correo",
+            f"Se ha creado un ZIP en el Escritorio con {len(paths)} raw(s):\n\n{zip_path}\n\nLa ruta queda copiada al portapapeles.",
+        )
+
     def select_session(self):
         indexes = self.sessions_table.selectionModel().selectedRows()
         if not indexes:
@@ -909,6 +1024,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def _capture_row(self, cap: CaptureRecord) -> dict[str, str]:
         quality = _as_float(cap.value("calidad"))
         bpm = _as_float(cap.value("bpm"))
+        raw_path = self.capture_raw_path(cap)
+        raw_key = self.raw_mail_key(raw_path)
         ref_avg, _ref_count = _mean_ref_pulse(
             cap.value("pulso_previo"),
             cap.value("pulso_final_pulsio"),
@@ -922,6 +1039,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         else:
             state = "Dudosa" if cap.value("bpm") else ""
         return {
+            "Correo": "",
+            "_mail_key": raw_key,
+            "_mail_path": str(raw_path) if raw_path else "",
+            "_mail_checked": "1" if raw_key and raw_key in self.mail_raw_paths else "0",
+            "_mail_tooltip": "Marcar raw para incluirlo en el ZIP de correo" if raw_path else "Esta toma no tiene raw localizado",
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
             "Especie": animal_label(cap.value("animal_type")) if cap.value("animal_type") else "",
@@ -980,7 +1102,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Pulso previo": cap.value("pulso_previo"),
             "Pulso final pulsio": cap.value("pulso_final_pulsio"),
             "Pulso final fonendo": cap.value("pulso_final_fonendo"),
-            "Raw": cap.files.get("raw", Path(cap.value("raw") or "")).name if (cap.files.get("raw") or cap.value("raw")) else "",
+            "Raw": raw_path.name if raw_path else "",
         }
 
     def _display_temp_mapping(self, value: str, animal_type: str = "") -> str:
@@ -1100,55 +1222,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return
         QtWidgets.QApplication.clipboard().setText("\n".join(str(path) for path in paths))
         QtWidgets.QMessageBox.information(self, "Archivos", f"Copiadas {len(paths)} ruta(s) al portapapeles.")
-
-    def prepare_gmail_for_selected_files(self):
-        paths = self.selected_file_paths()
-        if not paths:
-            QtWidgets.QMessageBox.information(self, "Gmail", "Selecciona primero uno o varios archivos en la pestaña Archivos.")
-            return
-        DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        animal_raw = self.current_capture.value("id") if self.current_capture else "seleccion"
-        animal = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in (animal_raw or "seleccion"))[:60]
-        zip_path = DOCUMENTS_DIR / f"raws_para_correo_{animal}_{stamp}.zip"
-        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for path in paths:
-                zf.write(path, arcname=path.name)
-        QtWidgets.QApplication.clipboard().setText(str(zip_path))
-        subject = f"Raws mtestv2 {animal}"
-        body = (
-            "Adjunto ZIP con los archivos seleccionados de mtestv2.\n\n"
-            f"Archivo preparado: {zip_path}\n"
-            "La ruta del ZIP queda copiada al portapapeles para adjuntarla en Gmail."
-        )
-        url = "https://mail.google.com/mail/?view=cm&fs=1&su={}&body={}".format(
-            urllib.parse.quote(subject),
-            urllib.parse.quote(body),
-        )
-        opened = self.open_chrome_url(url)
-        detail = (
-            f"Se ha creado el ZIP:\n{zip_path}\n\n"
-            "Gmail no permite adjuntar archivos locales automáticamente desde una URL de Chrome. "
-            "La ruta del ZIP queda copiada al portapapeles para pegarla en el selector de adjuntos."
-        )
-        if not opened:
-            detail += "\n\nNo pude abrir Chrome automáticamente; abre Gmail y adjunta ese ZIP."
-        QtWidgets.QMessageBox.information(self, "Preparar Gmail", detail)
-
-    def open_chrome_url(self, url: str) -> bool:
-        candidates = [
-            shutil.which("chrome"),
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        ]
-        for candidate in candidates:
-            if candidate and Path(candidate).exists():
-                try:
-                    subprocess.Popen([candidate, url])
-                    return True
-                except OSError:
-                    continue
-        return bool(QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)))
 
     def _summary_html(self, cap: CaptureRecord) -> str:
         quality = _as_float(cap.value("calidad"))

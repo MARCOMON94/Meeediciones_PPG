@@ -62,15 +62,13 @@ Esta actualizacion agrupa los cambios de temperatura, sensores, Bluetooth, anima
   - Temp RRT final
 - La temporalizacion por tramos tambien muestra maximos de FLT/FRT/RLT/RRT cuando existen.
 
-7. Archivos para Gmail
-- En la pestana `Archivos` se permite seleccionar varios ficheros.
-- Se anaden acciones:
-  - abrir seleccion
-  - copiar rutas
-  - preparar Gmail
-- `Preparar Gmail` crea un ZIP con los archivos seleccionados en `resultados/documentos_generados`.
-- La app abre Gmail en Chrome con asunto y cuerpo preparados.
-- Por seguridad del navegador, Gmail no permite adjuntar automaticamente archivos locales desde una URL; la ruta del ZIP queda copiada al portapapeles para adjuntarla manualmente.
+7. Raws para correo
+- En `Estadisticas` se anade una columna de casillas en la tabla `Raws / tomas`.
+- Se pueden marcar raws de una sesion, cambiar de sesion y seguir marcando mas raws.
+- El boton superior `Preparar correo` crea un ZIP en el Escritorio con todos los raws marcados.
+- La app ya no abre Gmail ni Chrome.
+- Al terminar, muestra un mensaje con la ruta del ZIP y la copia al portapapeles.
+- La pestana `Archivos` queda para abrir archivos y copiar rutas, no para preparar el correo.
 
 8. Documentacion
 - README actualizado con:
@@ -79,7 +77,7 @@ Esta actualizacion agrupa los cambios de temperatura, sensores, Bluetooth, anima
   - temperatura final por maximo
   - BLE Nano 33 IoT
   - perfiles por animal
-  - flujo de ZIP para Gmail
+  - flujo de ZIP para correo
 
 Recomendacion de uso
 --------------------
@@ -88,4 +86,4 @@ Recomendacion de uso
 - Revisar la asignacion A0-A3 antes de iniciar.
 - Guardar configuracion animal si se quiere dejarla como predefinida para ese crotal.
 - En vaca, usar los cuatro termometros cuando se quiera diferenciar delantero/trasero e izquierda/derecha.
-- Para enviar datos, entrar en Estadisticas, abrir la toma, seleccionar los archivos en Archivos y usar `Preparar Gmail`.
+- Para enviar datos, entrar en Estadisticas, marcar los raws con las casillas y usar el boton superior `Preparar correo`.
