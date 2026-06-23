@@ -136,8 +136,18 @@ class ScheduledConfigWindow(PPGSuite):
         self.setCentralWidget(central)
         root = QtWidgets.QHBoxLayout(central)
 
-        left = QtWidgets.QVBoxLayout()
-        root.addLayout(left, stretch=0)
+        left_width = 430
+        left_scroll = QtWidgets.QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFixedWidth(left_width)
+        left_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
+        left_widget = QtWidgets.QWidget()
+        left_widget.setMinimumWidth(left_width - 24)
+        left_widget.setMaximumWidth(left_width - 24)
+        left_scroll.setWidget(left_widget)
+        left = QtWidgets.QVBoxLayout(left_widget)
+        root.addWidget(left_scroll, stretch=0)
 
         serial_group = QtWidgets.QGroupBox("Puerto")
         serial_layout = QtWidgets.QGridLayout(serial_group)
