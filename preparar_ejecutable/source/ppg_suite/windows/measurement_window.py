@@ -22,6 +22,27 @@ except Exception:
     BleakClient = None
     BleakScanner = None
 
+from ..animal_config import (
+    ANIMAL_COW,
+    ANIMAL_OPTIONS,
+    POSITION_LABELS,
+    POSITION_SUMMARY_PREFIXES,
+    TEMP_CHANNELS,
+    TEMP_MAPPING_DEFAULT,
+    TEMP_MAPPING_INVERTED,
+    animal_label,
+    default_mapping_for_animal,
+    default_position_for_animal,
+    display_mapping,
+    display_position,
+    inverted_mapping_for_animal,
+    mapping_from_assignments,
+    normalize_animal_type,
+    normalize_position,
+    parse_temp_mapping,
+    primary_channel_for,
+    positions_for_animal,
+)
 from ..menu import AppMode
 from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
 from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR, log
@@ -33,8 +54,6 @@ from ..utils import fmt, now_stamp, open_folder, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
 
 
-TEMP_MAPPING_DEFAULT = "A0_RT_A1_LT"
-TEMP_MAPPING_INVERTED = "A0_LT_A1_RT"
 TEMP_SETTLE_S = 1.0
 TEMP_FINAL_WINDOW_S = 5.0
 BLE_PORT_ID = "BLE:MTESTV2_NANO33IOT"
@@ -45,21 +64,11 @@ BLE_TX_UUID = "7f510003-1b15-4b91-9f4b-3a4d5f6e0001"
 
 
 def normalize_udder_text(value: str) -> str:
-    text = (value or "").strip()
-    upper = text.upper()
-    if upper.startswith("RT") or "DERECHA" in upper or upper == "RIGHT":
-        return "RT"
-    if upper.startswith("LT") or "IZQUIERDA" in upper or upper == "LEFT":
-        return "LT"
-    return text
+    return normalize_position(value)
 
 
-def temp_primary_channel_for(udder_side: str, temp_mapping: str) -> str:
-    udder = normalize_udder_text(udder_side)
-    mapping = temp_mapping if temp_mapping in {TEMP_MAPPING_DEFAULT, TEMP_MAPPING_INVERTED} else TEMP_MAPPING_DEFAULT
-    if udder == "LT":
-        return "A1" if mapping == TEMP_MAPPING_DEFAULT else "A0"
-    return "A0" if mapping == TEMP_MAPPING_DEFAULT else "A1"
+def temp_primary_channel_for(position: str, temp_mapping: str, animal_type: str = "") -> str:
+    return primary_channel_for(position, temp_mapping, animal_type)
 
 
 def temperature_channel_summary(
@@ -311,22 +320,29 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(90.0); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.animal_combo = QtWidgets.QComboBox()
+        self.configure_animal_combo(self.animal_combo)
         self.udder_combo = QtWidgets.QComboBox()
         self.configure_udder_combo(self.udder_combo)
-        self.temp_mapping_combo = QtWidgets.QComboBox()
-        self.configure_temp_mapping_combo(self.temp_mapping_combo)
+        self.temp_mapping_widget = self.create_temp_mapping_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit()
+        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion animal")
+        self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         self.condition_edit.setPlaceholderText("Ej.: campo, ordeño activo, sensor reajustado, animal inquieto...")
         cap.addRow("Crotal:", self.crotal_edit)
+        cap.addRow("Animal:", self.animal_combo)
         cap.addRow("Duración:", self.duration_spin)
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         cap.addRow("Sensor:", self.udder_combo)
-        cap.addRow("Termometros:", self.temp_mapping_combo)
+        cap.addRow("Termometros:", self.temp_mapping_widget)
         cap.addRow("Medicion:", self.vacuum_combo)
         cap.addRow("Condiciones:", self.condition_edit)
+        cap.addRow("", self.btn_save_animal_config)
         left.addWidget(capture_group)
+        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
+        self.refresh_animal_dependent_controls()
 
         self.sensor_widget = SensorConfigWidget()
         left.addWidget(self.sensor_widget)
@@ -416,15 +432,165 @@ class PPGSuite(QtWidgets.QMainWindow):
         else:
             super().keyPressEvent(event)
 
+    def configure_animal_combo(self, combo: QtWidgets.QComboBox):
+        combo.clear()
+        for label, value in ANIMAL_OPTIONS:
+            combo.addItem(label, value)
+
+    def current_animal_type(self) -> str:
+        if hasattr(self, "animal_combo"):
+            data = self.animal_combo.currentData()
+            if data:
+                return normalize_animal_type(str(data))
+            return normalize_animal_type(self.animal_combo.currentText())
+        return normalize_animal_type(getattr(self.state, "animal_type", ""))
+
     def configure_udder_combo(self, combo: QtWidgets.QComboBox):
         combo.clear()
-        combo.addItem("Sensor derecha", "RT")
-        combo.addItem("Sensor izquierda", "LT")
+        animal_type = self.current_animal_type()
+        for position in positions_for_animal(animal_type):
+            combo.addItem(f"Sensor {POSITION_LABELS.get(position, position)}", position)
 
     def configure_temp_mapping_combo(self, combo: QtWidgets.QComboBox):
         combo.clear()
         combo.addItem("A0 derecha / A1 izquierda", TEMP_MAPPING_DEFAULT)
         combo.addItem("A0 izquierda / A1 derecha", TEMP_MAPPING_INVERTED)
+
+    def create_temp_mapping_widget(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QGridLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(6)
+        layout.setVerticalSpacing(2)
+        self.temp_channel_combos: dict[str, QtWidgets.QComboBox] = {}
+        self.temp_channel_labels: dict[str, QtWidgets.QLabel] = {}
+        for row, channel in enumerate(TEMP_CHANNELS):
+            label = QtWidgets.QLabel(channel)
+            combo = QtWidgets.QComboBox()
+            self.temp_channel_labels[channel] = label
+            self.temp_channel_combos[channel] = combo
+            layout.addWidget(label, row, 0)
+            layout.addWidget(combo, row, 1)
+        return widget
+
+    def refresh_animal_dependent_controls(self):
+        animal_type = self.current_animal_type()
+        current_position = self.current_udder_text() if hasattr(self, "udder_combo") else ""
+        if hasattr(self, "udder_combo"):
+            self.udder_combo.blockSignals(True)
+            self.configure_udder_combo(self.udder_combo)
+            positions = positions_for_animal(animal_type)
+            wanted = normalize_position(current_position, animal_type) if current_position else default_position_for_animal(animal_type)
+            if wanted not in positions:
+                wanted = default_position_for_animal(animal_type)
+            for i in range(self.udder_combo.count()):
+                if self.udder_combo.itemData(i) == wanted:
+                    self.udder_combo.setCurrentIndex(i)
+                    break
+            self.udder_combo.blockSignals(False)
+        self.configure_temp_mapping_editor(default_mapping_for_animal(animal_type))
+
+    def configure_temp_mapping_editor(self, mapping: str = ""):
+        if not hasattr(self, "temp_channel_combos"):
+            return
+        animal_type = self.current_animal_type()
+        positions = positions_for_animal(animal_type)
+        assignments = parse_temp_mapping(mapping or default_mapping_for_animal(animal_type), animal_type)
+        for channel in TEMP_CHANNELS:
+            combo = self.temp_channel_combos[channel]
+            combo.blockSignals(True)
+            combo.clear()
+            for position in positions:
+                combo.addItem(POSITION_LABELS.get(position, position), position)
+            wanted = assignments.get(channel)
+            if wanted not in positions:
+                wanted = positions[0]
+            for i in range(combo.count()):
+                if combo.itemData(i) == wanted:
+                    combo.setCurrentIndex(i)
+                    break
+            visible = animal_type == ANIMAL_COW or channel in ("A0", "A1")
+            combo.setVisible(visible)
+            self.temp_channel_labels[channel].setVisible(visible)
+            combo.blockSignals(False)
+
+    def current_temp_assignments(self) -> dict[str, str]:
+        if hasattr(self, "temp_channel_combos"):
+            return {
+                channel: str(combo.currentData() or combo.currentText())
+                for channel, combo in self.temp_channel_combos.items()
+                if combo.isVisible()
+            }
+        return parse_temp_mapping(default_mapping_for_animal(self.current_animal_type()), self.current_animal_type())
+
+    def animal_profile_path(self):
+        return self.config_dir / "animal_profiles.json"
+
+    def load_animal_profiles(self) -> dict[str, dict]:
+        path = self.animal_profile_path()
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def save_animal_profiles(self, profiles: dict[str, dict]):
+        path = self.animal_profile_path()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(profiles, f, indent=2, ensure_ascii=False)
+
+    def current_animal_profile(self) -> dict:
+        return {
+            "id": sanitize_id(self.crotal_edit.text()),
+            "animal_type": self.current_animal_type(),
+            "animal_label": animal_label(self.current_animal_type()),
+            "sensor_position": self.current_udder_text(),
+            "temp_mapping": self.current_temp_mapping(),
+            "temp_assignments": self.current_temp_assignments(),
+            "sensor_config": asdict(self.sensor_widget.get_config()),
+            "analysis_config": asdict(self.analysis_widget.get_config()),
+            "updated": datetime.now().isoformat(),
+        }
+
+    def profile_summary_text(self, profile: dict) -> str:
+        sensor_cfg = profile.get("sensor_config") or {}
+        analysis_cfg = profile.get("analysis_config") or {}
+        animal_type = normalize_animal_type(str(profile.get("animal_type") or ""))
+        mapping = str(profile.get("temp_mapping") or "")
+        return (
+            f"Animal: {profile.get('animal_label') or animal_label(animal_type)}\n"
+            f"Sensor: {display_position(str(profile.get('sensor_position') or ''))}\n"
+            f"Termometros: {display_mapping(mapping, animal_type)}\n"
+            f"RED={sensor_cfg.get('red', '-')} IR={sensor_cfg.get('ir', '-')} AVG={sensor_cfg.get('avg', '-')} "
+            f"RATE={sensor_cfg.get('rate', '-')} WIDTH={sensor_cfg.get('width', '-')} ADC={sensor_cfg.get('adc', '-')} SKIP={sensor_cfg.get('skip', '-')}\n"
+            f"BPM {analysis_cfg.get('bpm_min', '-')}-{analysis_cfg.get('bpm_max', '-')} | "
+            f"detrend={analysis_cfg.get('detrend_seconds', '-')}s | smooth={analysis_cfg.get('smooth_seconds', '-')}s"
+        )
+
+    def save_animal_profile_clicked(self):
+        profile = self.current_animal_profile()
+        animal_id = profile["id"] or "SIN_CROTAL"
+        profiles = self.load_animal_profiles()
+        previous = profiles.get(animal_id)
+        if previous:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
+            msg.setWindowTitle("Cambiar configuracion animal")
+            msg.setText("La configuracion anterior predefinida es esta:")
+            msg.setInformativeText(
+                f"{self.profile_summary_text(previous)}\n\n"
+                f"La configuracion seleccionada ahora es esta:\n"
+                f"{self.profile_summary_text(profile)}\n\n"
+                "Quieres cambiarla por la seleccionada?"
+            )
+            change_btn = msg.addButton("Cambiar configuracion", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton("Cancelar", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+            msg.exec()
+            if msg.clickedButton() != change_btn:
+                return
+        profiles[animal_id] = profile
+        self.save_animal_profiles(profiles)
+        QtWidgets.QMessageBox.information(self, "Configuracion animal", f"Configuracion guardada para {animal_id}.")
 
     def is_bluetooth_port(self, port_info) -> bool:
         txt = f"{getattr(port_info, 'device', '')} {getattr(port_info, 'description', '')} {getattr(port_info, 'hwid', '')}".upper()
@@ -616,19 +782,21 @@ class PPGSuite(QtWidgets.QMainWindow):
         if hasattr(self, "udder_combo"):
             data = self.udder_combo.currentData()
             if data:
-                return normalize_udder_text(str(data))
-            return normalize_udder_text(self.udder_combo.currentText())
+                return normalize_position(str(data), self.current_animal_type())
+            return normalize_position(self.udder_combo.currentText(), self.current_animal_type())
         return ""
 
     def current_temp_mapping(self) -> str:
+        if hasattr(self, "temp_channel_combos"):
+            return mapping_from_assignments(self.current_temp_assignments(), self.current_animal_type())
         if hasattr(self, "temp_mapping_combo"):
             data = self.temp_mapping_combo.currentData()
-            if data in (TEMP_MAPPING_DEFAULT, TEMP_MAPPING_INVERTED):
+            if data:
                 return str(data)
-        return TEMP_MAPPING_DEFAULT
+        return default_mapping_for_animal(self.current_animal_type())
 
     def current_temp_primary_channel(self) -> str:
-        return temp_primary_channel_for(self.current_udder_text(), self.current_temp_mapping())
+        return temp_primary_channel_for(self.current_udder_text(), self.current_temp_mapping(), self.current_animal_type())
 
     def current_vacuum_text(self) -> str:
         if hasattr(self, "vacuum_combo"):
@@ -718,7 +886,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         # micros,red,ir,tempC
         # micros,red,ir,tempC,tempRaw
         # micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw
-        if len(parts) not in (3, 4, 5, 6, 7):
+        if len(parts) not in (3, 4, 5, 6, 7, 9, 11):
             return False
 
         try:
@@ -801,6 +969,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             temp_a0_raw = math.nan
             temp_a1_c = math.nan
             temp_a1_raw = math.nan
+            temp_a2_c = math.nan
+            temp_a2_raw = math.nan
+            temp_a3_c = math.nan
+            temp_a3_raw = math.nan
 
             if len(parts) >= 4 and parts[3].strip().lower() != "nan":
                 temp_a0_c = float(parts[3].strip())
@@ -810,21 +982,36 @@ class PPGSuite(QtWidgets.QMainWindow):
                 temp_a1_c = float(parts[5].strip())
             if len(parts) >= 7 and parts[6].strip().lower() != "nan":
                 temp_a1_raw = float(parts[6].strip())
-            st.temp_primary_channel = temp_primary_channel_for(st.udder_side, st.temp_mapping)
-            if st.temp_primary_channel == "A1":
-                temp_c = temp_a1_c
-                temp_raw = temp_a1_raw
-            else:
-                temp_c = temp_a0_c
-                temp_raw = temp_a0_raw
-            if st.temp_mapping == TEMP_MAPPING_INVERTED:
-                temp_rt_c, temp_rt_raw = temp_a1_c, temp_a1_raw
-                temp_lt_c, temp_lt_raw = temp_a0_c, temp_a0_raw
-            else:
-                temp_rt_c, temp_rt_raw = temp_a0_c, temp_a0_raw
-                temp_lt_c, temp_lt_raw = temp_a1_c, temp_a1_raw
+            if len(parts) >= 8 and parts[7].strip().lower() != "nan":
+                temp_a2_c = float(parts[7].strip())
+            if len(parts) >= 9 and parts[8].strip().lower() != "nan":
+                temp_a2_raw = float(parts[8].strip())
+            if len(parts) >= 10 and parts[9].strip().lower() != "nan":
+                temp_a3_c = float(parts[9].strip())
+            if len(parts) >= 11 and parts[10].strip().lower() != "nan":
+                temp_a3_raw = float(parts[10].strip())
 
-            if red == 0 and ir == 0 and not np.isfinite(temp_a0_c) and not np.isfinite(temp_a0_raw) and not np.isfinite(temp_a1_c) and not np.isfinite(temp_a1_raw):
+            channel_values = {
+                "A0": (temp_a0_c, temp_a0_raw),
+                "A1": (temp_a1_c, temp_a1_raw),
+                "A2": (temp_a2_c, temp_a2_raw),
+                "A3": (temp_a3_c, temp_a3_raw),
+            }
+            st.temp_primary_channel = temp_primary_channel_for(st.udder_side, st.temp_mapping, st.animal_type)
+            temp_c, temp_raw = channel_values.get(st.temp_primary_channel, channel_values["A0"])
+            assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
+            position_values = {
+                position: channel_values.get(channel, (math.nan, math.nan))
+                for channel, position in assignments.items()
+            }
+            temp_rt_c, temp_rt_raw = position_values.get("RT", (math.nan, math.nan))
+            temp_lt_c, temp_lt_raw = position_values.get("LT", (math.nan, math.nan))
+            temp_flt_c, temp_flt_raw = position_values.get("FLT", (math.nan, math.nan))
+            temp_frt_c, temp_frt_raw = position_values.get("FRT", (math.nan, math.nan))
+            temp_rlt_c, temp_rlt_raw = position_values.get("RLT", (math.nan, math.nan))
+            temp_rrt_c, temp_rrt_raw = position_values.get("RRT", (math.nan, math.nan))
+
+            if red == 0 and ir == 0 and not any(np.isfinite(v) for pair in channel_values.values() for v in pair):
                 st.discarded_lines += 1
                 return
 
@@ -846,6 +1033,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.temp_a0_raw.append(temp_a0_raw)
             st.temp_a1_c.append(temp_a1_c)
             st.temp_a1_raw.append(temp_a1_raw)
+            st.temp_a2_c.append(temp_a2_c)
+            st.temp_a2_raw.append(temp_a2_raw)
+            st.temp_a3_c.append(temp_a3_c)
+            st.temp_a3_raw.append(temp_a3_raw)
             st.valid_lines += 1
 
             if st.raw_writer:
@@ -855,6 +1046,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                     st.crotal_id,
                     st.base_name,
                     st.mode,
+                    st.animal_type,
                     st.measurement_condition,
                     st.udder_side,
                     st.temp_mapping,
@@ -871,10 +1063,22 @@ class PPGSuite(QtWidgets.QMainWindow):
                     fmt(temp_a0_raw, 0, ""),
                     fmt(temp_a1_c, 2, ""),
                     fmt(temp_a1_raw, 0, ""),
+                    fmt(temp_a2_c, 2, ""),
+                    fmt(temp_a2_raw, 0, ""),
+                    fmt(temp_a3_c, 2, ""),
+                    fmt(temp_a3_raw, 0, ""),
                     fmt(temp_rt_c, 2, ""),
                     fmt(temp_rt_raw, 0, ""),
                     fmt(temp_lt_c, 2, ""),
                     fmt(temp_lt_raw, 0, ""),
+                    fmt(temp_flt_c, 2, ""),
+                    fmt(temp_flt_raw, 0, ""),
+                    fmt(temp_frt_c, 2, ""),
+                    fmt(temp_frt_raw, 0, ""),
+                    fmt(temp_rlt_c, 2, ""),
+                    fmt(temp_rlt_raw, 0, ""),
+                    fmt(temp_rrt_c, 2, ""),
+                    fmt(temp_rrt_raw, 0, ""),
                     cfg.red,
                     cfg.ir,
                     cfg.avg,
@@ -897,14 +1101,16 @@ class PPGSuite(QtWidgets.QMainWindow):
     def reset_capture_state(self, keep_identity: bool = True):
         old = self.state
         crotal = old.crotal_id if keep_identity else sanitize_id(self.crotal_edit.text())
+        animal_type = old.animal_type if keep_identity else self.current_animal_type()
         prev = old.pulse_prev if keep_identity else safe_float_text(self.prev_pulse_edit.text())
         condition = old.measurement_condition if keep_identity else self.current_condition_text()
         udder = old.udder_side if keep_identity else self.current_udder_text()
         temp_mapping = old.temp_mapping if keep_identity else self.current_temp_mapping()
-        temp_primary_channel = temp_primary_channel_for(udder, temp_mapping)
+        temp_primary_channel = temp_primary_channel_for(udder, temp_mapping, animal_type)
         vacuum = old.vacuum_condition if keep_identity else self.current_vacuum_text()
         self.state = CaptureState(
             crotal_id=crotal,
+            animal_type=animal_type,
             pulse_prev=prev,
             measurement_condition=condition,
             udder_side=udder,
@@ -922,9 +1128,9 @@ class PPGSuite(QtWidgets.QMainWindow):
         st.raw_handle = open(st.raw_file, "w", newline="", encoding="utf-8")
         st.raw_writer = csv.writer(st.raw_handle, delimiter=";")
         st.raw_writer.writerow([
-            "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
-            "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
-            "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw",
+            "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+            "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
+            "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
             "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
             "cfg_confirmacion", "system_time"
@@ -1074,24 +1280,36 @@ class PPGSuite(QtWidgets.QMainWindow):
             np.asarray(st.temp_a1_raw[:n], dtype=float),
         )
 
+    def temp_channel_arrays(self) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        st = self.state
+        out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        for channel in TEMP_CHANNELS:
+            values = getattr(st, f"temp_{channel.lower()}_c", [])
+            raw = getattr(st, f"temp_{channel.lower()}_raw", [])
+            n = min(len(st.t), len(values), len(raw))
+            out[channel] = (
+                np.asarray(values[:n], dtype=float),
+                np.asarray(raw[:n], dtype=float),
+            )
+        return out
+
     def temperature_summary(self) -> dict[str, float | int]:
         t, _red, _ir = self.arrays()
         temp_c, temp_raw = self.temp_arrays()
-        temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw = self.temp_dual_arrays()
         primary = temperature_channel_summary(t, temp_c, temp_raw)
-        a0 = temperature_channel_summary(t, temp_a0_c, temp_a0_raw)
-        a1 = temperature_channel_summary(t, temp_a1_c, temp_a1_raw)
-        if self.state.temp_mapping == TEMP_MAPPING_INVERTED:
-            rt, lt = a1, a0
-        else:
-            rt, lt = a0, a1
-        return {
+        channel_arrays = self.temp_channel_arrays()
+        channel_summaries = {
+            channel: temperature_channel_summary(t, values, raw)
+            for channel, (values, raw) in channel_arrays.items()
+        }
+        assignments = parse_temp_mapping(self.state.temp_mapping, self.state.animal_type)
+        position_summaries = {
+            position: channel_summaries.get(channel, temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float)))
+            for channel, position in assignments.items()
+        }
+        out = {
             "temp_samples": primary["samples"],
             "temp_raw_samples": primary["raw_samples"],
-            "temp_a0_samples": a0["samples"],
-            "temp_a0_raw_samples": a0["raw_samples"],
-            "temp_a1_samples": a1["samples"],
-            "temp_a1_raw_samples": a1["raw_samples"],
             "temp_c_last": primary["last"],
             "temp_c_mean": primary["mean"],
             "temp_c_min": primary["min"],
@@ -1104,43 +1322,38 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_final_window_end_s": primary["final_window_end_s"],
             "temp_final_window_used": primary["final_window_used"],
             "temp_raw_last": primary["raw_last"],
-            "temp_a0_c_last": a0["last"],
-            "temp_a0_c_mean": a0["mean"],
-            "temp_a0_c_min": a0["min"],
-            "temp_a0_c_max": a0["max"],
-            "temp_a0_c_final_max_5s": a0["final_max_5s"],
-            "temp_a0_c_final_time_s": a0["final_time_s"],
-            "temp_a0_c_final_raw_at_max": a0["final_raw_at_max"],
-            "temp_a0_c_final_samples": a0["final_samples"],
-            "temp_a0_raw_last": a0["raw_last"],
-            "temp_a1_c_last": a1["last"],
-            "temp_a1_c_mean": a1["mean"],
-            "temp_a1_c_min": a1["min"],
-            "temp_a1_c_max": a1["max"],
-            "temp_a1_c_final_max_5s": a1["final_max_5s"],
-            "temp_a1_c_final_time_s": a1["final_time_s"],
-            "temp_a1_c_final_raw_at_max": a1["final_raw_at_max"],
-            "temp_a1_c_final_samples": a1["final_samples"],
-            "temp_a1_raw_last": a1["raw_last"],
-            "temp_rt_c_last": rt["last"],
-            "temp_rt_c_mean": rt["mean"],
-            "temp_rt_c_min": rt["min"],
-            "temp_rt_c_max": rt["max"],
-            "temp_rt_c_final_max_5s": rt["final_max_5s"],
-            "temp_rt_c_final_time_s": rt["final_time_s"],
-            "temp_rt_c_final_raw_at_max": rt["final_raw_at_max"],
-            "temp_rt_c_final_samples": rt["final_samples"],
-            "temp_rt_raw_last": rt["raw_last"],
-            "temp_lt_c_last": lt["last"],
-            "temp_lt_c_mean": lt["mean"],
-            "temp_lt_c_min": lt["min"],
-            "temp_lt_c_max": lt["max"],
-            "temp_lt_c_final_max_5s": lt["final_max_5s"],
-            "temp_lt_c_final_time_s": lt["final_time_s"],
-            "temp_lt_c_final_raw_at_max": lt["final_raw_at_max"],
-            "temp_lt_c_final_samples": lt["final_samples"],
-            "temp_lt_raw_last": lt["raw_last"],
         }
+        for channel in TEMP_CHANNELS:
+            summary = channel_summaries[channel]
+            prefix = f"temp_{channel.lower()}"
+            out.update({
+                f"{prefix}_samples": summary["samples"],
+                f"{prefix}_raw_samples": summary["raw_samples"],
+                f"{prefix}_c_last": summary["last"],
+                f"{prefix}_c_mean": summary["mean"],
+                f"{prefix}_c_min": summary["min"],
+                f"{prefix}_c_max": summary["max"],
+                f"{prefix}_c_final_max_5s": summary["final_max_5s"],
+                f"{prefix}_c_final_time_s": summary["final_time_s"],
+                f"{prefix}_c_final_raw_at_max": summary["final_raw_at_max"],
+                f"{prefix}_c_final_samples": summary["final_samples"],
+                f"{prefix}_raw_last": summary["raw_last"],
+            })
+        empty = temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float))
+        for position, prefix in POSITION_SUMMARY_PREFIXES.items():
+            summary = position_summaries.get(position, empty)
+            out.update({
+                f"{prefix}_c_last": summary["last"],
+                f"{prefix}_c_mean": summary["mean"],
+                f"{prefix}_c_min": summary["min"],
+                f"{prefix}_c_max": summary["max"],
+                f"{prefix}_c_final_max_5s": summary["final_max_5s"],
+                f"{prefix}_c_final_time_s": summary["final_time_s"],
+                f"{prefix}_c_final_raw_at_max": summary["final_raw_at_max"],
+                f"{prefix}_c_final_samples": summary["final_samples"],
+                f"{prefix}_raw_last": summary["raw_last"],
+            })
+        return out
 
     def compute_current_metrics(self, window_s: Optional[float] = None) -> Metrics:
         t, red, ir = self.arrays()
@@ -1237,7 +1450,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         st = self.state
         t, red, ir = self.arrays()
         temp_c, temp_raw = self.temp_arrays()
-        temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw = self.temp_dual_arrays()
+        channel_arrays = self.temp_channel_arrays()
+        assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
         if t.size < 2 or not st.base_name:
             return
         cfg = self.analysis_widget.get_config()
@@ -1271,28 +1485,37 @@ class PPGSuite(QtWidgets.QMainWindow):
         with open(st.processed_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
-                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
-                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw",
+                "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
+                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s"
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
-                ta0c = temp_a0_c[i] if i < temp_a0_c.size else math.nan
-                ta0r = temp_a0_raw[i] if i < temp_a0_raw.size else math.nan
-                ta1c = temp_a1_c[i] if i < temp_a1_c.size else math.nan
-                ta1r = temp_a1_raw[i] if i < temp_a1_raw.size else math.nan
-                if st.temp_mapping == TEMP_MAPPING_INVERTED:
-                    trtc, trtr, tltc, tltr = ta1c, ta1r, ta0c, ta0r
-                else:
-                    trtc, trtr, tltc, tltr = ta0c, ta0r, ta1c, ta1r
+                channel_values = {}
+                for channel in TEMP_CHANNELS:
+                    values, raw = channel_arrays[channel]
+                    channel_values[channel] = (
+                        values[i] if i < values.size else math.nan,
+                        raw[i] if i < raw.size else math.nan,
+                    )
+                position_values = {
+                    position: channel_values.get(channel, (math.nan, math.nan))
+                    for channel, position in assignments.items()
+                }
                 w.writerow([
-                    st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, st.config_label, i + 1, f"{t[i]:.6f}",
+                    st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, st.animal_type, st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, st.config_label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
-                    fmt(ta0c, 2, ""), fmt(ta0r, 0, ""), fmt(ta1c, 2, ""), fmt(ta1r, 0, ""),
-                    fmt(trtc, 2, ""), fmt(trtr, 0, ""), fmt(tltc, 2, ""), fmt(tltr, 0, ""),
+                    fmt(channel_values["A0"][0], 2, ""), fmt(channel_values["A0"][1], 0, ""), fmt(channel_values["A1"][0], 2, ""), fmt(channel_values["A1"][1], 0, ""),
+                    fmt(channel_values["A2"][0], 2, ""), fmt(channel_values["A2"][1], 0, ""), fmt(channel_values["A3"][0], 2, ""), fmt(channel_values["A3"][1], 0, ""),
+                    fmt(position_values.get("RT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("LT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("LT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("FLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("FLT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("FRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("FRT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("RLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RLT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("RRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RRT", (math.nan, math.nan))[1], 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, "")
                 ])
@@ -1330,9 +1553,12 @@ class PPGSuite(QtWidgets.QMainWindow):
             "id": st.crotal_id,
             "base_name": st.base_name,
             "mode": st.mode,
+            "animal_type": st.animal_type,
+            "animal_label": animal_label(st.animal_type),
             "measurement_condition": st.measurement_condition,
             "udder_side": st.udder_side,
             "temp_mapping": st.temp_mapping,
+            "temp_assignments": parse_temp_mapping(st.temp_mapping, st.animal_type),
             "temp_primary_channel": st.temp_primary_channel,
             "vacuum_condition": st.vacuum_condition,
             "config_label": st.config_label,
@@ -1371,7 +1597,7 @@ class PPGSuite(QtWidgets.QMainWindow):
     def write_session_header(self):
         header = [
             "session_id", "id", "base_name", "fecha", "hora", "modo", "condiciones_medida",
-            "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label",
+            "animal_type", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label",
             "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real",
             "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label",
             "spo2_pct", "ratio_r", "resp_min_exp", "resp_calidad_exp", "resp_razon_exp",
@@ -1380,6 +1606,12 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_lt_c_final_max_5s", "temp_lt_c_final_time_s", "temp_lt_c_final_raw_at_max", "temp_lt_c_ultima", "temp_lt_c_media", "temp_lt_raw_ultima",
             "temp_a0_c_final_max_5s", "temp_a0_c_final_time_s", "temp_a0_c_final_raw_at_max", "temp_a0_c_ultima", "temp_a0_c_media", "temp_a0_raw_ultima",
             "temp_a1_c_final_max_5s", "temp_a1_c_final_time_s", "temp_a1_c_final_raw_at_max", "temp_a1_c_ultima", "temp_a1_c_media", "temp_a1_raw_ultima",
+            "temp_a2_c_final_max_5s", "temp_a2_c_final_time_s", "temp_a2_c_final_raw_at_max", "temp_a2_c_ultima", "temp_a2_c_media", "temp_a2_raw_ultima",
+            "temp_a3_c_final_max_5s", "temp_a3_c_final_time_s", "temp_a3_c_final_raw_at_max", "temp_a3_c_ultima", "temp_a3_c_media", "temp_a3_raw_ultima",
+            "temp_flt_c_final_max_5s", "temp_flt_c_final_time_s", "temp_flt_c_final_raw_at_max", "temp_flt_c_ultima", "temp_flt_c_media", "temp_flt_raw_ultima",
+            "temp_frt_c_final_max_5s", "temp_frt_c_final_time_s", "temp_frt_c_final_raw_at_max", "temp_frt_c_ultima", "temp_frt_c_media", "temp_frt_raw_ultima",
+            "temp_rlt_c_final_max_5s", "temp_rlt_c_final_time_s", "temp_rlt_c_final_raw_at_max", "temp_rlt_c_ultima", "temp_rlt_c_media", "temp_rlt_raw_ultima",
+            "temp_rrt_c_final_max_5s", "temp_rrt_c_final_time_s", "temp_rrt_c_final_raw_at_max", "temp_rrt_c_ultima", "temp_rrt_c_media", "temp_rrt_raw_ultima",
             "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto",
             "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
             "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file",
@@ -1391,7 +1623,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         temp = self.temperature_summary()
         row = [
             st.session_id or st.base_name, st.crotal_id, st.base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
-            st.mode, st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, st.config_label,
+            st.mode, st.measurement_condition, st.animal_type, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, st.config_label,
             reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""),
             fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""),
             fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""),
@@ -1401,6 +1633,12 @@ class PPGSuite(QtWidgets.QMainWindow):
             fmt(temp["temp_lt_c_final_max_5s"], 2, ""), fmt(temp["temp_lt_c_final_time_s"], 3, ""), fmt(temp["temp_lt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_lt_c_last"], 2, ""), fmt(temp["temp_lt_c_mean"], 2, ""), fmt(temp["temp_lt_raw_last"], 0, ""),
             fmt(temp["temp_a0_c_final_max_5s"], 2, ""), fmt(temp["temp_a0_c_final_time_s"], 3, ""), fmt(temp["temp_a0_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a0_c_last"], 2, ""), fmt(temp["temp_a0_c_mean"], 2, ""), fmt(temp["temp_a0_raw_last"], 0, ""),
             fmt(temp["temp_a1_c_final_max_5s"], 2, ""), fmt(temp["temp_a1_c_final_time_s"], 3, ""), fmt(temp["temp_a1_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a1_c_last"], 2, ""), fmt(temp["temp_a1_c_mean"], 2, ""), fmt(temp["temp_a1_raw_last"], 0, ""),
+            fmt(temp["temp_a2_c_final_max_5s"], 2, ""), fmt(temp["temp_a2_c_final_time_s"], 3, ""), fmt(temp["temp_a2_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a2_c_last"], 2, ""), fmt(temp["temp_a2_c_mean"], 2, ""), fmt(temp["temp_a2_raw_last"], 0, ""),
+            fmt(temp["temp_a3_c_final_max_5s"], 2, ""), fmt(temp["temp_a3_c_final_time_s"], 3, ""), fmt(temp["temp_a3_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a3_c_last"], 2, ""), fmt(temp["temp_a3_c_mean"], 2, ""), fmt(temp["temp_a3_raw_last"], 0, ""),
+            fmt(temp["temp_flt_c_final_max_5s"], 2, ""), fmt(temp["temp_flt_c_final_time_s"], 3, ""), fmt(temp["temp_flt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_flt_c_last"], 2, ""), fmt(temp["temp_flt_c_mean"], 2, ""), fmt(temp["temp_flt_raw_last"], 0, ""),
+            fmt(temp["temp_frt_c_final_max_5s"], 2, ""), fmt(temp["temp_frt_c_final_time_s"], 3, ""), fmt(temp["temp_frt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_frt_c_last"], 2, ""), fmt(temp["temp_frt_c_mean"], 2, ""), fmt(temp["temp_frt_raw_last"], 0, ""),
+            fmt(temp["temp_rlt_c_final_max_5s"], 2, ""), fmt(temp["temp_rlt_c_final_time_s"], 3, ""), fmt(temp["temp_rlt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rlt_c_last"], 2, ""), fmt(temp["temp_rlt_c_mean"], 2, ""), fmt(temp["temp_rlt_raw_last"], 0, ""),
+            fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""),
             m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo,
             st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "",

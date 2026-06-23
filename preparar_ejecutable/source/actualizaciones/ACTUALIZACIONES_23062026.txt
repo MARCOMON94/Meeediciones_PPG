@@ -1,0 +1,91 @@
+ACTUALIZACIONES 23062026
+========================
+
+Esta actualizacion agrupa los cambios de temperatura, sensores, Bluetooth, animales y Estadisticas.
+
+1. Temperatura final por golpe de calor
+- La temperatura final ya no se interpreta como media.
+- Se guarda como el maximo del primer golpe de calor de cada termometro/sensor.
+- La app ignora el primer segundo de estabilizacion y toma el maximo en los 5 segundos siguientes.
+- Cada sensor conserva su temperatura maxima independiente, porque cada zona puede comportarse distinto.
+- Las medias antiguas siguen guardadas como dato tecnico, pero Estadisticas prioriza los campos `*_final_max_5s`.
+
+2. Animales y posiciones
+- Las pantallas de recogida tienen selector de animal:
+  - Oveja
+  - Cabra
+  - Vaca
+- Oveja y cabra usan sensores `RT` y `LT`.
+- Vaca usa cuatro posiciones:
+  - `FLT`: delantera izquierda
+  - `FRT`: delantera derecha
+  - `RLT`: trasera izquierda
+  - `RRT`: trasera derecha
+- Las etiquetas visibles pasan a hablar de sensores y termometros para que sea mas orientativo.
+
+3. Termometros A0-A3
+- El firmware y la app pasan de A0/A1 a A0/A1/A2/A3.
+- El formato nuevo del firmware es:
+  - `micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw,tempA2C,tempA2Raw,tempA3C,tempA3Raw`
+- La app sigue aceptando datos antiguos con A0/A1.
+- Para oveja/cabra basta con A0/A1.
+- Para vaca se pueden usar los cuatro termometros y asignarlos a FLT/FRT/RLT/RRT.
+
+4. Configuracion por animal
+- Se anade boton `Guardar configuracion animal`.
+- Guarda una configuracion local por crotal/animal en `resultados/configs/animal_profiles.json`.
+- La configuracion incluye:
+  - especie
+  - sensor/posicion
+  - asignacion de termometros
+  - parametros del sensor MAX3010x
+  - parametros principales de analisis
+- Si ya existe una configuracion previa para ese crotal, la app muestra:
+  - configuracion anterior predefinida
+  - configuracion seleccionada ahora
+  - pregunta si se quiere cambiar por la seleccionada
+- Si se cancela, no se sobrescribe.
+
+5. Bluetooth Nano 33 IoT
+- El firmware mantiene soporte BLE para Arduino Nano 33 IoT usando `ArduinoBLE`.
+- La app usa `bleak` para conectar al servicio BLE `mtestv2 Nano33IoT`.
+- BLE no aparece como COM clasico; por eso sigue existiendo una opcion propia `BLE Nano 33 IoT mtestv2`.
+- USB Serial sigue siendo la opcion recomendada cuando se quieren mas muestras por segundo.
+
+6. Estadisticas mas limpia
+- La tabla principal de raws/tomas se reduce a columnas mas utiles para revision rapida.
+- Los datos tecnicos siguen disponibles en Resumen, Parametros dispositivo y Archivos.
+- Se anaden campos de vaca:
+  - Temp FLT final
+  - Temp FRT final
+  - Temp RLT final
+  - Temp RRT final
+- La temporalizacion por tramos tambien muestra maximos de FLT/FRT/RLT/RRT cuando existen.
+
+7. Archivos para Gmail
+- En la pestana `Archivos` se permite seleccionar varios ficheros.
+- Se anaden acciones:
+  - abrir seleccion
+  - copiar rutas
+  - preparar Gmail
+- `Preparar Gmail` crea un ZIP con los archivos seleccionados en `resultados/documentos_generados`.
+- La app abre Gmail en Chrome con asunto y cuerpo preparados.
+- Por seguridad del navegador, Gmail no permite adjuntar automaticamente archivos locales desde una URL; la ruta del ZIP queda copiada al portapapeles para adjuntarla manualmente.
+
+8. Documentacion
+- README actualizado con:
+  - animales y posiciones
+  - termometros A0-A3
+  - temperatura final por maximo
+  - BLE Nano 33 IoT
+  - perfiles por animal
+  - flujo de ZIP para Gmail
+
+Recomendacion de uso
+--------------------
+
+- Seleccionar primero animal y sensor/posicion.
+- Revisar la asignacion A0-A3 antes de iniciar.
+- Guardar configuracion animal si se quiere dejarla como predefinida para ese crotal.
+- En vaca, usar los cuatro termometros cuando se quiera diferenciar delantero/trasero e izquierda/derecha.
+- Para enviar datos, entrar en Estadisticas, abrir la toma, seleccionar los archivos en Archivos y usar `Preparar Gmail`.

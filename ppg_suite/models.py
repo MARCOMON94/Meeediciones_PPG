@@ -89,6 +89,7 @@ class CaptureState:
     capture_start_wall: float = 0.0
     requested_duration_s: float = 20.0
     crotal_id: str = "SIN_CROTAL"
+    animal_type: str = "oveja"
     pulse_prev: str = ""
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
@@ -107,6 +108,10 @@ class CaptureState:
     temp_a0_raw: list[float] = field(default_factory=list)
     temp_a1_c: list[float] = field(default_factory=list)
     temp_a1_raw: list[float] = field(default_factory=list)
+    temp_a2_c: list[float] = field(default_factory=list)
+    temp_a2_raw: list[float] = field(default_factory=list)
+    temp_a3_c: list[float] = field(default_factory=list)
+    temp_a3_raw: list[float] = field(default_factory=list)
     config_label: str = ""
     valid_lines: int = 0
     discarded_lines: int = 0

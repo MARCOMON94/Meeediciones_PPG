@@ -9,7 +9,7 @@ MAX30105 sensor;
 
 // ======================================================
 // Firmware mtestv2
-// MAX3010x + NTC A0/A1
+// MAX3010x + NTC A0/A1/A2/A3
 //
 // Comandos desde Python:
 //   STATUS
@@ -20,7 +20,7 @@ MAX30105 sensor;
 //   STOP
 //
 // Datos enviados:
-//   micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw
+//   micros,red,ir,tempA0C,tempA0Raw,tempA1C,tempA1Raw,tempA2C,tempA2Raw,tempA3C,tempA3Raw
 // ======================================================
 
 #if defined(ARDUINO_SAMD_NANO_33_IOT)
@@ -66,6 +66,8 @@ SensorConfig cfg;
 // ---------- NTC TEMPERATURA ----------
 const int PIN_TEMP_A0 = A0;
 const int PIN_TEMP_A1 = A1;
+const int PIN_TEMP_A2 = A2;
+const int PIN_TEMP_A3 = A3;
 
 // Montaje asumido:
 // 3.3V ---- NTC ---- A0 ---- R_FIJA ---- GND
@@ -226,6 +228,8 @@ void applyTempConfig() {
 #endif
   pinMode(PIN_TEMP_A0, INPUT);
   pinMode(PIN_TEMP_A1, INPUT);
+  pinMode(PIN_TEMP_A2, INPUT);
+  pinMode(PIN_TEMP_A3, INPUT);
 }
 
 void handleConfig(const String &line) {
@@ -312,8 +316,12 @@ float leerTemperaturaC(uint16_t raw) {
 void printDataLine(uint32_t red, uint32_t ir) {
   uint16_t rawTempA0 = leerTempRaw(PIN_TEMP_A0);
   uint16_t rawTempA1 = leerTempRaw(PIN_TEMP_A1);
+  uint16_t rawTempA2 = leerTempRaw(PIN_TEMP_A2);
+  uint16_t rawTempA3 = leerTempRaw(PIN_TEMP_A3);
   float tempA0C = leerTemperaturaC(rawTempA0);
   float tempA1C = leerTemperaturaC(rawTempA1);
+  float tempA2C = leerTemperaturaC(rawTempA2);
+  float tempA3C = leerTemperaturaC(rawTempA3);
 
   String line = String(micros());
   line += ",";
@@ -328,6 +336,14 @@ void printDataLine(uint32_t red, uint32_t ir) {
   line += isnan(tempA1C) ? "nan" : String(tempA1C, 2);
   line += ",";
   line += String(rawTempA1);
+  line += ",";
+  line += isnan(tempA2C) ? "nan" : String(tempA2C, 2);
+  line += ",";
+  line += String(rawTempA2);
+  line += ",";
+  line += isnan(tempA3C) ? "nan" : String(tempA3C, 2);
+  line += ",";
+  line += String(rawTempA3);
 
   Serial.println(line);
 #if MTEST_BLE_TRANSPORT_ENABLED
@@ -557,6 +573,8 @@ void diagnosticoTemperatura() {
 
   diagnosticoPinTemperatura(PIN_TEMP_A0, F("NTC_A0"));
   diagnosticoPinTemperatura(PIN_TEMP_A1, F("NTC_A1"));
+  diagnosticoPinTemperatura(PIN_TEMP_A2, F("NTC_A2"));
+  diagnosticoPinTemperatura(PIN_TEMP_A3, F("NTC_A3"));
   Serial.println(F("TEMP_NOTA Para deteccion fiable, cada entrada debe tener su divisor NTC-resistencia: 3.3V -> NTC -> Ax -> resistencia fija 10k -> GND."));
   Serial.println(F("TEMP_FIN"));
   return;

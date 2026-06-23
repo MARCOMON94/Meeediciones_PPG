@@ -10,13 +10,14 @@ from datetime import datetime
 import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 
+from ..animal_config import POSITION_SUMMARY_PREFIXES, TEMP_CHANNELS, animal_label, parse_temp_mapping
 from ..models import SensorConfig
 from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR
 from ..utils import open_folder
-from .measurement_window import PPGSuite, TEMP_MAPPING_INVERTED, temperature_channel_summary
+from .measurement_window import PPGSuite, temperature_channel_summary
 
 
 @dataclass(frozen=True)
@@ -159,10 +160,11 @@ class ScheduledConfigWindow(PPGSuite):
         form = QtWidgets.QFormLayout(capture_group)
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.animal_combo = QtWidgets.QComboBox()
+        self.configure_animal_combo(self.animal_combo)
         self.udder_combo = QtWidgets.QComboBox()
         self.configure_udder_combo(self.udder_combo)
-        self.temp_mapping_combo = QtWidgets.QComboBox()
-        self.configure_temp_mapping_combo(self.temp_mapping_combo)
+        self.temp_mapping_widget = self.create_temp_mapping_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit(self.scheduled_condition)
@@ -171,10 +173,13 @@ class ScheduledConfigWindow(PPGSuite):
         self.duration_spin.setDecimals(1)
         self.duration_spin.setValue(self.scheduled_total_duration_s / 60.0)
         self.duration_spin.setSuffix(" min")
+        self.btn_save_animal_config = QtWidgets.QPushButton("Guardar configuracion animal")
+        self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         form.addRow("Crotal:", self.crotal_edit)
+        form.addRow("Animal:", self.animal_combo)
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         form.addRow("Sensor:", self.udder_combo)
-        form.addRow("Termometros:", self.temp_mapping_combo)
+        form.addRow("Termometros:", self.temp_mapping_widget)
         form.addRow("Medicion:", self.vacuum_combo)
         form.addRow("Condiciones:", self.condition_edit)
         form.addRow("Duración total:", self.duration_spin)
@@ -185,7 +190,10 @@ class ScheduledConfigWindow(PPGSuite):
         self.duration_warning.setWordWrap(True)
         self.duration_warning.setStyleSheet("color: #8a5a00; font-weight: bold;")
         form.addRow("", self.duration_warning)
+        form.addRow("", self.btn_save_animal_config)
         left.addWidget(capture_group)
+        self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
+        self.refresh_animal_dependent_controls()
 
         self.btn_start = QtWidgets.QPushButton("Iniciar bloque")
         self.btn_stop = QtWidgets.QPushButton("Parar")
@@ -243,6 +251,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.scheduled_step_index = 0
         self.scheduled_segments = []
         st.crotal_id = sanitize_id(self.crotal_edit.text())
+        st.animal_type = self.current_animal_type()
         pulse_prev = self.ensure_initial_pulse_or_confirm()
         if pulse_prev is None:
             return
@@ -405,7 +414,7 @@ class ScheduledConfigWindow(PPGSuite):
             )
         self.info.setText(self.info.text() + f"\nGuardadas {written} tomas independientes en la sesion.\n")
 
-    def segment_arrays(self, segment: ScheduledSegment) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def segment_arrays(self, segment: ScheduledSegment) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict[str, tuple[np.ndarray, np.ndarray]]]:
         st = self.state
         start = max(0, segment.start_sample)
         end = min(segment.end_sample if segment.end_sample is not None else len(st.t), len(st.t))
@@ -414,33 +423,37 @@ class ScheduledConfigWindow(PPGSuite):
         ir = np.asarray(st.ir[start:end], dtype=float)
         temp_c = np.asarray(st.temp_c[start:end], dtype=float)
         temp_raw = np.asarray(st.temp_raw[start:end], dtype=float)
-        temp_a0_c = np.asarray(st.temp_a0_c[start:end], dtype=float)
-        temp_a0_raw = np.asarray(st.temp_a0_raw[start:end], dtype=float)
-        temp_a1_c = np.asarray(st.temp_a1_c[start:end], dtype=float)
-        temp_a1_raw = np.asarray(st.temp_a1_raw[start:end], dtype=float)
+        channel_arrays = {
+            channel: (
+                np.asarray(getattr(st, f"temp_{channel.lower()}_c", [])[start:end], dtype=float),
+                np.asarray(getattr(st, f"temp_{channel.lower()}_raw", [])[start:end], dtype=float),
+            )
+            for channel in TEMP_CHANNELS
+        }
         if t.size:
             t = t - t[0]
-        return t, red, ir, temp_c, temp_raw, temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw
+        return t, red, ir, temp_c, temp_raw, channel_arrays
 
-    def temp_summary_for_arrays(self, t: np.ndarray, temp_c: np.ndarray, temp_raw: np.ndarray, temp_a0_c: np.ndarray | None = None, temp_a0_raw: np.ndarray | None = None, temp_a1_c: np.ndarray | None = None, temp_a1_raw: np.ndarray | None = None) -> dict[str, float | int]:
-        temp_a0_c = temp_c if temp_a0_c is None else temp_a0_c
-        temp_a0_raw = temp_raw if temp_a0_raw is None else temp_a0_raw
-        temp_a1_c = np.asarray([], dtype=float) if temp_a1_c is None else temp_a1_c
-        temp_a1_raw = np.asarray([], dtype=float) if temp_a1_raw is None else temp_a1_raw
+    def temp_summary_for_arrays(self, t: np.ndarray, temp_c: np.ndarray, temp_raw: np.ndarray, channel_arrays: dict[str, tuple[np.ndarray, np.ndarray]] | None = None) -> dict[str, float | int]:
+        channel_arrays = channel_arrays or {"A0": (temp_c, temp_raw)}
         primary = temperature_channel_summary(t, temp_c, temp_raw)
-        a0 = temperature_channel_summary(t, temp_a0_c, temp_a0_raw)
-        a1 = temperature_channel_summary(t, temp_a1_c, temp_a1_raw)
-        if self.state.temp_mapping == TEMP_MAPPING_INVERTED:
-            rt, lt = a1, a0
-        else:
-            rt, lt = a0, a1
-        return {
+        channel_summaries = {
+            channel: temperature_channel_summary(
+                t,
+                channel_arrays.get(channel, (np.asarray([], dtype=float), np.asarray([], dtype=float)))[0],
+                channel_arrays.get(channel, (np.asarray([], dtype=float), np.asarray([], dtype=float)))[1],
+            )
+            for channel in TEMP_CHANNELS
+        }
+        assignments = parse_temp_mapping(self.state.temp_mapping, self.state.animal_type)
+        position_summaries = {
+            position: channel_summaries.get(channel)
+            for channel, position in assignments.items()
+            if channel in channel_summaries
+        }
+        out = {
             "temp_samples": primary["samples"],
             "temp_raw_samples": primary["raw_samples"],
-            "temp_a0_samples": a0["samples"],
-            "temp_a0_raw_samples": a0["raw_samples"],
-            "temp_a1_samples": a1["samples"],
-            "temp_a1_raw_samples": a1["raw_samples"],
             "temp_c_last": primary["last"],
             "temp_c_mean": primary["mean"],
             "temp_c_min": primary["min"],
@@ -453,43 +466,38 @@ class ScheduledConfigWindow(PPGSuite):
             "temp_final_window_end_s": primary["final_window_end_s"],
             "temp_final_window_used": primary["final_window_used"],
             "temp_raw_last": primary["raw_last"],
-            "temp_a0_c_last": a0["last"],
-            "temp_a0_c_mean": a0["mean"],
-            "temp_a0_c_min": a0["min"],
-            "temp_a0_c_max": a0["max"],
-            "temp_a0_c_final_max_5s": a0["final_max_5s"],
-            "temp_a0_c_final_time_s": a0["final_time_s"],
-            "temp_a0_c_final_raw_at_max": a0["final_raw_at_max"],
-            "temp_a0_c_final_samples": a0["final_samples"],
-            "temp_a0_raw_last": a0["raw_last"],
-            "temp_a1_c_last": a1["last"],
-            "temp_a1_c_mean": a1["mean"],
-            "temp_a1_c_min": a1["min"],
-            "temp_a1_c_max": a1["max"],
-            "temp_a1_c_final_max_5s": a1["final_max_5s"],
-            "temp_a1_c_final_time_s": a1["final_time_s"],
-            "temp_a1_c_final_raw_at_max": a1["final_raw_at_max"],
-            "temp_a1_c_final_samples": a1["final_samples"],
-            "temp_a1_raw_last": a1["raw_last"],
-            "temp_rt_c_last": rt["last"],
-            "temp_rt_c_mean": rt["mean"],
-            "temp_rt_c_min": rt["min"],
-            "temp_rt_c_max": rt["max"],
-            "temp_rt_c_final_max_5s": rt["final_max_5s"],
-            "temp_rt_c_final_time_s": rt["final_time_s"],
-            "temp_rt_c_final_raw_at_max": rt["final_raw_at_max"],
-            "temp_rt_c_final_samples": rt["final_samples"],
-            "temp_rt_raw_last": rt["raw_last"],
-            "temp_lt_c_last": lt["last"],
-            "temp_lt_c_mean": lt["mean"],
-            "temp_lt_c_min": lt["min"],
-            "temp_lt_c_max": lt["max"],
-            "temp_lt_c_final_max_5s": lt["final_max_5s"],
-            "temp_lt_c_final_time_s": lt["final_time_s"],
-            "temp_lt_c_final_raw_at_max": lt["final_raw_at_max"],
-            "temp_lt_c_final_samples": lt["final_samples"],
-            "temp_lt_raw_last": lt["raw_last"],
         }
+        for channel in TEMP_CHANNELS:
+            summary = channel_summaries[channel]
+            prefix = f"temp_{channel.lower()}"
+            out.update({
+                f"{prefix}_samples": summary["samples"],
+                f"{prefix}_raw_samples": summary["raw_samples"],
+                f"{prefix}_c_last": summary["last"],
+                f"{prefix}_c_mean": summary["mean"],
+                f"{prefix}_c_min": summary["min"],
+                f"{prefix}_c_max": summary["max"],
+                f"{prefix}_c_final_max_5s": summary["final_max_5s"],
+                f"{prefix}_c_final_time_s": summary["final_time_s"],
+                f"{prefix}_c_final_raw_at_max": summary["final_raw_at_max"],
+                f"{prefix}_c_final_samples": summary["final_samples"],
+                f"{prefix}_raw_last": summary["raw_last"],
+            })
+        empty = temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float))
+        for position, prefix in POSITION_SUMMARY_PREFIXES.items():
+            summary = position_summaries.get(position) or empty
+            out.update({
+                f"{prefix}_c_last": summary["last"],
+                f"{prefix}_c_mean": summary["mean"],
+                f"{prefix}_c_min": summary["min"],
+                f"{prefix}_c_max": summary["max"],
+                f"{prefix}_c_final_max_5s": summary["final_max_5s"],
+                f"{prefix}_c_final_time_s": summary["final_time_s"],
+                f"{prefix}_c_final_raw_at_max": summary["final_raw_at_max"],
+                f"{prefix}_c_final_samples": summary["final_samples"],
+                f"{prefix}_raw_last": summary["raw_last"],
+            })
+        return out
 
     def save_signal_plot(self, path, t: np.ndarray, red: np.ndarray, ir: np.ndarray, analysis_cfg, title: str):
         width, height = 1100, 560
@@ -569,7 +577,7 @@ class ScheduledConfigWindow(PPGSuite):
 
     def save_segment_capture(self, segment: ScheduledSegment, reason: str) -> bool:
         st = self.state
-        t, red, ir, temp_c, temp_raw, temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw = self.segment_arrays(segment)
+        t, red, ir, temp_c, temp_raw, channel_arrays = self.segment_arrays(segment)
         if t.size < 2:
             return False
         step = segment.step
@@ -579,15 +587,30 @@ class ScheduledConfigWindow(PPGSuite):
         analysis_cfg = self.analysis_widget.get_config()
         metrics = score_and_merge_metrics(t, red, ir, step.config, analysis_cfg)
         blocks = block_bpm(t, ir, step.config, analysis_cfg, block_s=10)
-        temp = self.temp_summary_for_arrays(t, temp_c, temp_raw, temp_a0_c, temp_a0_raw, temp_a1_c, temp_a1_raw)
+        temp = self.temp_summary_for_arrays(t, temp_c, temp_raw, channel_arrays)
+        assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
+
+        def row_temperature_values(i: int) -> tuple[dict[str, tuple[float, float]], dict[str, tuple[float, float]]]:
+            channel_values: dict[str, tuple[float, float]] = {}
+            for channel in TEMP_CHANNELS:
+                values, raw_values = channel_arrays[channel]
+                channel_values[channel] = (
+                    values[i] if i < values.size else math.nan,
+                    raw_values[i] if i < raw_values.size else math.nan,
+                )
+            position_values = {
+                position: channel_values.get(channel, (math.nan, math.nan))
+                for channel, position in assignments.items()
+            }
+            return channel_values, position_values
 
         raw_file = RAW_DIR / f"raw_{base_name}.csv"
         with open(raw_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
-                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
-                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw",
+                "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
+                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
                 "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
                 "cfg_confirmacion", "system_time",
@@ -595,19 +618,18 @@ class ScheduledConfigWindow(PPGSuite):
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
-                ta0c = temp_a0_c[i] if i < temp_a0_c.size else math.nan
-                ta0r = temp_a0_raw[i] if i < temp_a0_raw.size else math.nan
-                ta1c = temp_a1_c[i] if i < temp_a1_c.size else math.nan
-                ta1r = temp_a1_raw[i] if i < temp_a1_raw.size else math.nan
-                if st.temp_mapping == TEMP_MAPPING_INVERTED:
-                    trtc, trtr, tltc, tltr = ta1c, ta1r, ta0c, ta0r
-                else:
-                    trtc, trtr, tltc, tltr = ta0c, ta0r, ta1c, ta1r
+                channel_values, position_values = row_temperature_values(i)
                 w.writerow([
-                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, i + 1, f"{t[i]:.6f}",
+                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.animal_type, st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
-                    fmt(ta0c, 2, ""), fmt(ta0r, 0, ""), fmt(ta1c, 2, ""), fmt(ta1r, 0, ""),
-                    fmt(trtc, 2, ""), fmt(trtr, 0, ""), fmt(tltc, 2, ""), fmt(tltr, 0, ""),
+                    fmt(channel_values["A0"][0], 2, ""), fmt(channel_values["A0"][1], 0, ""), fmt(channel_values["A1"][0], 2, ""), fmt(channel_values["A1"][1], 0, ""),
+                    fmt(channel_values["A2"][0], 2, ""), fmt(channel_values["A2"][1], 0, ""), fmt(channel_values["A3"][0], 2, ""), fmt(channel_values["A3"][1], 0, ""),
+                    fmt(position_values.get("RT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("LT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("LT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("FLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("FLT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("FRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("FRT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("RLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RLT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("RRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RRT", (math.nan, math.nan))[1], 0, ""),
                     step.config.red, step.config.ir, step.config.avg, step.config.rate, step.config.width, step.config.adc,
                     step.config.skip, 1 if step.config.debug else 0,
                     segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo,
@@ -629,28 +651,27 @@ class ScheduledConfigWindow(PPGSuite):
         with open(processed_file, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow([
-                "session_id", "id", "base_name", "modo", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
-                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw",
-                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw",
+                "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
+                "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
+                "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
                 tr = temp_raw[i] if i < temp_raw.size else math.nan
-                ta0c = temp_a0_c[i] if i < temp_a0_c.size else math.nan
-                ta0r = temp_a0_raw[i] if i < temp_a0_raw.size else math.nan
-                ta1c = temp_a1_c[i] if i < temp_a1_c.size else math.nan
-                ta1r = temp_a1_raw[i] if i < temp_a1_raw.size else math.nan
-                if st.temp_mapping == TEMP_MAPPING_INVERTED:
-                    trtc, trtr, tltc, tltr = ta1c, ta1r, ta0c, ta0r
-                else:
-                    trtc, trtr, tltc, tltr = ta0c, ta0r, ta1c, ta1r
+                channel_values, position_values = row_temperature_values(i)
                 w.writerow([
-                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, i + 1, f"{t[i]:.6f}",
+                    session_id, st.crotal_id, base_name, self.capture_mode_name(), st.animal_type, st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
-                    fmt(ta0c, 2, ""), fmt(ta0r, 0, ""), fmt(ta1c, 2, ""), fmt(ta1r, 0, ""),
-                    fmt(trtc, 2, ""), fmt(trtr, 0, ""), fmt(tltc, 2, ""), fmt(tltr, 0, ""),
+                    fmt(channel_values["A0"][0], 2, ""), fmt(channel_values["A0"][1], 0, ""), fmt(channel_values["A1"][0], 2, ""), fmt(channel_values["A1"][1], 0, ""),
+                    fmt(channel_values["A2"][0], 2, ""), fmt(channel_values["A2"][1], 0, ""), fmt(channel_values["A3"][0], 2, ""), fmt(channel_values["A3"][1], 0, ""),
+                    fmt(position_values.get("RT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("LT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("LT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("FLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("FLT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("FRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("FRT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("RLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RLT", (math.nan, math.nan))[1], 0, ""),
+                    fmt(position_values.get("RRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RRT", (math.nan, math.nan))[1], 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     "", "", "", "",
                 ])
@@ -671,9 +692,12 @@ class ScheduledConfigWindow(PPGSuite):
                 "id": st.crotal_id,
                 "base_name": base_name,
                 "mode": self.capture_mode_name(),
+                "animal_type": st.animal_type,
+                "animal_label": animal_label(st.animal_type),
                 "measurement_condition": st.measurement_condition,
                 "udder_side": st.udder_side,
                 "temp_mapping": st.temp_mapping,
+                "temp_assignments": parse_temp_mapping(st.temp_mapping, st.animal_type),
                 "temp_primary_channel": st.temp_primary_channel,
                 "vacuum_condition": st.vacuum_condition,
                 "config_label": step.label,
@@ -703,7 +727,7 @@ class ScheduledConfigWindow(PPGSuite):
         now = datetime.now()
         self.session_writer.writerow([
             session_id, st.crotal_id, base_name, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
-            self.capture_mode_name(), st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, reason, fmt(self.scheduled_step_duration_s, 1, ""),
+            self.capture_mode_name(), st.measurement_condition, st.animal_type, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, reason, fmt(self.scheduled_step_duration_s, 1, ""),
             int(t.size), fmt(metrics.duration_s, 3, ""), fmt(metrics.hz, 2, ""), fmt(metrics.bpm, 1, ""),
             fmt(metrics.bpm_peak, 1, ""), fmt(metrics.bpm_fft, 1, ""), fmt(metrics.bpm_autocorr, 1, ""),
             fmt(metrics.quality, 1, ""), metrics.quality_label, fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
@@ -713,6 +737,12 @@ class ScheduledConfigWindow(PPGSuite):
             fmt(temp["temp_lt_c_final_max_5s"], 2, ""), fmt(temp["temp_lt_c_final_time_s"], 3, ""), fmt(temp["temp_lt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_lt_c_last"], 2, ""), fmt(temp["temp_lt_c_mean"], 2, ""), fmt(temp["temp_lt_raw_last"], 0, ""),
             fmt(temp["temp_a0_c_final_max_5s"], 2, ""), fmt(temp["temp_a0_c_final_time_s"], 3, ""), fmt(temp["temp_a0_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a0_c_last"], 2, ""), fmt(temp["temp_a0_c_mean"], 2, ""), fmt(temp["temp_a0_raw_last"], 0, ""),
             fmt(temp["temp_a1_c_final_max_5s"], 2, ""), fmt(temp["temp_a1_c_final_time_s"], 3, ""), fmt(temp["temp_a1_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a1_c_last"], 2, ""), fmt(temp["temp_a1_c_mean"], 2, ""), fmt(temp["temp_a1_raw_last"], 0, ""),
+            fmt(temp["temp_a2_c_final_max_5s"], 2, ""), fmt(temp["temp_a2_c_final_time_s"], 3, ""), fmt(temp["temp_a2_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a2_c_last"], 2, ""), fmt(temp["temp_a2_c_mean"], 2, ""), fmt(temp["temp_a2_raw_last"], 0, ""),
+            fmt(temp["temp_a3_c_final_max_5s"], 2, ""), fmt(temp["temp_a3_c_final_time_s"], 3, ""), fmt(temp["temp_a3_c_final_raw_at_max"], 0, ""), fmt(temp["temp_a3_c_last"], 2, ""), fmt(temp["temp_a3_c_mean"], 2, ""), fmt(temp["temp_a3_raw_last"], 0, ""),
+            fmt(temp["temp_flt_c_final_max_5s"], 2, ""), fmt(temp["temp_flt_c_final_time_s"], 3, ""), fmt(temp["temp_flt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_flt_c_last"], 2, ""), fmt(temp["temp_flt_c_mean"], 2, ""), fmt(temp["temp_flt_raw_last"], 0, ""),
+            fmt(temp["temp_frt_c_final_max_5s"], 2, ""), fmt(temp["temp_frt_c_final_time_s"], 3, ""), fmt(temp["temp_frt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_frt_c_last"], 2, ""), fmt(temp["temp_frt_c_mean"], 2, ""), fmt(temp["temp_frt_raw_last"], 0, ""),
+            fmt(temp["temp_rlt_c_final_max_5s"], 2, ""), fmt(temp["temp_rlt_c_final_time_s"], 3, ""), fmt(temp["temp_rlt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rlt_c_last"], 2, ""), fmt(temp["temp_rlt_c_mean"], 2, ""), fmt(temp["temp_rlt_raw_last"], 0, ""),
+            fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(metrics.pi_ir_pct, 4, ""), fmt(metrics.pi_red_pct, 4, ""), fmt(metrics.artifact_ir_pct, 1, ""),
             fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, segment.pulse_prev,
             segment.pulse_final_pulsio, segment.pulse_final_fonendo, raw_file.name, processed_file.name, plot_file.name,
@@ -1017,7 +1047,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         return "; ".join(notes)
 
     def _evaluate_experiment_segment(self, segment: ScheduledSegment) -> dict[str, float | str | int]:
-        t, red, ir, _temp_c, _temp_raw, _temp_a0_c, _temp_a0_raw, _temp_a1_c, _temp_a1_raw = self.segment_arrays(segment)
+        t, red, ir, _temp_c, _temp_raw, _channel_arrays = self.segment_arrays(segment)
         metrics = score_and_merge_metrics(t, red, ir, segment.step.config, self.analysis_widget.get_config())
         ref_avg, ref_count = _ref_average(segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo)
         bpm = metrics.bpm_fft if math.isfinite(metrics.bpm_fft) else metrics.bpm

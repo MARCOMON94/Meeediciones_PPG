@@ -4,7 +4,12 @@ import csv
 import html
 import json
 import math
+import shutil
+import subprocess
+import urllib.parse
+import zipfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -12,8 +17,9 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
+from ..animal_config import animal_label, display_mapping
 from ..models import AnalysisConfig, SensorConfig
-from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
+from ..paths import CONFIG_DIR, DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..processing import score_and_merge_metrics
 from ..utils import fmt
 
@@ -43,6 +49,7 @@ HEADER_TOOLTIPS = {
     "Calidad media": "Media de la calidad guardada en las tomas visibles. Es orientativa y depende del cribado aplicado.",
     "Hora": "Hora registrada para la toma.",
     "Animal": "Identificador introducido para el animal o sujeto de la toma.",
+    "Especie": "Tipo de animal seleccionado: oveja, cabra o vaca.",
     "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
     "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
     "Sensor": "Sensor indicado para la toma: derecha o izquierda.",
@@ -69,12 +76,17 @@ HEADER_TOOLTIPS = {
     "Temp LT final": "Maximo independiente de la ubre izquierda en la ventana final 1-6 s.",
     "Temp LT ult.": "Ultima temperatura calculada para la ubre izquierda.",
     "Temp LT raw": "Raw asociado a la ubre izquierda.",
+    "Temp FLT final": "Maximo de temperatura en sensor delantero izquierdo de vaca.",
+    "Temp FRT final": "Maximo de temperatura en sensor delantero derecho de vaca.",
+    "Temp RLT final": "Maximo de temperatura en sensor trasero izquierdo de vaca.",
+    "Temp RRT final": "Maximo de temperatura en sensor trasero derecho de vaca.",
     "Temp A0 final": "Maximo calculado desde la fuente analogica A0 en la ventana final 1-6 s.",
     "Temp A0 ult.": "Ultima temperatura calculada desde la fuente analogica A0.",
     "Temp A0 raw": "Ultimo valor bruto ADC de la fuente analogica A0.",
     "Temp A1 final": "Maximo calculado desde la fuente analogica A1 en la ventana final 1-6 s.",
     "Temp A1 ult.": "Ultima temperatura calculada desde la fuente analogica A1.",
     "Temp A1 raw": "Ultimo valor bruto ADC de la fuente analogica A1.",
+    "Raw": "Archivo raw asociado a la toma.",
     "Calidad": "Puntuacion global interna de la toma tras BPM, PI, artefactos, saturacion y cribado.",
     "Contacto": "Etiqueta de contacto/perfusion derivada del nivel DC e indice de perfusion IR.",
     "PI IR %": "Indice de perfusion IR: componente pulsatile AC respecto al nivel DC. Cuanto mayor, mas visible es el pulso.",
@@ -108,6 +120,10 @@ HEADER_TOOLTIPS = {
     "Temp max tramo": "Temperatura maxima primaria disponible dentro del tramo.",
     "Temp RT max tramo": "Temperatura maxima de la ubre derecha dentro del tramo.",
     "Temp LT max tramo": "Temperatura maxima de la ubre izquierda dentro del tramo.",
+    "Temp FLT max tramo": "Temperatura maxima del sensor delantero izquierdo dentro del tramo.",
+    "Temp FRT max tramo": "Temperatura maxima del sensor delantero derecho dentro del tramo.",
+    "Temp RLT max tramo": "Temperatura maxima del sensor trasero izquierdo dentro del tramo.",
+    "Temp RRT max tramo": "Temperatura maxima del sensor trasero derecho dentro del tramo.",
     "Muestras tramo": "Numero de muestras dentro del tramo temporal.",
 }
 
@@ -302,16 +318,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_headers = [
-        "Hora", "Animal", "Modo", "Sensor", "Termometros", "Canal temp", "Medicion", "Configuracion", "Estado", "Pulso ref.", "Dif. BPM-ref",
-        "BPM medio", "BPM picos", "BPM FFT", "BPM autocorr", "Oxigeno medio", "Ratio R", "Temp final", "Temp ult.",
-        "Temp RT final", "Temp RT ult.", "Temp RT raw", "Temp LT final", "Temp LT ult.", "Temp LT raw",
-        "Temp A0 final", "Temp A0 ult.", "Temp A0 raw", "Temp A1 final", "Temp A1 ult.", "Temp A1 raw",
-        "Resp/min (experimental)", "Calidad resp.", "Temp raw", "Calidad", "Contacto", "PI IR %", "PI RED %", "Artef. IR %",
-        "Artef. RED %", "Sat. %", "RED", "IR", "AVG", "RATE", "WIDTH", "ADC",
-        "Duracion", "Hz", "Muestras", "Pulso previo", "Pulso final pulsio", "Pulso final fonendo",
+        "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
+        "Pulso ref.", "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
+        "Temp final", "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
+        "Duracion", "Hz", "Muestras", "Raw",
     ]
     files_headers = ["tipo", "archivo", "filas", "ruta"]
-    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp max tramo", "Temp RT max tramo", "Temp LT max tramo", "Muestras tramo"]
+    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp max tramo", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "Muestras tramo"]
 
     def __init__(self):
         super().__init__()
@@ -486,15 +499,30 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.detail_tabs.addTab(self.params, "Parametros dispositivo")
 
         self.files_model = DictTableModel(self.files_headers)
+        files_page = QtWidgets.QWidget()
+        files_layout = QtWidgets.QVBoxLayout(files_page)
+        files_buttons = QtWidgets.QHBoxLayout()
+        self.btn_open_selected_files = QtWidgets.QPushButton("Abrir seleccion")
+        self.btn_copy_file_paths = QtWidgets.QPushButton("Copiar rutas")
+        self.btn_prepare_gmail = QtWidgets.QPushButton("Preparar Gmail")
+        files_buttons.addWidget(self.btn_open_selected_files)
+        files_buttons.addWidget(self.btn_copy_file_paths)
+        files_buttons.addWidget(self.btn_prepare_gmail)
+        files_buttons.addStretch(1)
+        files_layout.addLayout(files_buttons)
         self.files_table = QtWidgets.QTableView()
         self.files_table.setModel(self.files_model)
         self.files_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self.files_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.files_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
         self.files_table.setAlternatingRowColors(True)
         self.files_table.verticalHeader().setVisible(False)
         self.files_table.setSortingEnabled(True)
         self.files_table.doubleClicked.connect(self.open_file_from_files_table)
-        self.detail_tabs.addTab(self.files_table, "Archivos")
+        files_layout.addWidget(self.files_table)
+        self.btn_open_selected_files.clicked.connect(self.open_selected_files)
+        self.btn_copy_file_paths.clicked.connect(self.copy_selected_file_paths)
+        self.btn_prepare_gmail.clicked.connect(self.prepare_gmail_for_selected_files)
+        self.detail_tabs.addTab(files_page, "Archivos")
 
     def pick_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Seleccionar carpeta con CSV", str(RESULTS_DIR))
@@ -571,6 +599,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         cap.row.setdefault("base_name", str(data.get("base_name") or cap.base_name))
         cap.row.setdefault("id", str(data.get("id") or ""))
         cap.row.setdefault("modo", str(data.get("mode") or ""))
+        cap.row.setdefault("animal_type", str(data.get("animal_type") or ""))
         cap.row.setdefault("condiciones_medida", str(data.get("measurement_condition") or ""))
         cap.row.setdefault("ubre", str(data.get("udder_side") or data.get("ubre") or ""))
         cap.row.setdefault("temp_mapping", str(data.get("temp_mapping") or ""))
@@ -632,6 +661,34 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "temp_a1_c_media": temp.get("temp_a1_c_mean"),
             "temp_a1_c_ultima": temp.get("temp_a1_c_last"),
             "temp_a1_raw_ultima": temp.get("temp_a1_raw_last"),
+            "temp_a2_c_final_max_5s": temp.get("temp_a2_c_final_max_5s"),
+            "temp_a2_c_final_time_s": temp.get("temp_a2_c_final_time_s"),
+            "temp_a2_c_final_raw_at_max": temp.get("temp_a2_c_final_raw_at_max"),
+            "temp_a2_c_media": temp.get("temp_a2_c_mean"),
+            "temp_a2_c_ultima": temp.get("temp_a2_c_last"),
+            "temp_a2_raw_ultima": temp.get("temp_a2_raw_last"),
+            "temp_a3_c_final_max_5s": temp.get("temp_a3_c_final_max_5s"),
+            "temp_a3_c_final_time_s": temp.get("temp_a3_c_final_time_s"),
+            "temp_a3_c_final_raw_at_max": temp.get("temp_a3_c_final_raw_at_max"),
+            "temp_a3_c_media": temp.get("temp_a3_c_mean"),
+            "temp_a3_c_ultima": temp.get("temp_a3_c_last"),
+            "temp_a3_raw_ultima": temp.get("temp_a3_raw_last"),
+            "temp_flt_c_final_max_5s": temp.get("temp_flt_c_final_max_5s"),
+            "temp_flt_c_media": temp.get("temp_flt_c_mean"),
+            "temp_flt_c_ultima": temp.get("temp_flt_c_last"),
+            "temp_flt_raw_ultima": temp.get("temp_flt_raw_last"),
+            "temp_frt_c_final_max_5s": temp.get("temp_frt_c_final_max_5s"),
+            "temp_frt_c_media": temp.get("temp_frt_c_mean"),
+            "temp_frt_c_ultima": temp.get("temp_frt_c_last"),
+            "temp_frt_raw_ultima": temp.get("temp_frt_raw_last"),
+            "temp_rlt_c_final_max_5s": temp.get("temp_rlt_c_final_max_5s"),
+            "temp_rlt_c_media": temp.get("temp_rlt_c_mean"),
+            "temp_rlt_c_ultima": temp.get("temp_rlt_c_last"),
+            "temp_rlt_raw_ultima": temp.get("temp_rlt_raw_last"),
+            "temp_rrt_c_final_max_5s": temp.get("temp_rrt_c_final_max_5s"),
+            "temp_rrt_c_media": temp.get("temp_rrt_c_mean"),
+            "temp_rrt_c_ultima": temp.get("temp_rrt_c_last"),
+            "temp_rrt_raw_ultima": temp.get("temp_rrt_raw_last"),
             "artefactos_ir_pct": metrics.get("artifact_ir_pct"),
             "artefactos_red_pct": metrics.get("artifact_red_pct"),
             "pi_ir_pct": metrics.get("pi_ir_pct"),
@@ -867,9 +924,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         return {
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
+            "Especie": animal_label(cap.value("animal_type")) if cap.value("animal_type") else "",
             "Modo": _mode_label(cap.value("modo")),
             "Sensor": cap.value("ubre"),
-            "Termometros": self._display_temp_mapping(cap.value("temp_mapping")),
+            "Termometros": self._display_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type")),
             "Canal temp": cap.value("temp_primary_channel"),
             "Medicion": cap.value("medicion_vacio"),
             "Configuracion": cap.value("config_label"),
@@ -892,6 +950,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Temp LT final": fmt(_as_float(_cap_temp_final(cap, "temp_lt_c_final_max_5s", "temp_lt_c_media", "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
             "Temp LT ult.": fmt(_as_float(_cap_first(cap, "temp_lt_c_ultima", "temp_a1_c_ultima")), 1, ""),
             "Temp LT raw": fmt(_as_float(_cap_first(cap, "temp_lt_raw_ultima", "temp_a1_raw_ultima")), 0, ""),
+            "Temp FLT final": fmt(_as_float(_cap_temp_final(cap, "temp_flt_c_final_max_5s", "temp_flt_c_media")), 1, ""),
+            "Temp FRT final": fmt(_as_float(_cap_temp_final(cap, "temp_frt_c_final_max_5s", "temp_frt_c_media")), 1, ""),
+            "Temp RLT final": fmt(_as_float(_cap_temp_final(cap, "temp_rlt_c_final_max_5s", "temp_rlt_c_media")), 1, ""),
+            "Temp RRT final": fmt(_as_float(_cap_temp_final(cap, "temp_rrt_c_final_max_5s", "temp_rrt_c_media")), 1, ""),
             "Temp A0 final": fmt(_as_float(_cap_temp_final(cap, "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s", "temp_c_media")), 1, ""),
             "Temp A0 ult.": fmt(_as_float(_cap_first(cap, "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
             "Temp A0 raw": fmt(_as_float(_cap_first(cap, "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
@@ -918,15 +980,14 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Pulso previo": cap.value("pulso_previo"),
             "Pulso final pulsio": cap.value("pulso_final_pulsio"),
             "Pulso final fonendo": cap.value("pulso_final_fonendo"),
+            "Raw": cap.files.get("raw", Path(cap.value("raw") or "")).name if (cap.files.get("raw") or cap.value("raw")) else "",
         }
 
-    def _display_temp_mapping(self, value: str) -> str:
+    def _display_temp_mapping(self, value: str, animal_type: str = "") -> str:
         mapping = (value or "").strip()
-        if mapping == "A0_RT_A1_LT":
-            return "A0 derecha / A1 izquierda"
-        if mapping == "A0_LT_A1_RT":
-            return "A0 izquierda / A1 derecha"
-        return mapping
+        if mapping:
+            return display_mapping(mapping, animal_type)
+        return ""
 
     def select_capture(self):
         if self.current_session is None:
@@ -1012,6 +1073,83 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         path_text = self.files_model.rows[index.row()].get("ruta", "")
         self.open_path(Path(path_text) if path_text else None)
 
+    def selected_file_paths(self) -> list[Path]:
+        indexes = self.files_table.selectionModel().selectedRows() if self.files_table.selectionModel() else []
+        paths: list[Path] = []
+        for index in indexes:
+            if 0 <= index.row() < len(self.files_model.rows):
+                path_text = self.files_model.rows[index.row()].get("ruta", "")
+                if path_text:
+                    path = Path(path_text)
+                    if path.exists() and path not in paths:
+                        paths.append(path)
+        if not paths and self.current_capture:
+            raw = self.current_capture.files.get("raw")
+            if raw and raw.exists():
+                paths.append(raw)
+        return paths
+
+    def open_selected_files(self):
+        for path in self.selected_file_paths():
+            self.open_path(path)
+
+    def copy_selected_file_paths(self):
+        paths = self.selected_file_paths()
+        if not paths:
+            QtWidgets.QMessageBox.information(self, "Archivos", "No hay archivos seleccionados.")
+            return
+        QtWidgets.QApplication.clipboard().setText("\n".join(str(path) for path in paths))
+        QtWidgets.QMessageBox.information(self, "Archivos", f"Copiadas {len(paths)} ruta(s) al portapapeles.")
+
+    def prepare_gmail_for_selected_files(self):
+        paths = self.selected_file_paths()
+        if not paths:
+            QtWidgets.QMessageBox.information(self, "Gmail", "Selecciona primero uno o varios archivos en la pestaña Archivos.")
+            return
+        DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        animal_raw = self.current_capture.value("id") if self.current_capture else "seleccion"
+        animal = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in (animal_raw or "seleccion"))[:60]
+        zip_path = DOCUMENTS_DIR / f"raws_para_correo_{animal}_{stamp}.zip"
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in paths:
+                zf.write(path, arcname=path.name)
+        QtWidgets.QApplication.clipboard().setText(str(zip_path))
+        subject = f"Raws mtestv2 {animal}"
+        body = (
+            "Adjunto ZIP con los archivos seleccionados de mtestv2.\n\n"
+            f"Archivo preparado: {zip_path}\n"
+            "La ruta del ZIP queda copiada al portapapeles para adjuntarla en Gmail."
+        )
+        url = "https://mail.google.com/mail/?view=cm&fs=1&su={}&body={}".format(
+            urllib.parse.quote(subject),
+            urllib.parse.quote(body),
+        )
+        opened = self.open_chrome_url(url)
+        detail = (
+            f"Se ha creado el ZIP:\n{zip_path}\n\n"
+            "Gmail no permite adjuntar archivos locales automáticamente desde una URL de Chrome. "
+            "La ruta del ZIP queda copiada al portapapeles para pegarla en el selector de adjuntos."
+        )
+        if not opened:
+            detail += "\n\nNo pude abrir Chrome automáticamente; abre Gmail y adjunta ese ZIP."
+        QtWidgets.QMessageBox.information(self, "Preparar Gmail", detail)
+
+    def open_chrome_url(self, url: str) -> bool:
+        candidates = [
+            shutil.which("chrome"),
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                try:
+                    subprocess.Popen([candidate, url])
+                    return True
+                except OSError:
+                    continue
+        return bool(QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)))
+
     def _summary_html(self, cap: CaptureRecord) -> str:
         quality = _as_float(cap.value("calidad"))
         bpm = _as_float(cap.value("bpm"))
@@ -1056,12 +1194,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
         fields = [
             ("Animal", cap.value("id") or "-"),
+            ("Especie", animal_label(cap.value("animal_type")) if cap.value("animal_type") else "-"),
             ("Modo de recogida", _mode_label(cap.value("modo")) or "-"),
             ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip() or "-"),
             ("Configuracion", cap.value("config_label") or "-"),
             ("Descripcion configuracion", cap.value("config_description") or "-"),
             ("Sensor", cap.value("ubre") or "-"),
-            ("Termometros", self._display_temp_mapping(cap.value("temp_mapping")) or "-"),
+            ("Termometros", self._display_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type")) or "-"),
             ("Canal temp primario", cap.value("temp_primary_channel") or "-"),
             ("Medicion", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
@@ -1083,6 +1222,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Temperatura LT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_lt_c_final_max_5s', 'temp_lt_c_media', 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_lt_c_ultima', 'temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_lt_raw_ultima', 'temp_a1_raw_ultima')), 0, '-')}"),
             ("Temperatura A0 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
             ("Temperatura A1 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a1_raw_ultima')), 0, '-')}"),
+            ("Temperatura A2 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a2_c_final_max_5s', 'temp_a2_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a2_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a2_raw_ultima')), 0, '-')}"),
+            ("Temperatura A3 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a3_c_final_max_5s', 'temp_a3_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a3_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a3_raw_ultima')), 0, '-')}"),
+            ("Vaca FLT / FRT final", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_flt_c_final_max_5s', 'temp_flt_c_media')), 2, '-')} / {fmt(_as_float(_cap_temp_final(cap, 'temp_frt_c_final_max_5s', 'temp_frt_c_media')), 2, '-')} C"),
+            ("Vaca RLT / RRT final", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_rlt_c_final_max_5s', 'temp_rlt_c_media')), 2, '-')} / {fmt(_as_float(_cap_temp_final(cap, 'temp_rrt_c_final_max_5s', 'temp_rrt_c_media')), 2, '-')} C"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
@@ -1205,6 +1348,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         temp_values = self._temporal_series(source_rows, "temp_c")
         temp_rt_values = self._temporal_series_with_fallback(source_rows, "temp_rt_c", "temp_a0_c", "temp_c")
         temp_lt_values = self._temporal_series_with_fallback(source_rows, "temp_lt_c", "temp_a1_c")
+        temp_flt_values = self._temporal_series(source_rows, "temp_flt_c")
+        temp_frt_values = self._temporal_series(source_rows, "temp_frt_c")
+        temp_rlt_values = self._temporal_series(source_rows, "temp_rlt_c")
+        temp_rrt_values = self._temporal_series(source_rows, "temp_rrt_c")
 
         table_rows: list[dict[str, str]] = []
         centers: list[float] = []
@@ -1234,6 +1381,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 temp = self._masked_max(temp_values, mask)
                 temp_rt = self._masked_max(temp_rt_values, mask)
                 temp_lt = self._masked_max(temp_lt_values, mask)
+                temp_flt = self._masked_max(temp_flt_values, mask)
+                temp_frt = self._masked_max(temp_frt_values, mask)
+                temp_rlt = self._masked_max(temp_rlt_values, mask)
+                temp_rrt = self._masked_max(temp_rrt_values, mask)
                 metrics = self._metrics_for_temporal_mask(rel_t, red_values, ir_values, mask, sensor_cfg, analysis_cfg)
                 bpm_tramo = metrics.bpm if np.isfinite(metrics.bpm) else bpm_roll
                 spo2 = metrics.spo2 if np.isfinite(metrics.spo2) else spo2
@@ -1246,6 +1397,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 temp = math.nan
                 temp_rt = math.nan
                 temp_lt = math.nan
+                temp_flt = math.nan
+                temp_frt = math.nan
+                temp_rlt = math.nan
+                temp_rrt = math.nan
             bpm_10s = block_bpm[idx] if idx < len(block_bpm) else math.nan
             if not np.isfinite(bpm_10s) and np.isfinite(bpm_tramo):
                 bpm_10s = bpm_tramo
@@ -1270,6 +1425,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 "Temp max tramo": fmt(temp, 2, ""),
                 "Temp RT max tramo": fmt(temp_rt, 2, ""),
                 "Temp LT max tramo": fmt(temp_lt, 2, ""),
+                "Temp FLT max tramo": fmt(temp_flt, 2, ""),
+                "Temp FRT max tramo": fmt(temp_frt, 2, ""),
+                "Temp RLT max tramo": fmt(temp_rlt, 2, ""),
+                "Temp RRT max tramo": fmt(temp_rrt, 2, ""),
                 "Muestras tramo": str(samples),
             })
 
