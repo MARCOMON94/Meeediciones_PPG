@@ -6,6 +6,7 @@ import json
 import math
 import threading
 import time
+import unicodedata
 import wave
 from datetime import datetime
 from pathlib import Path
@@ -84,14 +85,80 @@ class VacuumExperimentWindow(PPGSuite):
         audio_layout = QtWidgets.QGridLayout(audio_group)
         self.audio_device_combo = QtWidgets.QComboBox()
         self.btn_refresh_audio = QtWidgets.QPushButton("Refrescar")
+        self.btn_test_audio = QtWidgets.QPushButton("Probar micro")
         self.audio_status_label = QtWidgets.QLabel("Microfono no comprobado")
         self.audio_status_label.setWordWrap(True)
         audio_layout.addWidget(self.audio_device_combo, 0, 0, 1, 2)
-        audio_layout.addWidget(self.btn_refresh_audio, 1, 0, 1, 2)
+        audio_layout.addWidget(self.btn_refresh_audio, 1, 0)
+        audio_layout.addWidget(self.btn_test_audio, 1, 1)
         audio_layout.addWidget(self.audio_status_label, 2, 0, 1, 2)
         self.btn_refresh_audio.clicked.connect(self.refresh_audio_devices)
+        self.btn_test_audio.clicked.connect(self.test_audio_device)
         self.audio_device_combo.currentIndexChanged.connect(self.select_audio_device)
         left_layout.insertWidget(1, audio_group)
+
+    def _sounddevice_default_input(self, sd) -> int | None:
+        try:
+            default = sd.default.device
+        except Exception:
+            return None
+        try:
+            value = default[0] if isinstance(default, (list, tuple)) else default
+            if value is None:
+                return None
+            idx = int(value)
+        except (TypeError, ValueError):
+            return None
+        return idx if idx >= 0 else None
+
+    def _sounddevice_hostapi_inputs(self, sd) -> tuple[list[dict], set[int]]:
+        try:
+            hostapis = list(sd.query_hostapis())
+        except Exception:
+            return [], set()
+        default_inputs: set[int] = set()
+        for api in hostapis:
+            try:
+                idx = int(api.get("default_input_device", -1))
+            except (TypeError, ValueError):
+                continue
+            if idx >= 0:
+                default_inputs.add(idx)
+        return hostapis, default_inputs
+
+    def _sounddevice_hostapi_name(self, hostapis: list[dict], device: dict) -> str:
+        try:
+            hostapi_idx = int(device.get("hostapi", -1))
+        except (TypeError, ValueError):
+            return ""
+        if 0 <= hostapi_idx < len(hostapis):
+            return " ".join(str(hostapis[hostapi_idx].get("name", "")).split())
+        return ""
+
+    def _clean_audio_device_name(self, raw_name: object, idx: int) -> str:
+        name = " ".join(str(raw_name or f"Microfono {idx}").split())
+        if ";(" in name:
+            prefix = name.split("(@", 1)[0].strip()
+            friendly = name.rsplit(";(", 1)[-1].rstrip(")").strip()
+            if friendly:
+                return f"{prefix} ({friendly})" if prefix else friendly
+        return name
+
+    def _audio_device_score(self, name: str, *, is_default: bool, is_api_default: bool) -> int:
+        lower = name.lower()
+        plain = unicodedata.normalize("NFKD", lower).encode("ascii", "ignore").decode("ascii")
+        score = 0
+        if is_default:
+            score += 1000
+        if "mic" in plain or "micro" in plain or "microfono" in plain:
+            score += 500
+        if "input" in plain or "entrada" in plain:
+            score += 80
+        if is_api_default:
+            score += 40
+        if "linea" in plain or "mezcla" in plain or "stereo mix" in plain:
+            score -= 300
+        return score
 
     def refresh_audio_devices(self):
         if not hasattr(self, "audio_device_combo"):
@@ -100,42 +167,79 @@ class VacuumExperimentWindow(PPGSuite):
         self.audio_device_combo.clear()
         self.audio_device_index = None
         self.audio_device_name = ""
+        status_text = "Microfono no comprobado"
         try:
             import sounddevice as sd
 
-            devices = sd.query_devices()
-            default_input = sd.default.device[0] if sd.default.device else None
-            first_input_row = -1
+            devices = list(sd.query_devices())
+            hostapis, api_default_inputs = self._sounddevice_hostapi_inputs(sd)
+            default_input = self._sounddevice_default_input(sd)
+            fallback_row = -1
+            preferred_row = -1
+            preferred_score = -10_000
             for idx, dev in enumerate(devices):
                 max_inputs = int(dev.get("max_input_channels", 0))
                 if max_inputs <= 0:
                     continue
-                name = " ".join(str(dev.get("name", f"Microfono {idx}")).split())
-                rate = int(float(dev.get("default_samplerate", self.audio_samplerate) or self.audio_samplerate))
+                name = self._clean_audio_device_name(dev.get("name", f"Microfono {idx}"), idx)
+                try:
+                    rate = int(float(dev.get("default_samplerate", self.audio_samplerate) or self.audio_samplerate))
+                except (TypeError, ValueError):
+                    rate = self.audio_samplerate
+                tags: list[str] = []
+                is_default = idx == default_input
+                is_api_default = idx in api_default_inputs
+                if is_default:
+                    tags.append("predeterminado")
+                elif is_api_default:
+                    tags.append("pred. sistema")
+                score = self._audio_device_score(name, is_default=is_default, is_api_default=is_api_default)
+                if score >= 500 and not is_default:
+                    tags.append("probable micro")
+                hostapi_name = self._sounddevice_hostapi_name(hostapis, dev)
+                if hostapi_name:
+                    tags.append(hostapi_name)
                 label = f"{idx} | {name} ({max_inputs} canal/es, {rate} Hz)"
-                self.audio_device_combo.addItem(label, {"index": idx, "samplerate": rate, "name": name})
-                if first_input_row < 0:
-                    first_input_row = self.audio_device_combo.count() - 1
-                if default_input == idx:
-                    self.audio_device_combo.setCurrentIndex(self.audio_device_combo.count() - 1)
+                if tags:
+                    label += f" | {', '.join(tags)}"
+                self.audio_device_combo.addItem(
+                    label,
+                    {
+                        "index": idx,
+                        "samplerate": rate,
+                        "name": name,
+                        "is_default": is_default,
+                        "is_api_default": is_api_default,
+                        "score": score,
+                    },
+                )
+                row = self.audio_device_combo.count() - 1
+                if fallback_row < 0:
+                    fallback_row = row
+                if score > preferred_score:
+                    preferred_row = row
+                    preferred_score = score
             if self.audio_device_combo.count() == 0:
                 self.audio_device_combo.addItem("Sin microfonos de entrada", None)
-                self.audio_status_label.setText("No se han encontrado microfonos de entrada.")
-            elif self.audio_device_combo.currentIndex() < 0 and first_input_row >= 0:
-                self.audio_device_combo.setCurrentIndex(first_input_row)
-                self.audio_status_label.setText("Microfono listo.")
+                status_text = "No se han encontrado microfonos de entrada."
             else:
-                self.audio_status_label.setText("Microfono listo.")
+                selected_row = preferred_row if preferred_row >= 0 else fallback_row
+                self.audio_device_combo.setCurrentIndex(selected_row)
+                selected = self.audio_device_combo.itemData(selected_row) or {}
+                selected_name = str(selected.get("name") or self.audio_device_combo.currentText())
+                default_note = "predeterminado" if selected.get("is_default") else "entrada disponible"
+                status_text = f"Microfono listo: {selected_name} ({default_note})."
         except Exception as exc:
             self.audio_device_combo.addItem("Audio no disponible", None)
-            self.audio_status_label.setText(f"No se pudo listar microfonos: {exc}")
+            status_text = f"No se pudo listar microfonos: {exc}"
             self.audio_status = f"audio no disponible: {exc}"
             log.warning("No se pudieron listar microfonos: %s", exc)
         finally:
             self.audio_device_combo.blockSignals(False)
-            self.select_audio_device()
+            self.select_audio_device(update_label=False)
+            self.audio_status_label.setText(status_text)
 
-    def select_audio_device(self):
+    def select_audio_device(self, *_args, update_label: bool = True):
         if not hasattr(self, "audio_device_combo"):
             return
         data = self.audio_device_combo.currentData()
@@ -147,6 +251,43 @@ class VacuumExperimentWindow(PPGSuite):
             self.audio_device_index = None
             self.audio_samplerate = 44100
             self.audio_device_name = ""
+        if update_label and hasattr(self, "audio_status_label") and self.audio_stream is None:
+            if self.audio_device_name:
+                self.audio_status_label.setText(f"Microfono seleccionado: {self.audio_device_name}")
+            else:
+                self.audio_status_label.setText("No hay microfono seleccionado.")
+
+    def test_audio_device(self):
+        self.select_audio_device(update_label=False)
+        if self.audio_device_index is None:
+            QtWidgets.QMessageBox.warning(self, "Microfono", "No hay microfono seleccionado.")
+            return
+        try:
+            import sounddevice as sd
+
+            frames = max(1, int(self.audio_samplerate * 0.45))
+            data = sd.rec(
+                frames,
+                samplerate=self.audio_samplerate,
+                channels=1,
+                dtype="float32",
+                device=self.audio_device_index,
+            )
+            sd.wait()
+            arr = np.asarray(data, dtype=float).reshape(-1)
+            peak = float(np.max(np.abs(arr))) if arr.size else 0.0
+            rms = float(np.sqrt(np.mean(arr * arr))) if arr.size else 0.0
+            status = f"Microfono OK: {self.audio_device_name} | pico {peak:.3f} | RMS {rms:.3f}"
+            if peak < 0.005:
+                status += " | senal baja"
+            self.audio_status = status
+            self.audio_status_label.setText(status)
+            QtWidgets.QMessageBox.information(self, "Microfono", status)
+        except Exception as exc:
+            device_text = self.audio_device_name or f"microfono {self.audio_device_index}"
+            self.audio_status = f"micro no disponible en {device_text}: {exc}"
+            self.audio_status_label.setText(self.audio_status)
+            QtWidgets.QMessageBox.warning(self, "Microfono", self.audio_status)
 
     def _audio_callback(self, indata, frames, time_info, status):
         del frames, time_info
@@ -161,6 +302,13 @@ class VacuumExperimentWindow(PPGSuite):
         self.audio_status = "audio pendiente"
         self.audio_start_perf = math.nan
         self.audio_stop_perf = math.nan
+        self.select_audio_device(update_label=False)
+        if self.audio_device_index is None:
+            self.audio_status = "audio no disponible: no hay microfono seleccionado"
+            if hasattr(self, "audio_status_label"):
+                self.audio_status_label.setText(self.audio_status)
+            log.warning("No se pudo iniciar audio: no hay microfono seleccionado")
+            return
         try:
             import sounddevice as sd
 
@@ -179,7 +327,8 @@ class VacuumExperimentWindow(PPGSuite):
                 self.audio_status_label.setText(self.audio_status)
         except Exception as exc:
             self.audio_stream = None
-            self.audio_status = f"audio no disponible: {exc}"
+            device_text = self.audio_device_name or f"microfono {self.audio_device_index}"
+            self.audio_status = f"audio no disponible en {device_text}: {exc}"
             if hasattr(self, "audio_status_label"):
                 self.audio_status_label.setText(self.audio_status)
             log.warning("No se pudo iniciar audio en experimento con vacio: %s", exc)

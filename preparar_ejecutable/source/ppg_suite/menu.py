@@ -56,10 +56,10 @@ class ModeSelectDialog(QtWidgets.QDialog):
         grid.addWidget(self.btn_temp, 0, 1)
         grid.addWidget(self.btn_reajustes, 1, 0)
         grid.addWidget(self.btn_configurations, 1, 1)
-        grid.addWidget(self.btn_3m, 2, 0, 1, 2)
-        grid.addWidget(self.btn_vacuum, 3, 0, 1, 2)
-        grid.addWidget(self.btn_relations, 4, 0, 1, 2)
-        grid.addWidget(self.btn_fourier, 5, 0, 1, 2)
+        grid.addWidget(self.btn_3m, 2, 0)
+        grid.addWidget(self.btn_vacuum, 2, 1)
+        grid.addWidget(self.btn_relations, 3, 0, 1, 2)
+        grid.addWidget(self.btn_fourier, 4, 0, 1, 2)
 
         info = QtWidgets.QLabel(
             "Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.\n"
