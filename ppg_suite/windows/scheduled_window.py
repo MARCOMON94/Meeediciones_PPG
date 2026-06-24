@@ -175,6 +175,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.udder_combo = QtWidgets.QComboBox()
         self.configure_udder_combo(self.udder_combo)
         self.temp_mapping_widget = self.create_temp_mapping_widget()
+        self.temp_monitor_widget = self.create_temp_monitor_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit(self.scheduled_condition)
@@ -189,6 +190,7 @@ class ScheduledConfigWindow(PPGSuite):
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         form.addRow("Sensor:", self.udder_combo)
         form.addRow("Termometros:", self.temp_mapping_widget)
+        form.addRow("Temperatura:", self.temp_monitor_widget)
         form.addRow("Medicion:", self.vacuum_combo)
         form.addRow("Anotaciones inicio:", self.condition_edit)
         form.addRow("Duración total:", self.duration_spin)
@@ -234,7 +236,30 @@ class ScheduledConfigWindow(PPGSuite):
         self.plot_main.setLabel("bottom", "Tiempo", units="s")
         self.ir_curve = self.plot_main.plot([], [], pen=pg.mkPen((0, 80, 220), width=2), name="IR")
         self.red_curve = self.plot_main.plot([], [], pen=pg.mkPen((220, 30, 30), width=1), name="RED")
-        self.tabs.addTab(self.plot_main, "Señal")
+        self.plot_temp_live = pg.PlotWidget(title="Temperatura inicial de la configuracion")
+        self.plot_temp_live.setBackground("w")
+        self.plot_temp_live.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_temp_live.setLabel("bottom", "Tiempo", units="s")
+        self.plot_temp_live.setLabel("left", "Temp", units="C")
+        self.temp_live_curves = {
+            "A0": self.plot_temp_live.plot([], [], pen=pg.mkPen((180, 60, 60), width=2), name="A0"),
+            "A1": self.plot_temp_live.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1"),
+            "A2": self.plot_temp_live.plot([], [], pen=pg.mkPen((220, 140, 30), width=2), name="A2"),
+            "A3": self.plot_temp_live.plot([], [], pen=pg.mkPen((80, 160, 80), width=2), name="A3"),
+        }
+        self.temp_alert_line = pg.InfiniteLine(
+            angle=0,
+            movable=False,
+            pen=pg.mkPen((220, 60, 40), width=1, style=QtCore.Qt.PenStyle.DashLine),
+        )
+        self.plot_temp_live.addItem(self.temp_alert_line)
+        self.plot_temp_live.addLegend()
+        signal_page = QtWidgets.QWidget()
+        signal_layout = QtWidgets.QVBoxLayout(signal_page)
+        signal_layout.setContentsMargins(0, 0, 0, 0)
+        signal_layout.addWidget(self.plot_main, stretch=3)
+        signal_layout.addWidget(self.plot_temp_live, stretch=2)
+        self.tabs.addTab(signal_page, "Señal")
 
         self.plot_trend = pg.PlotWidget(title="Rolling vivo | BPM / SpO2")
         self.plot_trend.setBackground("w")
@@ -294,6 +319,17 @@ class ScheduledConfigWindow(PPGSuite):
         self.send_command("START_CONTINUOUS")
         self.scheduled_step_start_wall = time.time()
         st.capturing = True
+
+    def temperature_monitor_start_index(self) -> int:
+        if self.scheduled_segments:
+            return max(0, min(self.scheduled_segments[-1].start_sample, len(self.state.t)))
+        return 0
+
+    def temperature_monitor_elapsed(self, trel: float) -> float:
+        start_idx = self.temperature_monitor_start_index()
+        if 0 <= start_idx < len(self.state.t):
+            return float(trel - self.state.t[start_idx])
+        return float(trel)
 
     def ask_transition_reference(self, previous_step: ScheduledStep, next_step: ScheduledStep | None) -> tuple[str, str, str]:
         dialog = QtWidgets.QDialog(self)
@@ -453,12 +489,15 @@ class ScheduledConfigWindow(PPGSuite):
 
     def temp_summary_for_arrays(self, t: np.ndarray, temp_c: np.ndarray, temp_raw: np.ndarray, channel_arrays: dict[str, tuple[np.ndarray, np.ndarray]] | None = None) -> dict[str, float | int]:
         channel_arrays = channel_arrays or {"A0": (temp_c, temp_raw)}
-        primary = temperature_channel_summary(t, temp_c, temp_raw)
+        window_s = max(1.0, float(getattr(self.state, "temp_monitor_seconds", self.current_temp_monitor_seconds()) or self.current_temp_monitor_seconds()))
+        primary = temperature_channel_summary(t, temp_c, temp_raw, settle_s=0.0, window_s=window_s)
         channel_summaries = {
             channel: temperature_channel_summary(
                 t,
                 channel_arrays.get(channel, (np.asarray([], dtype=float), np.asarray([], dtype=float)))[0],
                 channel_arrays.get(channel, (np.asarray([], dtype=float), np.asarray([], dtype=float)))[1],
+                settle_s=0.0,
+                window_s=window_s,
             )
             for channel in TEMP_CHANNELS
         }
@@ -482,6 +521,8 @@ class ScheduledConfigWindow(PPGSuite):
             "temp_final_window_start_s": primary["final_window_start_s"],
             "temp_final_window_end_s": primary["final_window_end_s"],
             "temp_final_window_used": primary["final_window_used"],
+            "temp_monitor_seconds": window_s,
+            "temp_alert_threshold_c": getattr(self.state, "temp_alert_threshold_c", self.current_temp_alert_threshold()),
             "temp_raw_last": primary["raw_last"],
         }
         for channel in TEMP_CHANNELS:
@@ -500,7 +541,7 @@ class ScheduledConfigWindow(PPGSuite):
                 f"{prefix}_c_final_samples": summary["final_samples"],
                 f"{prefix}_raw_last": summary["raw_last"],
             })
-        empty = temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float))
+        empty = temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float), settle_s=0.0, window_s=window_s)
         for position, prefix in POSITION_SUMMARY_PREFIXES.items():
             summary = position_summaries.get(position) or empty
             out.update({
@@ -778,6 +819,7 @@ class ScheduledConfigWindow(PPGSuite):
         if t.size < 2:
             self.ir_curve.setData([], [])
             self.red_curve.setData([], [])
+            self.update_live_temperature_plot()
             return
         cfg = self.analysis_widget.get_config()
         hz = estimate_hz(t)
@@ -786,6 +828,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.ir_curve.setData(tt, processed_for_plot(ir[mask], hz, cfg))
         self.red_curve.setData(tt, processed_for_plot(red[mask], hz, cfg))
         self.plot_main.setXRange(float(tt[0]), max(float(tt[-1]), float(tt[0]) + 1), padding=0.01)
+        self.update_live_temperature_plot()
         if self.state.rolling_t:
             self.trend_bpm_curve.setData(self.state.rolling_t, self.state.rolling_bpm)
             self.trend_spo2_curve.setData(self.state.rolling_t, self.state.rolling_spo2)
@@ -820,6 +863,7 @@ class ScheduledConfigWindow(PPGSuite):
             f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} % | Saturacion ADC: {fmt(m.saturation_pct,1)} %\n"
             f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
             f"Temp: {fmt(temp['temp_c_last'],1)} °C | raw {fmt(temp['temp_raw_last'],0)}\n"
+            f"{self.temp_monitor_status_line()}\n"
             f"Contacto: {m.contact_label}\n"
             f"Raw: {st.raw_file.name if st.raw_file else '-'}\n"
         )
@@ -883,6 +927,7 @@ class ConfigTableWidget(QtWidgets.QTableWidget):
 class ConfigurationsWindow(ScheduledConfigWindow):
     def __init__(self):
         self.table_ready = False
+        self.updating_table_labels = False
         super().__init__(
             "Configuraciones personalizadas",
             build_12_config_steps(),
@@ -925,23 +970,78 @@ class ConfigurationsWindow(ScheduledConfigWindow):
         self.btn_load_64.clicked.connect(lambda: self.load_steps_to_table(build_64_config_steps()))
 
         self.load_steps_to_table(self.scheduled_steps)
+        self.config_table.itemChanged.connect(self.on_config_table_item_changed)
         self.table_ready = True
 
+    def generated_config_label(self, row: int, cfg: SensorConfig | None = None) -> str:
+        if cfg is None:
+            red = self.table_value(row, 1, "63")
+            ir = self.table_value(row, 2, "63")
+            avg = self.table_value(row, 3, "4")
+            rate = self.table_value(row, 4, "800")
+            width = self.table_value(row, 5, "411")
+            adc = self.table_value(row, 6, "16384")
+            skip = self.table_value(row, 7, "50")
+        else:
+            red = str(cfg.red)
+            ir = str(cfg.ir)
+            avg = str(cfg.avg)
+            rate = str(cfg.rate)
+            width = str(cfg.width)
+            adc = str(cfg.adc)
+            skip = str(cfg.skip)
+        return f"MUESTRA {row + 1:03d} - RED{red} IR{ir} AVG{avg} RATE{rate} W{width} ADC{adc} SKIP{skip}"
+
+    def table_value(self, row: int, col: int, default: str = "") -> str:
+        item = self.config_table.item(row, col)
+        text = item.text().strip() if item else ""
+        return text or default
+
+    def set_config_table_item(self, row: int, col: int, value: str):
+        item = QtWidgets.QTableWidgetItem(value)
+        if col == 0:
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+        self.config_table.setItem(row, col, item)
+
+    def update_generated_label_for_row(self, row: int, label: str | None = None):
+        if row < 0 or row >= self.config_table.rowCount():
+            return
+        label = label or self.generated_config_label(row)
+        self.updating_table_labels = True
+        try:
+            item = self.config_table.item(row, 0)
+            if item is None:
+                self.set_config_table_item(row, 0, label)
+            else:
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                if item.text() != label:
+                    item.setText(label)
+        finally:
+            self.updating_table_labels = False
+
+    def on_config_table_item_changed(self, item: QtWidgets.QTableWidgetItem):
+        if self.updating_table_labels or not self.table_ready:
+            return
+        self.update_generated_label_for_row(item.row())
+
     def set_table_row_count(self, count: int):
+        self.updating_table_labels = True
         old = self.config_table.rowCount()
         self.config_table.setRowCount(count)
         for row in range(old, count):
-            defaults = [f"CONFIG {row + 1:02d}", "63", "63", "4", "800", "411", "16384", "50", "0", ""]
+            defaults = [self.generated_config_label(row), "63", "63", "4", "800", "411", "16384", "50", "0", ""]
             for col, value in enumerate(defaults):
-                self.config_table.setItem(row, col, QtWidgets.QTableWidgetItem(value))
+                self.set_config_table_item(row, col, value)
+        self.updating_table_labels = False
 
     def load_steps_to_table(self, steps: list[ScheduledStep]):
+        self.updating_table_labels = True
         self.scheduled_steps = steps
         self.count_spin.setValue(len(steps))
         self.config_table.setRowCount(len(steps))
         for row, step in enumerate(steps):
             values = [
-                step.label,
+                self.generated_config_label(row, step.config),
                 str(step.config.red),
                 str(step.config.ir),
                 str(step.config.avg),
@@ -953,7 +1053,8 @@ class ConfigurationsWindow(ScheduledConfigWindow):
                 step.description,
             ]
             for col, value in enumerate(values):
-                self.config_table.setItem(row, col, QtWidgets.QTableWidgetItem(value))
+                self.set_config_table_item(row, col, value)
+        self.updating_table_labels = False
 
     def steps_from_table(self) -> list[ScheduledStep]:
         steps: list[ScheduledStep] = []
@@ -962,7 +1063,6 @@ class ConfigurationsWindow(ScheduledConfigWindow):
             for col in range(self.config_table.columnCount()):
                 item = self.config_table.item(row, col)
                 vals.append(item.text().strip() if item else "")
-            label = vals[0] or f"CONFIG {row + 1:02d}"
             try:
                 cfg = SensorConfig(
                     red=int(vals[1] or 63),
@@ -976,6 +1076,8 @@ class ConfigurationsWindow(ScheduledConfigWindow):
                 ).clean()
             except ValueError as exc:
                 raise ValueError(f"Fila {row + 1}: valor numerico no valido") from exc
+            label = self.generated_config_label(row, cfg)
+            self.update_generated_label_for_row(row, label)
             desc = vals[9] or f"Configuracion personalizada {row + 1}"
             steps.append(ScheduledStep(label, desc, cfg))
         if not steps:

@@ -33,13 +33,6 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_real.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Weight.Bold))
         layout.addWidget(self.btn_real)
 
-        modes_label = QtWidgets.QLabel("Otros modos")
-        modes_label.setFont(QtGui.QFont("Arial", 10, QtGui.QFont.Weight.Bold))
-        layout.addWidget(modes_label)
-
-        grid = QtWidgets.QGridLayout()
-        layout.addLayout(grid)
-
         self.btn_test = QtWidgets.QPushButton("Test de campo")
         self.btn_temp = QtWidgets.QPushButton("Solo temperatura")
         self.btn_reajustes = QtWidgets.QPushButton("Reajustes")
@@ -52,14 +45,25 @@ class ModeSelectDialog(QtWidgets.QDialog):
         for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_vacuum, self.btn_relations, self.btn_fourier]:
             button.setMinimumHeight(38)
 
-        grid.addWidget(self.btn_test, 0, 0)
-        grid.addWidget(self.btn_temp, 0, 1)
-        grid.addWidget(self.btn_reajustes, 1, 0)
-        grid.addWidget(self.btn_configurations, 1, 1)
-        grid.addWidget(self.btn_3m, 2, 0)
-        grid.addWidget(self.btn_vacuum, 2, 1)
-        grid.addWidget(self.btn_relations, 3, 0, 1, 2)
-        grid.addWidget(self.btn_fourier, 4, 0, 1, 2)
+        layout.addWidget(self.btn_relations)
+        layout.addWidget(self.btn_fourier)
+        layout.addWidget(self.btn_configurations)
+
+        self.btn_other_toggle = QtWidgets.QPushButton("Otros")
+        self.btn_other_toggle.setCheckable(True)
+        self.btn_other_toggle.setMinimumHeight(38)
+        layout.addWidget(self.btn_other_toggle)
+
+        self.other_modes_widget = QtWidgets.QWidget()
+        other_layout = QtWidgets.QVBoxLayout(self.other_modes_widget)
+        other_layout.setContentsMargins(0, 0, 0, 0)
+        other_layout.addWidget(self.btn_test)
+        other_layout.addWidget(self.btn_temp)
+        other_layout.addWidget(self.btn_reajustes)
+        other_layout.addWidget(self.btn_3m)
+        other_layout.addWidget(self.btn_vacuum)
+        self.other_modes_widget.setVisible(False)
+        layout.addWidget(self.other_modes_widget)
 
         info = QtWidgets.QLabel(
             "Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.\n"
@@ -94,6 +98,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_vacuum.clicked.connect(lambda: self.choose("experimento_vacio"))
         self.btn_relations.clicked.connect(lambda: self.choose("relations"))
         self.btn_fourier.clicked.connect(lambda: self.choose("fourier"))
+        self.btn_other_toggle.toggled.connect(self.other_modes_widget.setVisible)
         self.btn_updates.clicked.connect(self.show_latest_updates)
 
     def choose(self, mode: AppMode):

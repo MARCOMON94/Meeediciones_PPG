@@ -54,6 +54,8 @@ from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWi
 
 TEMP_SETTLE_S = 1.0
 TEMP_FINAL_WINDOW_S = 5.0
+TEMP_MONITOR_DEFAULT_S = 5.0
+TEMP_ALERT_DEFAULT_C = 40.0
 BLE_PORT_ID = "BLE:MTESTV2_NANO33IOT"
 BLE_DEVICE_NAME_HINTS = ("mtestv2", "Nano33IoT", "Nano 33 IoT")
 BLE_SERVICE_UUID = "7f510001-1b15-4b91-9f4b-3a4d5f6e0001"
@@ -90,9 +92,9 @@ def temperature_channel_summary(
         final_mask = valid & (rel >= settle_s) & (rel <= settle_s + window_s)
         if not np.any(final_mask):
             final_mask = valid & (rel >= 0.0) & (rel <= window_s)
-            window_used = "fallback_0_5s"
+            window_used = f"fallback_0_{window_s:g}s"
         else:
-            window_used = "settled_1_6s"
+            window_used = f"initial_0_{window_s:g}s" if settle_s <= 0 else f"settled_{settle_s:g}_{settle_s + window_s:g}s"
     else:
         rel = np.asarray([], dtype=float)
         final_mask = np.zeros_like(values, dtype=bool)
@@ -324,6 +326,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.udder_combo = QtWidgets.QComboBox()
         self.configure_udder_combo(self.udder_combo)
         self.temp_mapping_widget = self.create_temp_mapping_widget()
+        self.temp_monitor_widget = self.create_temp_monitor_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit()
@@ -335,6 +338,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         cap.addRow("Sensor:", self.udder_combo)
         cap.addRow("Termometros:", self.temp_mapping_widget)
+        cap.addRow("Temperatura:", self.temp_monitor_widget)
         cap.addRow("Medicion:", self.vacuum_combo)
         cap.addRow("Anotaciones inicio:", self.condition_edit)
         left.addWidget(capture_group)
@@ -394,7 +398,30 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.plot_main.setBackground("w"); self.plot_main.showGrid(x=True, y=True, alpha=0.25); self.plot_main.setLabel("bottom", "Tiempo", units="s")
         self.ir_curve = self.plot_main.plot([], [], pen=pg.mkPen((0, 80, 220), width=2), name="IR")
         self.red_curve = self.plot_main.plot([], [], pen=pg.mkPen((220, 30, 30), width=1), name="RED")
-        self.tabs.addTab(self.plot_main, "Señal")
+        self.plot_temp_live = pg.PlotWidget(title="Temperatura inicial")
+        self.plot_temp_live.setBackground("w")
+        self.plot_temp_live.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_temp_live.setLabel("bottom", "Tiempo", units="s")
+        self.plot_temp_live.setLabel("left", "Temp", units="C")
+        self.temp_live_curves = {
+            "A0": self.plot_temp_live.plot([], [], pen=pg.mkPen((180, 60, 60), width=2), name="A0"),
+            "A1": self.plot_temp_live.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1"),
+            "A2": self.plot_temp_live.plot([], [], pen=pg.mkPen((220, 140, 30), width=2), name="A2"),
+            "A3": self.plot_temp_live.plot([], [], pen=pg.mkPen((80, 160, 80), width=2), name="A3"),
+        }
+        self.temp_alert_line = pg.InfiniteLine(
+            angle=0,
+            movable=False,
+            pen=pg.mkPen((220, 60, 40), width=1, style=QtCore.Qt.PenStyle.DashLine),
+        )
+        self.plot_temp_live.addItem(self.temp_alert_line)
+        self.plot_temp_live.addLegend()
+        signal_page = QtWidgets.QWidget()
+        signal_layout = QtWidgets.QVBoxLayout(signal_page)
+        signal_layout.setContentsMargins(0, 0, 0, 0)
+        signal_layout.addWidget(self.plot_main, stretch=3)
+        signal_layout.addWidget(self.plot_temp_live, stretch=2)
+        self.tabs.addTab(signal_page, "Señal")
 
         self.plot_fft = pg.PlotWidget(title="FFT IR")
         self.plot_fft.setBackground("w"); self.plot_fft.showGrid(x=True, y=True, alpha=0.25); self.plot_fft.setLabel("bottom", "BPM")
@@ -474,6 +501,46 @@ class PPGSuite(QtWidgets.QMainWindow):
             layout.addWidget(label, row, 0)
             layout.addWidget(combo, row, 1)
         return widget
+
+    def create_temp_monitor_widget(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QGridLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(6)
+        layout.setVerticalSpacing(2)
+        self.temp_monitor_seconds_spin = NoWheelDoubleSpinBox()
+        self.temp_monitor_seconds_spin.setRange(1.0, 60.0)
+        self.temp_monitor_seconds_spin.setDecimals(1)
+        self.temp_monitor_seconds_spin.setValue(TEMP_MONITOR_DEFAULT_S)
+        self.temp_monitor_seconds_spin.setSuffix(" s")
+        self.temp_alert_threshold_spin = NoWheelDoubleSpinBox()
+        self.temp_alert_threshold_spin.setRange(20.0, 80.0)
+        self.temp_alert_threshold_spin.setDecimals(1)
+        self.temp_alert_threshold_spin.setValue(TEMP_ALERT_DEFAULT_C)
+        self.temp_alert_threshold_spin.setSuffix(" C")
+        layout.addWidget(QtWidgets.QLabel("Medir"), 0, 0)
+        layout.addWidget(self.temp_monitor_seconds_spin, 0, 1)
+        layout.addWidget(QtWidgets.QLabel("Avisar >"), 1, 0)
+        layout.addWidget(self.temp_alert_threshold_spin, 1, 1)
+        return widget
+
+    def current_temp_monitor_seconds(self) -> float:
+        if hasattr(self, "temp_monitor_seconds_spin"):
+            return max(1.0, float(self.temp_monitor_seconds_spin.value()))
+        return TEMP_MONITOR_DEFAULT_S
+
+    def current_temp_alert_threshold(self) -> float:
+        if hasattr(self, "temp_alert_threshold_spin"):
+            return float(self.temp_alert_threshold_spin.value())
+        return TEMP_ALERT_DEFAULT_C
+
+    def apply_temperature_monitor_config_to_state(self):
+        self.state.temp_monitor_seconds = self.current_temp_monitor_seconds()
+        self.state.temp_alert_threshold_c = self.current_temp_alert_threshold()
+        self.state.temp_alert_triggered = False
+        self.state.temp_alert_value_c = math.nan
+        self.state.temp_alert_label = ""
+        self.state.temp_alert_time_s = math.nan
 
     def refresh_animal_dependent_controls(self):
         animal_type = self.current_animal_type()
@@ -1033,6 +1100,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.temp_a3_c.append(temp_a3_c)
             st.temp_a3_raw.append(temp_a3_raw)
             st.valid_lines += 1
+            self.check_temperature_alert(trel, channel_values, position_values)
 
             if st.raw_writer:
                 cfg = self.last_sensor_config
@@ -1106,6 +1174,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         temp_primary_channel = temp_primary_channel_for(udder, temp_mapping, animal_type)
         vacuum = old.vacuum_condition if keep_identity else self.current_vacuum_text()
         final_annotations = old.final_annotations if keep_identity else ""
+        temp_monitor_seconds = old.temp_monitor_seconds if keep_identity else self.current_temp_monitor_seconds()
+        temp_alert_threshold_c = old.temp_alert_threshold_c if keep_identity else self.current_temp_alert_threshold()
         self.state = CaptureState(
             crotal_id=crotal,
             animal_type=animal_type,
@@ -1115,6 +1185,8 @@ class PPGSuite(QtWidgets.QMainWindow):
             udder_side=udder,
             temp_mapping=temp_mapping,
             temp_primary_channel=temp_primary_channel,
+            temp_monitor_seconds=temp_monitor_seconds,
+            temp_alert_threshold_c=temp_alert_threshold_c,
             vacuum_condition=vacuum,
             sensor_ready=old.sensor_ready,
             last_config_ack=self.last_config_ack,
@@ -1292,18 +1364,153 @@ class PPGSuite(QtWidgets.QMainWindow):
             )
         return out
 
+    def temperature_monitor_start_index(self) -> int:
+        return 0
+
+    def temperature_monitor_elapsed(self, trel: float) -> float:
+        t, _red, _ir = self.arrays()
+        finite_t = t[np.isfinite(t)]
+        if finite_t.size:
+            return float(trel - finite_t[0])
+        return float(trel)
+
+    def temperature_window_max(self) -> tuple[str, float, float]:
+        st = self.state
+        t = np.asarray(st.t, dtype=float)
+        if not t.size:
+            return "", math.nan, math.nan
+        start_idx = max(0, min(self.temperature_monitor_start_index(), t.size - 1))
+        window_s = max(1.0, float(getattr(st, "temp_monitor_seconds", TEMP_MONITOR_DEFAULT_S) or TEMP_MONITOR_DEFAULT_S))
+        rel = t[start_idx:] - float(t[start_idx])
+        mask = np.isfinite(rel) & (rel >= 0.0) & (rel <= window_s)
+        if not np.any(mask):
+            return "", math.nan, math.nan
+        assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
+        channel_positions = {channel: position for channel, position in assignments.items()}
+        best_label = ""
+        best_value = math.nan
+        best_time = math.nan
+        for channel in TEMP_CHANNELS:
+            values = np.asarray(getattr(st, f"temp_{channel.lower()}_c", []), dtype=float)
+            n = min(t.size, values.size)
+            if start_idx >= n:
+                continue
+            local_rel = t[start_idx:n] - float(t[start_idx])
+            local_values = values[start_idx:n]
+            local_mask = np.isfinite(local_rel) & np.isfinite(local_values) & (local_rel >= 0.0) & (local_rel <= window_s)
+            if not np.any(local_mask):
+                continue
+            selected = local_values[local_mask]
+            idx = int(np.nanargmax(selected))
+            value = float(selected[idx])
+            if not np.isfinite(best_value) or value > best_value:
+                selected_rel = local_rel[local_mask]
+                position = channel_positions.get(channel, "")
+                label = f"{position} ({channel})" if position else channel
+                best_label = label
+                best_value = value
+                best_time = float(selected_rel[idx])
+        return best_label, best_value, best_time
+
+    def temp_monitor_status_line(self) -> str:
+        st = self.state
+        label, value, at_s = self.temperature_window_max()
+        threshold = float(getattr(st, "temp_alert_threshold_c", TEMP_ALERT_DEFAULT_C) or TEMP_ALERT_DEFAULT_C)
+        window_s = float(getattr(st, "temp_monitor_seconds", TEMP_MONITOR_DEFAULT_S) or TEMP_MONITOR_DEFAULT_S)
+        if np.isfinite(value):
+            base = f"Temp inicial {fmt(value,1)} C en {label or '-'} ({fmt(at_s,1)}s/{fmt(window_s,1)}s), aviso > {fmt(threshold,1)} C"
+        else:
+            base = f"Temp inicial: sin datos en {fmt(window_s,1)}s, aviso > {fmt(threshold,1)} C"
+        if getattr(st, "temp_alert_triggered", False):
+            base += f" | AVISO {fmt(getattr(st, 'temp_alert_value_c', math.nan),1)} C {getattr(st, 'temp_alert_label', '')}"
+        return base
+
+    def check_temperature_alert(self, trel: float, channel_values: dict[str, tuple[float, float]], position_values: dict[str, tuple[float, float]]):
+        st = self.state
+        if not st.capturing or getattr(st, "temp_alert_triggered", False):
+            return
+        elapsed = self.temperature_monitor_elapsed(trel)
+        window_s = max(1.0, float(getattr(st, "temp_monitor_seconds", TEMP_MONITOR_DEFAULT_S) or TEMP_MONITOR_DEFAULT_S))
+        if not np.isfinite(elapsed) or elapsed < 0.0 or elapsed > window_s:
+            return
+        threshold = float(getattr(st, "temp_alert_threshold_c", TEMP_ALERT_DEFAULT_C) or TEMP_ALERT_DEFAULT_C)
+        candidates: list[tuple[str, float]] = []
+        for position, (temp_c, _raw) in position_values.items():
+            if np.isfinite(temp_c):
+                candidates.append((f"{position}", float(temp_c)))
+        if not candidates:
+            for channel, (temp_c, _raw) in channel_values.items():
+                if np.isfinite(temp_c):
+                    candidates.append((channel, float(temp_c)))
+        if not candidates:
+            return
+        label, value = max(candidates, key=lambda item: item[1])
+        if value < threshold:
+            return
+        st.temp_alert_triggered = True
+        st.temp_alert_value_c = value
+        st.temp_alert_label = label
+        st.temp_alert_time_s = float(elapsed)
+        self.show_temperature_alert(label, value, elapsed, threshold)
+
+    def show_temperature_alert(self, label: str, value: float, elapsed: float, threshold: float):
+        text = (
+            f"La temperatura inicial ha superado el umbral.\n\n"
+            f"Sensor: {label}\n"
+            f"Temperatura: {fmt(value, 1)} C\n"
+            f"Tiempo: {fmt(elapsed, 1)} s\n"
+            f"Umbral: {fmt(threshold, 1)} C"
+        )
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle("Aviso temperatura")
+        box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        box.setText(text)
+        box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+        self._temperature_alert_box = box
+        box.open()
+
+    def update_live_temperature_plot(self):
+        if not hasattr(self, "temp_live_curves"):
+            return
+        st = self.state
+        t = np.asarray(st.t, dtype=float)
+        if t.size < 1:
+            for curve in self.temp_live_curves.values():
+                curve.setData([], [])
+            return
+        start_idx = max(0, min(self.temperature_monitor_start_index(), t.size - 1))
+        window_s = max(1.0, float(getattr(st, "temp_monitor_seconds", TEMP_MONITOR_DEFAULT_S) or TEMP_MONITOR_DEFAULT_S))
+        for channel, curve in self.temp_live_curves.items():
+            values = np.asarray(getattr(st, f"temp_{channel.lower()}_c", []), dtype=float)
+            n = min(t.size, values.size)
+            if start_idx >= n:
+                curve.setData([], [])
+                continue
+            rel = t[start_idx:n] - float(t[start_idx])
+            mask = np.isfinite(rel) & np.isfinite(values[start_idx:n]) & (rel >= 0.0) & (rel <= window_s)
+            curve.setData(rel[mask], values[start_idx:n][mask])
+        threshold = float(getattr(st, "temp_alert_threshold_c", TEMP_ALERT_DEFAULT_C) or TEMP_ALERT_DEFAULT_C)
+        self.temp_alert_line.setValue(threshold)
+        label, value, at_s = self.temperature_window_max()
+        if np.isfinite(value):
+            self.plot_temp_live.setTitle(f"Temperatura inicial | max {fmt(value,1)} C {label} a {fmt(at_s,1)} s")
+        else:
+            self.plot_temp_live.setTitle("Temperatura inicial")
+        self.plot_temp_live.setXRange(0.0, window_s, padding=0.02)
+
     def temperature_summary(self) -> dict[str, float | int]:
         t, _red, _ir = self.arrays()
         temp_c, temp_raw = self.temp_arrays()
-        primary = temperature_channel_summary(t, temp_c, temp_raw)
+        window_s = max(1.0, float(getattr(self.state, "temp_monitor_seconds", TEMP_MONITOR_DEFAULT_S) or TEMP_MONITOR_DEFAULT_S))
+        primary = temperature_channel_summary(t, temp_c, temp_raw, settle_s=0.0, window_s=window_s)
         channel_arrays = self.temp_channel_arrays()
         channel_summaries = {
-            channel: temperature_channel_summary(t, values, raw)
+            channel: temperature_channel_summary(t, values, raw, settle_s=0.0, window_s=window_s)
             for channel, (values, raw) in channel_arrays.items()
         }
         assignments = parse_temp_mapping(self.state.temp_mapping, self.state.animal_type)
         position_summaries = {
-            position: channel_summaries.get(channel, temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float)))
+            position: channel_summaries.get(channel, temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float), settle_s=0.0, window_s=window_s))
             for channel, position in assignments.items()
         }
         out = {
@@ -1320,6 +1527,12 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_final_window_start_s": primary["final_window_start_s"],
             "temp_final_window_end_s": primary["final_window_end_s"],
             "temp_final_window_used": primary["final_window_used"],
+            "temp_monitor_seconds": window_s,
+            "temp_alert_threshold_c": getattr(self.state, "temp_alert_threshold_c", TEMP_ALERT_DEFAULT_C),
+            "temp_alert_triggered": 1 if getattr(self.state, "temp_alert_triggered", False) else 0,
+            "temp_alert_value_c": getattr(self.state, "temp_alert_value_c", math.nan),
+            "temp_alert_time_s": getattr(self.state, "temp_alert_time_s", math.nan),
+            "temp_alert_label": getattr(self.state, "temp_alert_label", ""),
             "temp_raw_last": primary["raw_last"],
         }
         for channel in TEMP_CHANNELS:
@@ -1338,7 +1551,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"{prefix}_c_final_samples": summary["final_samples"],
                 f"{prefix}_raw_last": summary["raw_last"],
             })
-        empty = temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float))
+        empty = temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float), settle_s=0.0, window_s=window_s)
         for position, prefix in POSITION_SUMMARY_PREFIXES.items():
             summary = position_summaries.get(position, empty)
             out.update({
@@ -1706,6 +1919,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"{spo2_warning_line}"
                 f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
                 f"Temp: {fmt(temp['temp_c_last'],1)} °C\n"
+                f"{self.temp_monitor_status_line()}\n"
                 f"Hz real: {fmt(m.hz,2)}\n"
                 f"Contacto: {m.contact_label}\n\n"
                 f"Config Arduino: {self.last_config_ack}\n"
@@ -1727,6 +1941,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 f"{spo2_warning_line}"
                 f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
                 f"Temp RT/LT final: {fmt(temp['temp_rt_c_final_max_5s'],1)} / {fmt(temp['temp_lt_c_final_max_5s'],1)} C | canal {st.temp_primary_channel} {fmt(temp['temp_c_final_max_5s'],1)} C\n"
+                f"{self.temp_monitor_status_line()}\n"
                 f"Hz real: {fmt(m.hz,2)} | duración señal {fmt(m.duration_s,3)} s\n"
                 f"PI IR/RED: {fmt(m.pi_ir_pct,3)} / {fmt(m.pi_red_pct,3)} %\n"
                 f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} %\n"
@@ -1742,6 +1957,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         t, red, ir = self.arrays()
         if t.size < 2:
             self.ir_curve.setData([], []); self.red_curve.setData([], [])
+            self.update_live_temperature_plot()
             return
         cfg = self.analysis_widget.get_config()
         hz = estimate_hz(t)
@@ -1753,6 +1969,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.ir_curve.setData(tt, processed_for_plot(ii, hz, cfg))
         self.red_curve.setData(tt, processed_for_plot(rr, hz, cfg))
         self.plot_main.setXRange(float(tt[0]), max(float(tt[-1]), float(tt[0])+1), padding=0.01)
+        self.update_live_temperature_plot()
 
         now = time.time()
         if self.app_mode != "real" and now - self._last_heavy_plot_update >= self.heavy_plot_interval:

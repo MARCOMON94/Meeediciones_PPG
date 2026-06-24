@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import time
 
+import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
@@ -59,6 +60,7 @@ class TemperatureWindow(PPGSuite):
         self.udder_combo = QtWidgets.QComboBox()
         self.configure_udder_combo(self.udder_combo)
         self.temp_mapping_widget = self.create_temp_mapping_widget()
+        self.temp_monitor_widget = self.create_temp_monitor_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
         self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
         self.condition_edit = QtWidgets.QLineEdit("solo temperatura en campo")
@@ -68,6 +70,7 @@ class TemperatureWindow(PPGSuite):
         form.addRow("Duración:", self.duration_spin)
         form.addRow("Sensor:", self.udder_combo)
         form.addRow("Termometros:", self.temp_mapping_widget)
+        form.addRow("Temperatura:", self.temp_monitor_widget)
         form.addRow("Medicion:", self.vacuum_combo)
         form.addRow("Anotaciones inicio:", self.condition_edit)
         left.addWidget(capture_group)
@@ -111,6 +114,12 @@ class TemperatureWindow(PPGSuite):
         self.temp_a1_curve = self.plot_temp.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1")
         self.temp_a2_curve = self.plot_temp.plot([], [], pen=pg.mkPen((220, 140, 30), width=2), name="A2")
         self.temp_a3_curve = self.plot_temp.plot([], [], pen=pg.mkPen((80, 160, 80), width=2), name="A3")
+        self.temp_alert_line = pg.InfiniteLine(
+            angle=0,
+            movable=False,
+            pen=pg.mkPen((220, 60, 40), width=1, style=QtCore.Qt.PenStyle.DashLine),
+        )
+        self.plot_temp.addItem(self.temp_alert_line)
         self.plot_temp.addLegend()
         root.addWidget(self.plot_temp, stretch=1)
 
@@ -165,11 +174,18 @@ class TemperatureWindow(PPGSuite):
             self.temp_a2_curve.setData([], [])
             self.temp_a3_curve.setData([], [])
             return
-        self.temp_a0_curve.setData(t[:n], temp_a0_c[:n])
-        self.temp_a1_curve.setData(t[:n], temp_a1_c[:n])
-        self.temp_a2_curve.setData(t[:n], temp_a2_c[:n])
-        self.temp_a3_curve.setData(t[:n], temp_a3_c[:n])
-        self.plot_temp.setXRange(float(t[0]), max(float(t[n - 1]), float(t[0]) + 1), padding=0.01)
+        window_s = max(1.0, float(self.state.temp_monitor_seconds or self.current_temp_monitor_seconds()))
+        rel = t[:n] - float(t[0])
+        mask = np.isfinite(rel) & (rel >= 0.0) & (rel <= window_s)
+        self.temp_a0_curve.setData(rel[mask], temp_a0_c[:n][mask])
+        self.temp_a1_curve.setData(rel[mask], temp_a1_c[:n][mask])
+        self.temp_a2_curve.setData(rel[mask], temp_a2_c[:n][mask])
+        self.temp_a3_curve.setData(rel[mask], temp_a3_c[:n][mask])
+        self.temp_alert_line.setValue(float(self.state.temp_alert_threshold_c or self.current_temp_alert_threshold()))
+        label, value, at_s = self.temperature_window_max()
+        if math.isfinite(value):
+            self.plot_temp.setTitle(f"Temperatura inicial | max {fmt(value,1)} C {label} a {fmt(at_s,1)} s")
+        self.plot_temp.setXRange(0.0, window_s, padding=0.02)
 
     def _temp_channel_status(self, name: str, temp_c: float, raw: float) -> str:
         if not math.isfinite(raw):
@@ -235,6 +251,7 @@ class TemperatureWindow(PPGSuite):
             f"RT final: {fmt(temp['temp_rt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_rt_c_last'], 2)} C\n"
             f"LT final: {fmt(temp['temp_lt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_lt_c_last'], 2)} C\n"
             f"Vaca FLT/FRT/RLT/RRT final: {fmt(temp['temp_flt_c_final_max_5s'], 2)} / {fmt(temp['temp_frt_c_final_max_5s'], 2)} / {fmt(temp['temp_rlt_c_final_max_5s'], 2)} / {fmt(temp['temp_rrt_c_final_max_5s'], 2)} C\n"
+            f"{self.temp_monitor_status_line()}\n"
             f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | final {fmt(temp['temp_a0_c_final_max_5s'], 2)} C\n"
             f"A0 min/max: {fmt(temp['temp_a0_c_min'], 2)} / {fmt(temp['temp_a0_c_max'], 2)} C | raw {fmt(temp['temp_a0_raw_last'], 0)}\n"
             f"A1 actual: {fmt(temp['temp_a1_c_last'], 2)} C | final {fmt(temp['temp_a1_c_final_max_5s'], 2)} C\n"

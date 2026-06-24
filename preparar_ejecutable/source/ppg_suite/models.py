@@ -98,6 +98,12 @@ class CaptureState:
     udder_side: str = ""
     temp_mapping: str = "A0_RT_A1_LT"
     temp_primary_channel: str = "A0"
+    temp_monitor_seconds: float = 5.0
+    temp_alert_threshold_c: float = 40.0
+    temp_alert_triggered: bool = False
+    temp_alert_value_c: float = math.nan
+    temp_alert_label: str = ""
+    temp_alert_time_s: float = math.nan
     vacuum_condition: str = ""
     first_micro: Optional[int] = None
     t: list[float] = field(default_factory=list)

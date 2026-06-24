@@ -14,7 +14,7 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
-from ..animal_config import animal_label, display_mapping
+from ..animal_config import animal_label, display_mapping, normalize_animal_type
 from ..models import AnalysisConfig, SensorConfig
 from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..processing import score_and_merge_metrics
@@ -263,7 +263,7 @@ class DictTableModel(QtCore.QAbstractTableModel):
         if key == "Correo" and role == QtCore.Qt.ItemDataRole.CheckStateRole:
             return QtCore.Qt.CheckState.Checked if row.get("_mail_checked") == "1" else QtCore.Qt.CheckState.Unchecked
         if key == "Correo" and role == QtCore.Qt.ItemDataRole.ToolTipRole:
-            return row.get("_mail_tooltip", "Marcar raw para preparar correo")
+            return row.get("_mail_tooltip", "Marcar archivo para preparar correo")
         if key == "Correo" and role == QtCore.Qt.ItemDataRole.DisplayRole:
             return ""
         if role in (QtCore.Qt.ItemDataRole.DisplayRole, QtCore.Qt.ItemDataRole.ToolTipRole):
@@ -349,14 +349,18 @@ class DictTableModel(QtCore.QAbstractTableModel):
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
-    session_headers = ["Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
+    session_headers = ["Correo", "Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
+    capture_two_temp_headers = ["Temp RT final", "Temp LT final"]
+    capture_cow_temp_headers = ["Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final"]
     capture_headers = [
         "Correo", "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
         "Pulso ref.", "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
         "Temp final", "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
         "Duracion", "Hz", "Muestras", "Raw",
     ]
-    files_headers = ["tipo", "archivo", "filas", "ruta"]
+    files_headers = ["Correo", "tipo", "archivo", "filas", "ruta"]
+    temporal_two_temp_headers = ["Temp RT max tramo", "Temp LT max tramo"]
+    temporal_cow_temp_headers = ["Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo"]
     temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp max tramo", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "Muestras tramo"]
 
     def __init__(self):
@@ -370,7 +374,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_capture: CaptureRecord | None = None
         self.temporal_source_rows: list[dict[str, str]] = []
         self.temporal_rel_t = np.asarray([], dtype=float)
-        self.mail_raw_paths: dict[str, Path] = {}
+        self.mail_paths: dict[str, Path] = {}
         self._build_ui()
         self.update_mail_status()
         self.reload_data()
@@ -385,7 +389,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_back = QtWidgets.QPushButton("Volver al menu inicial")
         self.btn_back.setMinimumHeight(42)
         top.addWidget(self.btn_back)
-        self.mail_status = QtWidgets.QLabel("0 raws seleccionados")
+        self.mail_status = QtWidgets.QLabel("0 archivos seleccionados")
         self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
         self.btn_clear_mail = QtWidgets.QPushButton("Limpiar seleccion")
         self.btn_prepare_mail.setMinimumHeight(42)
@@ -443,6 +447,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         sessions_layout.addWidget(self.sessions_label)
         self.sessions_model = DictTableModel(self.session_headers)
+        self.sessions_model.check_changed_callback = self.on_mail_checked
         self.sessions_table = QtWidgets.QTableView()
         self.sessions_table.setModel(self.sessions_model)
         self.sessions_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -461,7 +466,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         captures_layout.addWidget(self.captures_label)
         self.captures_model = DictTableModel(self.capture_headers)
-        self.captures_model.check_changed_callback = self.on_capture_mail_checked
+        self.captures_model.check_changed_callback = self.on_mail_checked
         self.captures_table = QtWidgets.QTableView()
         self.captures_table.setModel(self.captures_model)
         self.captures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -545,6 +550,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.detail_tabs.addTab(self.params, "Parametros dispositivo")
 
         self.files_model = DictTableModel(self.files_headers)
+        self.files_model.check_changed_callback = self.on_mail_checked
         files_page = QtWidgets.QWidget()
         files_layout = QtWidgets.QVBoxLayout(files_page)
         files_buttons = QtWidgets.QHBoxLayout()
@@ -910,7 +916,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         qualities = [_as_float(cap.value("calidad")) for cap in caps]
         qualities = [q for q in qualities if np.isfinite(q)]
         animals = {cap.value("id").strip() for cap in caps if cap.value("id").strip()}
+        mail_key = self.mail_key(session.path)
         return {
+            "Correo": "",
+            "_mail_key": mail_key,
+            "_mail_path": str(session.path) if session.path else "",
+            "_mail_checked": "1" if mail_key and mail_key in self.mail_paths else "0",
+            "_mail_tooltip": "Marcar CSV de sesion para incluirlo en el ZIP" if session.path else "Esta sesion no tiene CSV localizado",
             "Sesion": session.name,
             "Fecha": min(dates) if dates else "",
             "Inicio": min(hours) if hours else "",
@@ -927,7 +939,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         path = self._resolve_file_from_row(cap.row, "raw", RAW_DIR)
         return path if path and path.exists() else None
 
-    def raw_mail_key(self, path: Path | None) -> str:
+    def mail_key(self, path: Path | None) -> str:
         if path is None:
             return ""
         try:
@@ -935,27 +947,28 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         except OSError:
             return str(path)
 
-    def on_capture_mail_checked(self, row: dict[str, str], checked: bool):
+    def on_mail_checked(self, row: dict[str, str], checked: bool):
         key = row.get("_mail_key", "")
         path_text = row.get("_mail_path", "")
         if not key or not path_text:
             return
         path = Path(path_text)
         if checked:
-            self.mail_raw_paths[key] = path
+            self.mail_paths[key] = path
         else:
-            self.mail_raw_paths.pop(key, None)
+            self.mail_paths.pop(key, None)
         self.update_mail_status()
 
     def update_mail_status(self):
-        count = len(self.mail_raw_paths)
-        self.mail_status.setText(f"{count} raw{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
+        count = len(self.mail_paths)
+        self.mail_status.setText(f"{count} archivo{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
 
     def clear_mail_selection(self):
-        if not self.mail_raw_paths:
+        if not self.mail_paths:
             return
-        self.mail_raw_paths.clear()
+        self.mail_paths.clear()
         self.update_mail_status()
+        self.apply_filters()
         if self.current_session is not None:
             self.set_session(self.current_session)
 
@@ -966,13 +979,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         return desktop if desktop.exists() else Path.home()
 
     def prepare_mail_zip(self):
-        paths = [path for path in self.mail_raw_paths.values() if path.exists()]
+        paths = [path for path in self.mail_paths.values() if path.exists()]
         if not paths:
-            QtWidgets.QMessageBox.information(self, "Preparar correo", "Marca primero uno o varios raws en la tabla de tomas.")
+            QtWidgets.QMessageBox.information(self, "Preparar correo", "Marca primero uno o varios archivos, raws o sesiones.")
             return
         desktop = self.desktop_dir()
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        zip_path = desktop / f"mtestv2_raws_para_correo_{stamp}.zip"
+        zip_path = desktop / f"mtestv2_archivos_para_correo_{stamp}.zip"
         used_names: dict[str, int] = {}
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for path in paths:
@@ -989,7 +1002,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.information(
             self,
             "Preparar correo",
-            f"Se ha creado un ZIP en el Escritorio con {len(paths)} raw(s):\n\n{zip_path}\n\nLa ruta queda copiada al portapapeles.",
+            f"Se ha creado un ZIP en el Escritorio con {len(paths)} archivo(s):\n\n{zip_path}\n\nLa ruta queda copiada al portapapeles.",
         )
 
     def select_session(self):
@@ -1016,7 +1029,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             row = self._capture_row(cap)
             row["_capture_index"] = str(idx)
             capture_rows.append(row)
-        self.captures_model.set_rows(self.capture_headers, capture_rows)
+        capture_headers = self._headers_for_temperature_rows(
+            self.capture_headers,
+            capture_rows,
+            self.capture_two_temp_headers,
+            self.capture_cow_temp_headers,
+        )
+        self.captures_model.set_rows(capture_headers, capture_rows)
         self.captures_table.resizeColumnsToContents()
         if session.captures:
             _select_first_row(self.captures_table)
@@ -1027,7 +1046,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         quality = _as_float(cap.value("calidad"))
         bpm = _as_float(cap.value("bpm"))
         raw_path = self.capture_raw_path(cap)
-        raw_key = self.raw_mail_key(raw_path)
+        raw_key = self.mail_key(raw_path)
         ref_avg, _ref_count = _mean_ref_pulse(
             cap.value("pulso_previo"),
             cap.value("pulso_final_pulsio"),
@@ -1044,7 +1063,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Correo": "",
             "_mail_key": raw_key,
             "_mail_path": str(raw_path) if raw_path else "",
-            "_mail_checked": "1" if raw_key and raw_key in self.mail_raw_paths else "0",
+            "_mail_checked": "1" if raw_key and raw_key in self.mail_paths else "0",
             "_mail_tooltip": "Marcar raw para incluirlo en el ZIP de correo" if raw_path else "Esta toma no tiene raw localizado",
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
@@ -1113,6 +1132,67 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return display_mapping(mapping, animal_type)
         return ""
 
+    def _row_is_cow(self, row: dict[str, str]) -> bool:
+        species = (row.get("Especie") or row.get("animal_type") or "").strip()
+        if species and normalize_animal_type(species) == "vaca":
+            return True
+        return any(str(row.get(header, "")).strip() for header in self.capture_cow_temp_headers)
+
+    def _row_is_two_sensor(self, row: dict[str, str]) -> bool:
+        species = (row.get("Especie") or row.get("animal_type") or "").strip()
+        if species and normalize_animal_type(species) != "vaca":
+            return True
+        return any(str(row.get(header, "")).strip() for header in self.capture_two_temp_headers)
+
+    def _headers_for_temperature_rows(
+        self,
+        headers: list[str],
+        rows: list[dict[str, str]],
+        two_headers: list[str],
+        cow_headers: list[str],
+        *,
+        show_two: bool | None = None,
+        show_cow: bool | None = None,
+    ) -> list[str]:
+        if show_two is None:
+            show_two = any(
+                self._row_is_two_sensor(row) or any(str(row.get(header, "")).strip() for header in two_headers)
+                for row in rows
+            )
+        if show_cow is None:
+            show_cow = any(
+                self._row_is_cow(row) or any(str(row.get(header, "")).strip() for header in cow_headers)
+                for row in rows
+            )
+        if rows and not show_two and not show_cow:
+            show_two = True
+        visible: list[str] = []
+        for header in headers:
+            if header in two_headers and not show_two:
+                continue
+            if header in cow_headers and not show_cow:
+                continue
+            visible.append(header)
+        return visible
+
+    def _capture_is_cow(self, cap: CaptureRecord) -> bool:
+        animal_type = cap.value("animal_type").strip()
+        if animal_type and normalize_animal_type(animal_type) == "vaca":
+            return True
+        position = cap.value("ubre").strip().upper()
+        if position in {"FLT", "FRT", "RLT", "RRT"}:
+            return True
+        return any(cap.value(key) for key in ("temp_flt_c_final_max_5s", "temp_frt_c_final_max_5s", "temp_rlt_c_final_max_5s", "temp_rrt_c_final_max_5s"))
+
+    def _capture_is_two_sensor(self, cap: CaptureRecord) -> bool:
+        animal_type = cap.value("animal_type").strip()
+        if animal_type and normalize_animal_type(animal_type) != "vaca":
+            return True
+        position = cap.value("ubre").strip().upper()
+        if position in {"RT", "LT"}:
+            return True
+        return any(cap.value(key) for key in ("temp_rt_c_final_max_5s", "temp_lt_c_final_max_5s"))
+
     def select_capture(self):
         if self.current_session is None:
             self.set_capture(None)
@@ -1146,7 +1226,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.params.setHtml(self._params_html(cap))
         file_rows = []
         for kind, path in sorted(cap.files.items()):
+            mail_key = self.mail_key(path)
             file_rows.append({
+                "Correo": "",
+                "_mail_key": mail_key,
+                "_mail_path": str(path),
+                "_mail_checked": "1" if mail_key and mail_key in self.mail_paths else "0",
+                "_mail_tooltip": "Marcar archivo para incluirlo en el ZIP de correo",
                 "tipo": kind,
                 "archivo": path.name,
                 "filas": str(len(_read_csv(path))) if path.suffix.lower() == ".csv" else "",
@@ -1508,7 +1594,23 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 "Muestras tramo": str(samples),
             })
 
-        self.temporal_model.set_rows(self.temporal_headers, table_rows)
+        temporal_headers = self._headers_for_temperature_rows(
+            self.temporal_headers,
+            table_rows,
+            self.temporal_two_temp_headers,
+            self.temporal_cow_temp_headers,
+            show_two=self._capture_is_two_sensor(cap) or any(
+                str(row.get(header, "")).strip()
+                for row in table_rows
+                for header in self.temporal_two_temp_headers
+            ),
+            show_cow=self._capture_is_cow(cap) or any(
+                str(row.get(header, "")).strip()
+                for row in table_rows
+                for header in self.temporal_cow_temp_headers
+            ),
+        )
+        self.temporal_model.set_rows(temporal_headers, table_rows)
         self.temporal_table.resizeColumnsToContents()
         if table_rows:
             self.temporal_table.selectRow(0)
