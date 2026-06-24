@@ -59,6 +59,10 @@ def positions_for_animal(animal_type: str) -> tuple[str, ...]:
     return ("FLT", "FRT", "RLT", "RRT") if normalize_animal_type(animal_type) == ANIMAL_COW else ("RT", "LT")
 
 
+def active_temp_channels_for_animal(animal_type: str) -> tuple[str, ...]:
+    return TEMP_CHANNELS if normalize_animal_type(animal_type) == ANIMAL_COW else ("A0", "A1")
+
+
 def normalize_position(value: str, animal_type: str = "") -> str:
     text = (value or "").strip().upper().replace(" ", "_").replace("-", "_")
     if text in POSITION_LABELS:

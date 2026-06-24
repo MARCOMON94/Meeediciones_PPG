@@ -30,6 +30,7 @@ from ..animal_config import (
     TEMP_CHANNELS,
     TEMP_MAPPING_DEFAULT,
     TEMP_MAPPING_INVERTED,
+    active_temp_channels_for_animal,
     animal_label,
     default_mapping_for_animal,
     default_position_for_animal,
@@ -415,7 +416,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             pen=pg.mkPen((220, 60, 40), width=1, style=QtCore.Qt.PenStyle.DashLine),
         )
         self.plot_temp_live.addItem(self.temp_alert_line)
-        self.plot_temp_live.addLegend()
+        self.temp_live_legend = self.plot_temp_live.addLegend()
         signal_page = QtWidgets.QWidget()
         signal_layout = QtWidgets.QVBoxLayout(signal_page)
         signal_layout.setContentsMargins(0, 0, 0, 0)
@@ -558,6 +559,36 @@ class PPGSuite(QtWidgets.QMainWindow):
                     break
             self.udder_combo.blockSignals(False)
         self.configure_temp_mapping_editor(default_mapping_for_animal(animal_type))
+        self.refresh_temperature_curve_channels()
+
+    def active_temp_channels(self) -> tuple[str, ...]:
+        animal_type = getattr(self.state, "animal_type", "")
+        if hasattr(self, "animal_combo") and not getattr(self.state, "capturing", False):
+            animal_type = self.current_animal_type()
+        return active_temp_channels_for_animal(animal_type)
+
+    def format_active_temp_channels(self) -> str:
+        return " / ".join(self.active_temp_channels())
+
+    def sync_temperature_curve_visibility(self, curves: dict[str, object], legend=None) -> tuple[str, ...]:
+        active = set(self.active_temp_channels())
+        for channel, curve in curves.items():
+            visible = channel in active
+            if hasattr(curve, "setVisible"):
+                curve.setVisible(visible)
+            if not visible and hasattr(curve, "setData"):
+                curve.setData([], [])
+        if legend is not None and hasattr(legend, "items"):
+            for channel, item in zip(TEMP_CHANNELS, legend.items):
+                visible = channel in active
+                for part in item:
+                    if hasattr(part, "setVisible"):
+                        part.setVisible(visible)
+        return tuple(channel for channel in TEMP_CHANNELS if channel in active)
+
+    def refresh_temperature_curve_channels(self):
+        if hasattr(self, "temp_live_curves"):
+            self.sync_temperature_curve_visibility(self.temp_live_curves, getattr(self, "temp_live_legend", None))
 
     def configure_temp_mapping_editor(self, mapping: str = ""):
         if not hasattr(self, "temp_channel_combos"):
@@ -1390,7 +1421,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         best_label = ""
         best_value = math.nan
         best_time = math.nan
-        for channel in TEMP_CHANNELS:
+        for channel in self.active_temp_channels():
             values = np.asarray(getattr(st, f"temp_{channel.lower()}_c", []), dtype=float)
             n = min(t.size, values.size)
             if start_idx >= n:
@@ -1439,7 +1470,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             if np.isfinite(temp_c):
                 candidates.append((f"{position}", float(temp_c)))
         if not candidates:
+            active_channels = set(self.active_temp_channels())
             for channel, (temp_c, _raw) in channel_values.items():
+                if channel not in active_channels:
+                    continue
                 if np.isfinite(temp_c):
                     candidates.append((channel, float(temp_c)))
         if not candidates:
@@ -1480,7 +1514,11 @@ class PPGSuite(QtWidgets.QMainWindow):
             return
         start_idx = max(0, min(self.temperature_monitor_start_index(), t.size - 1))
         window_s = max(1.0, float(getattr(st, "temp_monitor_seconds", TEMP_MONITOR_DEFAULT_S) or TEMP_MONITOR_DEFAULT_S))
+        active_channels = set(self.sync_temperature_curve_visibility(self.temp_live_curves, getattr(self, "temp_live_legend", None)))
         for channel, curve in self.temp_live_curves.items():
+            if channel not in active_channels:
+                curve.setData([], [])
+                continue
             values = np.asarray(getattr(st, f"temp_{channel.lower()}_c", []), dtype=float)
             n = min(t.size, values.size)
             if start_idx >= n:
@@ -1492,10 +1530,11 @@ class PPGSuite(QtWidgets.QMainWindow):
         threshold = float(getattr(st, "temp_alert_threshold_c", TEMP_ALERT_DEFAULT_C) or TEMP_ALERT_DEFAULT_C)
         self.temp_alert_line.setValue(threshold)
         label, value, at_s = self.temperature_window_max()
+        channel_names = self.format_active_temp_channels()
         if np.isfinite(value):
-            self.plot_temp_live.setTitle(f"Temperatura inicial | max {fmt(value,1)} C {label} a {fmt(at_s,1)} s")
+            self.plot_temp_live.setTitle(f"Temperatura inicial ({channel_names}) | max {fmt(value,1)} C {label} a {fmt(at_s,1)} s")
         else:
-            self.plot_temp_live.setTitle("Temperatura inicial")
+            self.plot_temp_live.setTitle(f"Temperatura inicial ({channel_names})")
         self.plot_temp_live.setXRange(0.0, window_s, padding=0.02)
 
     def temperature_summary(self) -> dict[str, float | int]:

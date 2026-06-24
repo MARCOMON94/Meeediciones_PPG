@@ -253,7 +253,7 @@ class ScheduledConfigWindow(PPGSuite):
             pen=pg.mkPen((220, 60, 40), width=1, style=QtCore.Qt.PenStyle.DashLine),
         )
         self.plot_temp_live.addItem(self.temp_alert_line)
-        self.plot_temp_live.addLegend()
+        self.temp_live_legend = self.plot_temp_live.addLegend()
         signal_page = QtWidgets.QWidget()
         signal_layout = QtWidgets.QVBoxLayout(signal_page)
         signal_layout.setContentsMargins(0, 0, 0, 0)

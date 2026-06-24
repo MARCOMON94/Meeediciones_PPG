@@ -106,21 +106,27 @@ class TemperatureWindow(PPGSuite):
         self.info.setMinimumWidth(320)
         left.addWidget(self.info, stretch=1)
 
-        self.plot_temp = pg.PlotWidget(title="Temperatura A0 / A1 / A2 / A3")
+        self.plot_temp = pg.PlotWidget(title="Temperatura inicial")
         self.plot_temp.setBackground("w")
         self.plot_temp.showGrid(x=True, y=True, alpha=0.25)
         self.plot_temp.setLabel("bottom", "Tiempo", units="s")
-        self.temp_a0_curve = self.plot_temp.plot([], [], pen=pg.mkPen((180, 60, 60), width=2), name="A0")
-        self.temp_a1_curve = self.plot_temp.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1")
-        self.temp_a2_curve = self.plot_temp.plot([], [], pen=pg.mkPen((220, 140, 30), width=2), name="A2")
-        self.temp_a3_curve = self.plot_temp.plot([], [], pen=pg.mkPen((80, 160, 80), width=2), name="A3")
+        self.temp_live_curves = {
+            "A0": self.plot_temp.plot([], [], pen=pg.mkPen((180, 60, 60), width=2), name="A0"),
+            "A1": self.plot_temp.plot([], [], pen=pg.mkPen((40, 100, 210), width=2), name="A1"),
+            "A2": self.plot_temp.plot([], [], pen=pg.mkPen((220, 140, 30), width=2), name="A2"),
+            "A3": self.plot_temp.plot([], [], pen=pg.mkPen((80, 160, 80), width=2), name="A3"),
+        }
+        self.temp_a0_curve = self.temp_live_curves["A0"]
+        self.temp_a1_curve = self.temp_live_curves["A1"]
+        self.temp_a2_curve = self.temp_live_curves["A2"]
+        self.temp_a3_curve = self.temp_live_curves["A3"]
         self.temp_alert_line = pg.InfiniteLine(
             angle=0,
             movable=False,
             pen=pg.mkPen((220, 60, 40), width=1, style=QtCore.Qt.PenStyle.DashLine),
         )
         self.plot_temp.addItem(self.temp_alert_line)
-        self.plot_temp.addLegend()
+        self.temp_live_legend = self.plot_temp.addLegend()
         root.addWidget(self.plot_temp, stretch=1)
 
     def start_temperature_capture(self):
@@ -163,28 +169,31 @@ class TemperatureWindow(PPGSuite):
     def update_plots(self):
         t, _red, _ir = self.arrays()
         channels = self.temp_channel_arrays()
-        temp_a0_c, _temp_a0_raw = channels["A0"]
-        temp_a1_c, _temp_a1_raw = channels["A1"]
-        temp_a2_c, _temp_a2_raw = channels["A2"]
-        temp_a3_c, _temp_a3_raw = channels["A3"]
-        n = min(t.size, temp_a0_c.size, temp_a1_c.size, temp_a2_c.size, temp_a3_c.size)
-        if n < 2:
-            self.temp_a0_curve.setData([], [])
-            self.temp_a1_curve.setData([], [])
-            self.temp_a2_curve.setData([], [])
-            self.temp_a3_curve.setData([], [])
+        active_channels = set(self.sync_temperature_curve_visibility(self.temp_live_curves, getattr(self, "temp_live_legend", None)))
+        if t.size < 2:
+            for curve in self.temp_live_curves.values():
+                curve.setData([], [])
             return
         window_s = max(1.0, float(self.state.temp_monitor_seconds or self.current_temp_monitor_seconds()))
-        rel = t[:n] - float(t[0])
-        mask = np.isfinite(rel) & (rel >= 0.0) & (rel <= window_s)
-        self.temp_a0_curve.setData(rel[mask], temp_a0_c[:n][mask])
-        self.temp_a1_curve.setData(rel[mask], temp_a1_c[:n][mask])
-        self.temp_a2_curve.setData(rel[mask], temp_a2_c[:n][mask])
-        self.temp_a3_curve.setData(rel[mask], temp_a3_c[:n][mask])
+        for channel, curve in self.temp_live_curves.items():
+            if channel not in active_channels:
+                curve.setData([], [])
+                continue
+            values, _raw = channels[channel]
+            n = min(t.size, values.size)
+            if n < 2:
+                curve.setData([], [])
+                continue
+            rel = t[:n] - float(t[0])
+            mask = np.isfinite(rel) & np.isfinite(values[:n]) & (rel >= 0.0) & (rel <= window_s)
+            curve.setData(rel[mask], values[:n][mask])
         self.temp_alert_line.setValue(float(self.state.temp_alert_threshold_c or self.current_temp_alert_threshold()))
         label, value, at_s = self.temperature_window_max()
+        channel_names = self.format_active_temp_channels()
         if math.isfinite(value):
-            self.plot_temp.setTitle(f"Temperatura inicial | max {fmt(value,1)} C {label} a {fmt(at_s,1)} s")
+            self.plot_temp.setTitle(f"Temperatura inicial ({channel_names}) | max {fmt(value,1)} C {label} a {fmt(at_s,1)} s")
+        else:
+            self.plot_temp.setTitle(f"Temperatura inicial ({channel_names})")
         self.plot_temp.setXRange(0.0, window_s, padding=0.02)
 
     def _temp_channel_status(self, name: str, temp_c: float, raw: float) -> str:
@@ -233,34 +242,45 @@ class TemperatureWindow(PPGSuite):
             format_status = "formato A0 + A1 + A2 + A3 (11 campos)"
         elif fields:
             format_status = f"formato inesperado: {fields} campos"
-        a0_status = self._temp_channel_status("A0", float(temp["temp_a0_c_last"]), float(temp["temp_a0_raw_last"]))
-        a1_status = self._temp_channel_status("A1", float(temp["temp_a1_c_last"]), float(temp["temp_a1_raw_last"]))
-        a2_status = self._temp_channel_status("A2", float(temp["temp_a2_c_last"]), float(temp["temp_a2_raw_last"]))
-        a3_status = self._temp_channel_status("A3", float(temp["temp_a3_c_last"]), float(temp["temp_a3_raw_last"]))
+        active_channels = self.active_temp_channels()
+        if fields == 11 and len(active_channels) == 2:
+            format_status += "; mostrando A0 + A1 por especie"
+        sample_lines = "".join(
+            f"Muestras {channel}: {temp[f'temp_{channel.lower()}_samples']} temp / {temp[f'temp_{channel.lower()}_raw_samples']} raw\n"
+            for channel in active_channels
+        )
+        if len(active_channels) == 4:
+            position_lines = (
+                f"Vaca FLT/FRT/RLT/RRT final: {fmt(temp['temp_flt_c_final_max_5s'], 2)} / {fmt(temp['temp_frt_c_final_max_5s'], 2)} / "
+                f"{fmt(temp['temp_rlt_c_final_max_5s'], 2)} / {fmt(temp['temp_rrt_c_final_max_5s'], 2)} C\n"
+            )
+        else:
+            position_lines = (
+                f"RT final: {fmt(temp['temp_rt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_rt_c_last'], 2)} C\n"
+                f"LT final: {fmt(temp['temp_lt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_lt_c_last'], 2)} C\n"
+            )
+        channel_lines = ""
+        diagnostic_lines = []
+        for channel in active_channels:
+            prefix = f"temp_{channel.lower()}"
+            channel_lines += (
+                f"{channel} actual: {fmt(temp[f'{prefix}_c_last'], 2)} C | final {fmt(temp[f'{prefix}_c_final_max_5s'], 2)} C\n"
+                f"{channel} min/max: {fmt(temp[f'{prefix}_c_min'], 2)} / {fmt(temp[f'{prefix}_c_max'], 2)} C | raw {fmt(temp[f'{prefix}_raw_last'], 0)}\n"
+            )
+            diagnostic_lines.append(self._temp_channel_status(channel, float(temp[f"{prefix}_c_last"]), float(temp[f"{prefix}_raw_last"])))
         self.info.setText(
             f"MODO CAMPO - SOLO TEMPERATURA\n"
             f"Puerto: {self.port_name}\n"
             f"Estado: {status}\n"
             f"Crotal: {st.crotal_id}\n"
-            f"Muestras A0: {temp['temp_a0_samples']} temp / {temp['temp_a0_raw_samples']} raw\n"
-            f"Muestras A1: {temp['temp_a1_samples']} temp / {temp['temp_a1_raw_samples']} raw\n"
-            f"Muestras A2: {temp['temp_a2_samples']} temp / {temp['temp_a2_raw_samples']} raw\n"
-            f"Muestras A3: {temp['temp_a3_samples']} temp / {temp['temp_a3_raw_samples']} raw\n"
+            f"{sample_lines}"
             f"Lineas OK: {st.valid_lines} | descartadas: {st.discarded_lines}\n"
             f"Serial: {format_status}\n\n"
-            f"RT final: {fmt(temp['temp_rt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_rt_c_last'], 2)} C\n"
-            f"LT final: {fmt(temp['temp_lt_c_final_max_5s'], 2)} C | ult. {fmt(temp['temp_lt_c_last'], 2)} C\n"
-            f"Vaca FLT/FRT/RLT/RRT final: {fmt(temp['temp_flt_c_final_max_5s'], 2)} / {fmt(temp['temp_frt_c_final_max_5s'], 2)} / {fmt(temp['temp_rlt_c_final_max_5s'], 2)} / {fmt(temp['temp_rrt_c_final_max_5s'], 2)} C\n"
+            f"{position_lines}"
             f"{self.temp_monitor_status_line()}\n"
-            f"A0 actual: {fmt(temp['temp_a0_c_last'], 2)} C | final {fmt(temp['temp_a0_c_final_max_5s'], 2)} C\n"
-            f"A0 min/max: {fmt(temp['temp_a0_c_min'], 2)} / {fmt(temp['temp_a0_c_max'], 2)} C | raw {fmt(temp['temp_a0_raw_last'], 0)}\n"
-            f"A1 actual: {fmt(temp['temp_a1_c_last'], 2)} C | final {fmt(temp['temp_a1_c_final_max_5s'], 2)} C\n"
-            f"A1 min/max: {fmt(temp['temp_a1_c_min'], 2)} / {fmt(temp['temp_a1_c_max'], 2)} C | raw {fmt(temp['temp_a1_raw_last'], 0)}\n\n"
+            f"{channel_lines}\n"
             f"Diagnostico rapido:\n"
-            f"{a0_status}\n"
-            f"{a1_status}\n"
-            f"{a2_status}\n"
-            f"{a3_status}\n\n"
+            f"{chr(10).join(diagnostic_lines)}\n\n"
             f"Conexiones:\n"
             f"A0-A3: 3.3V -> NTC -> Ax -> R fija 10k -> GND\n\n"
             f"Ultima linea: {st.last_line[:110]}\n"
