@@ -4,6 +4,7 @@ import csv
 import html
 import json
 import math
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -687,8 +688,11 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.resize(1420, 900)
         self.raw_files: list[RawFileInfo] = []
         self.results: list[SpectrumResult] = []
+        self.mail_paths: dict[str, Path] = {}
+        self._updating_raw_table = False
         self._build_ui()
         self.reload_raws()
+        self.update_mail_status()
 
     def _build_ui(self):
         central = QtWidgets.QWidget()
@@ -718,10 +722,15 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.btn_clear = QtWidgets.QPushButton("Desmarcar")
         self.btn_analyze = QtWidgets.QPushButton("Analizar seleccionados")
         self.btn_export = QtWidgets.QPushButton("Exportar informe PDF")
+        self.mail_status = QtWidgets.QLabel("0 archivos seleccionados")
+        self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
+        self.btn_clear_mail = QtWidgets.QPushButton("Limpiar correo")
         self.btn_export.setEnabled(False)
         self.btn_analyze.setMinimumHeight(36)
         self.btn_analyze.setStyleSheet("font-weight: bold;")
         self.btn_export.setMinimumHeight(36)
+        self.btn_prepare_mail.setMinimumHeight(36)
+        self.btn_clear_mail.setMinimumHeight(36)
         cl.addWidget(QtWidgets.QLabel("Animal"), 0, 0)
         cl.addWidget(self.animal_filter, 0, 1)
         cl.addWidget(QtWidgets.QLabel("Texto"), 0, 2)
@@ -730,6 +739,9 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         cl.addWidget(self.btn_clear, 0, 5)
         cl.addWidget(self.btn_analyze, 0, 6)
         cl.addWidget(self.btn_export, 0, 7)
+        cl.addWidget(self.mail_status, 1, 0, 1, 2)
+        cl.addWidget(self.btn_prepare_mail, 1, 4)
+        cl.addWidget(self.btn_clear_mail, 1, 5)
         root.addWidget(controls)
         self.animal_filter.currentTextChanged.connect(self.apply_filters)
         self.text_filter.textChanged.connect(self.apply_filters)
@@ -737,16 +749,19 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.btn_clear.clicked.connect(self.clear_selection)
         self.btn_analyze.clicked.connect(self.analyze_selected)
         self.btn_export.clicked.connect(self.export_report)
+        self.btn_prepare_mail.clicked.connect(self.prepare_mail_zip)
+        self.btn_clear_mail.clicked.connect(self.clear_mail_selection)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         root.addWidget(splitter, stretch=1)
 
-        self.raw_table = QtWidgets.QTableWidget(0, 6)
-        self.raw_table.setHorizontalHeaderLabels(["Usar", "Animal", "Fecha", "Filas", "Configuraciones", "Archivo"])
+        self.raw_table = QtWidgets.QTableWidget(0, 7)
+        self.raw_table.setHorizontalHeaderLabels(["Usar", "Correo", "Animal", "Fecha", "Filas", "Configuraciones", "Archivo"])
         self.raw_table.verticalHeader().setVisible(False)
         self.raw_table.setAlternatingRowColors(True)
         self.raw_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.raw_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.raw_table.itemChanged.connect(self.on_raw_table_item_changed)
         self.raw_table.doubleClicked.connect(self.open_selected_raw_file)
         splitter.addWidget(self.raw_table)
 
@@ -807,26 +822,108 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     def apply_filters(self):
         animal = self.animal_filter.currentText()
         text = self.text_filter.text().strip().lower()
-        self.raw_table.setRowCount(0)
-        for info in self.raw_files:
-            haystack = f"{info.path.name} {info.animal} {info.date} {info.config_summary}".lower()
-            if animal != "Todos" and animal not in info.animal:
-                continue
-            if text and text not in haystack:
-                continue
-            row = self.raw_table.rowCount()
-            self.raw_table.insertRow(row)
-            check = QtWidgets.QTableWidgetItem("")
-            check.setFlags(check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
-            check.setCheckState(QtCore.Qt.CheckState.Unchecked)
-            check.setData(QtCore.Qt.ItemDataRole.UserRole, str(info.path))
-            self.raw_table.setItem(row, 0, check)
-            values = [info.animal, info.date, str(info.rows), info.config_summary, info.path.name]
-            for col, value in enumerate(values, start=1):
-                item = QtWidgets.QTableWidgetItem(value)
-                item.setToolTip(str(info.path))
-                self.raw_table.setItem(row, col, item)
+        self._updating_raw_table = True
+        try:
+            self.raw_table.setRowCount(0)
+            for info in self.raw_files:
+                haystack = f"{info.path.name} {info.animal} {info.date} {info.config_summary}".lower()
+                if animal != "Todos" and animal not in info.animal:
+                    continue
+                if text and text not in haystack:
+                    continue
+                row = self.raw_table.rowCount()
+                self.raw_table.insertRow(row)
+                check = QtWidgets.QTableWidgetItem("")
+                check.setFlags(check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+                check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+                check.setData(QtCore.Qt.ItemDataRole.UserRole, str(info.path))
+                check.setToolTip("Marcar raw para incluirlo en el analisis comparativo")
+                self.raw_table.setItem(row, 0, check)
+                mail_check = QtWidgets.QTableWidgetItem("")
+                mail_check.setFlags(mail_check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+                mail_check.setCheckState(QtCore.Qt.CheckState.Checked if self.mail_key(info.path) in self.mail_paths else QtCore.Qt.CheckState.Unchecked)
+                mail_check.setData(QtCore.Qt.ItemDataRole.UserRole, str(info.path))
+                mail_check.setToolTip("Marcar raw para incluirlo en el ZIP de correo")
+                self.raw_table.setItem(row, 1, mail_check)
+                values = [info.animal, info.date, str(info.rows), info.config_summary, info.path.name]
+                for col, value in enumerate(values, start=2):
+                    item = QtWidgets.QTableWidgetItem(value)
+                    item.setToolTip(str(info.path))
+                    self.raw_table.setItem(row, col, item)
+        finally:
+            self._updating_raw_table = False
         self.raw_table.resizeColumnsToContents()
+
+    def mail_key(self, path: Path | None) -> str:
+        if path is None:
+            return ""
+        try:
+            return str(path.resolve())
+        except OSError:
+            return str(path)
+
+    def on_raw_table_item_changed(self, item: QtWidgets.QTableWidgetItem):
+        if self._updating_raw_table or item.column() != 1:
+            return
+        path_text = item.data(QtCore.Qt.ItemDataRole.UserRole) or ""
+        if not path_text:
+            return
+        path = Path(path_text)
+        key = self.mail_key(path)
+        if item.checkState() == QtCore.Qt.CheckState.Checked:
+            self.mail_paths[key] = path
+        else:
+            self.mail_paths.pop(key, None)
+        self.update_mail_status()
+
+    def update_mail_status(self):
+        count = len(self.mail_paths)
+        self.mail_status.setText(f"{count} archivo{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
+
+    def clear_mail_selection(self):
+        if not self.mail_paths:
+            return
+        self.mail_paths.clear()
+        self._updating_raw_table = True
+        try:
+            for row in range(self.raw_table.rowCount()):
+                item = self.raw_table.item(row, 1)
+                if item:
+                    item.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        finally:
+            self._updating_raw_table = False
+        self.update_mail_status()
+
+    def desktop_dir(self) -> Path:
+        desktop = Path.home() / "Desktop"
+        if not desktop.exists():
+            desktop = Path.home() / "Escritorio"
+        return desktop if desktop.exists() else Path.home()
+
+    def prepare_mail_zip(self):
+        paths = [path for path in self.mail_paths.values() if path.exists()]
+        if not paths:
+            QtWidgets.QMessageBox.information(self, "Preparar correo", "Marca primero uno o varios raws en la columna Correo.")
+            return
+        desktop = self.desktop_dir()
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_path = desktop / f"mtestv2_archivos_para_correo_{stamp}.zip"
+        used_names: dict[str, int] = {}
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in paths:
+                name = path.name
+                if name in used_names:
+                    used_names[name] += 1
+                    name = f"{path.stem}_{used_names[path.name]}{path.suffix}"
+                else:
+                    used_names[name] = 1
+                zf.write(path, arcname=name)
+        QtWidgets.QApplication.clipboard().setText(str(zip_path))
+        QtWidgets.QMessageBox.information(
+            self,
+            "Preparar correo",
+            f"Se ha creado un ZIP en el Escritorio con {len(paths)} raw(s):\n\n{zip_path}\n\nLa ruta queda copiada al portapapeles.",
+        )
 
     def selected_paths(self) -> list[Path]:
         paths: list[Path] = []
