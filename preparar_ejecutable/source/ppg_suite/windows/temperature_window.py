@@ -78,7 +78,7 @@ class TemperatureWindow(PPGSuite):
         self.condition_edit = QtWidgets.QLineEdit("solo temperatura en campo")
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         form.addRow("Crotal:", self.crotal_edit)
-        form.addRow("Animal:", self.animal_combo)
+        form.addRow("Especie:", self.animal_combo)
         form.addRow("Duración:", self.duration_spin)
         form.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)
         form.addRow("Sensor:", self.udder_combo)

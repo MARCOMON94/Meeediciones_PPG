@@ -79,7 +79,7 @@ class ReajustesWindow(PPGSuite):
         self.duration_spin.setVisible(False)
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         identity.addRow("Crotal:", self.crotal_edit)
-        identity.addRow("Animal:", self.animal_combo)
+        identity.addRow("Especie:", self.animal_combo)
         identity.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         identity.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)
         identity.addRow("Sensor:", self.udder_combo)

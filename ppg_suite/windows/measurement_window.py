@@ -336,7 +336,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         self.condition_edit.setPlaceholderText("Ej.: campo, ordeño activo, sensor reajustado, animal inquieto...")
         cap.addRow("Crotal:", self.crotal_edit)
-        cap.addRow("Animal:", self.animal_combo)
+        cap.addRow("Especie:", self.animal_combo)
         cap.addRow("Duración:", self.duration_spin)
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         cap.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)

@@ -189,7 +189,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.duration_spin.setSuffix(" min")
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         form.addRow("Crotal:", self.crotal_edit)
-        form.addRow("Animal:", self.animal_combo)
+        form.addRow("Especie:", self.animal_combo)
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
         form.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)
         form.addRow("Sensor:", self.udder_combo)
