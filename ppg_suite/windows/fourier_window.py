@@ -871,7 +871,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
     result_headers = [
-        "Puntuacion", "Veredicto", "Animal", "Configuracion", "BPM ref.", "Dif FFT-ref",
+        "Correo", "Puntuacion", "Veredicto", "Animal", "Configuracion", "BPM ref.", "Dif FFT-ref",
         "BPM FFT IR", "BPM autocorr", "BPM Hilbert", "BPM FFT RED", "Hilbert env. CV %", "Hilbert calidad",
         "BPM Wavelet", "Wavelet calidad", "Dominancia", "Banda", "SNR dB", "PI IR %", "Artefactos %", "Retenido %", "Descartado %",
         "SpO2 est.", "Calidad SpO2", "Resp/min (experimental)", "Calidad Resp.", "Saturacion %",
@@ -971,6 +971,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.results_table.setAlternatingRowColors(True)
         self.results_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.results_table.itemChanged.connect(self.on_results_table_item_changed)
         self.results_table.currentCellChanged.connect(self.plot_current_result)
         self.results_table.doubleClicked.connect(self.open_selected_result_file)
         results_layout.addWidget(self.results_table, stretch=2)
@@ -1063,6 +1064,14 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     def on_raw_table_item_changed(self, item: QtWidgets.QTableWidgetItem):
         if self._updating_raw_table or item.column() != 1:
             return
+        self.set_mail_checked_from_item(item)
+
+    def on_results_table_item_changed(self, item: QtWidgets.QTableWidgetItem):
+        if self._updating_raw_table or item.column() != 0:
+            return
+        self.set_mail_checked_from_item(item)
+
+    def set_mail_checked_from_item(self, item: QtWidgets.QTableWidgetItem):
         path_text = item.data(QtCore.Qt.ItemDataRole.UserRole) or ""
         if not path_text:
             return
@@ -1073,23 +1082,31 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         else:
             self.mail_paths.pop(key, None)
         self.update_mail_status()
+        self.sync_mail_check_states()
 
     def update_mail_status(self):
         count = len(self.mail_paths)
         self.mail_status.setText(f"{count} archivo{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
 
+    def sync_mail_check_states(self):
+        self._updating_raw_table = True
+        try:
+            for table, column in ((self.raw_table, 1), (self.results_table, 0)):
+                for row in range(table.rowCount()):
+                    item = table.item(row, column)
+                    if not item:
+                        continue
+                    path_text = item.data(QtCore.Qt.ItemDataRole.UserRole) or ""
+                    checked = self.mail_key(Path(path_text)) in self.mail_paths if path_text else False
+                    item.setCheckState(QtCore.Qt.CheckState.Checked if checked else QtCore.Qt.CheckState.Unchecked)
+        finally:
+            self._updating_raw_table = False
+
     def clear_mail_selection(self):
         if not self.mail_paths:
             return
         self.mail_paths.clear()
-        self._updating_raw_table = True
-        try:
-            for row in range(self.raw_table.rowCount()):
-                item = self.raw_table.item(row, 1)
-                if item:
-                    item.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        finally:
-            self._updating_raw_table = False
+        self.sync_mail_check_states()
         self.update_mail_status()
 
     def desktop_dir(self) -> Path:
@@ -1184,36 +1201,46 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
             self.plot.clear()
 
     def populate_results(self):
+        self._updating_raw_table = True
         self.results_table.setRowCount(0)
-        for result in self.results:
-            row = self.results_table.rowCount()
-            self.results_table.insertRow(row)
-            values = [
-                fmt(result.score, 1, ""), result.verdict, result.animal, result.config_label,
-                fmt(result.pulse_ref_avg, 1, ""), fmt(result.diff_fft_ref_bpm, 1, ""),
-                fmt(result.bpm_fft_ir, 1, ""), fmt(result.bpm_autocorr, 1, ""),
-                fmt(result.bpm_hilbert_ir, 1, ""), fmt(result.bpm_fft_red, 1, ""),
-                fmt(result.hilbert_envelope_cv_pct, 1, ""), fmt(result.hilbert_quality, 0, ""),
-                fmt(result.bpm_wavelet_ir, 1, ""), fmt(result.wavelet_quality, 0, ""),
-                fmt(result.dominance_ir, 2, ""), fmt(result.band_ratio_ir, 3, ""), fmt(result.peak_snr_db, 1, ""),
-                fmt(result.pi_ir_pct, 3, ""), fmt(result.artifact_ir_pct, 1, ""),
-                fmt(result.retained_pct, 1, ""), fmt(result.discarded_pct, 1, ""),
-                fmt(result.spo2_est_pct, 1, ""), fmt(result.spo2_quality, 0, ""),
-                fmt(result.resp_rate_rpm, 1, ""), fmt(result.resp_quality, 0, ""),
-                fmt(result.saturation_pct, 1, ""),
-                fmt(result.hz_jitter_pct, 1, ""), fmt(result.duration_s, 1, ""), str(result.n), result.file.name,
-            ]
-            for col, value in enumerate(values):
-                item = QtWidgets.QTableWidgetItem(value)
-                if col == 0:
-                    item.setData(QtCore.Qt.ItemDataRole.UserRole, row)
-                if result.score >= 75:
-                    item.setBackground(QtGui.QColor("#dff3e4"))
-                    item.setForeground(QtGui.QBrush(QtGui.QColor("#17202a")))
-                elif result.score < 42:
-                    item.setBackground(QtGui.QColor("#f8d7da"))
-                    item.setForeground(QtGui.QBrush(QtGui.QColor("#17202a")))
-                self.results_table.setItem(row, col, item)
+        try:
+            for result in self.results:
+                row = self.results_table.rowCount()
+                self.results_table.insertRow(row)
+                mail_check = QtWidgets.QTableWidgetItem("")
+                mail_check.setFlags(mail_check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+                mail_check.setCheckState(QtCore.Qt.CheckState.Checked if self.mail_key(result.file) in self.mail_paths else QtCore.Qt.CheckState.Unchecked)
+                mail_check.setData(QtCore.Qt.ItemDataRole.UserRole, str(result.file))
+                mail_check.setToolTip("Marcar raw para incluirlo en el ZIP de correo")
+                self.results_table.setItem(row, 0, mail_check)
+                values = [
+                    fmt(result.score, 1, ""), result.verdict, result.animal, result.config_label,
+                    fmt(result.pulse_ref_avg, 1, ""), fmt(result.diff_fft_ref_bpm, 1, ""),
+                    fmt(result.bpm_fft_ir, 1, ""), fmt(result.bpm_autocorr, 1, ""),
+                    fmt(result.bpm_hilbert_ir, 1, ""), fmt(result.bpm_fft_red, 1, ""),
+                    fmt(result.hilbert_envelope_cv_pct, 1, ""), fmt(result.hilbert_quality, 0, ""),
+                    fmt(result.bpm_wavelet_ir, 1, ""), fmt(result.wavelet_quality, 0, ""),
+                    fmt(result.dominance_ir, 2, ""), fmt(result.band_ratio_ir, 3, ""), fmt(result.peak_snr_db, 1, ""),
+                    fmt(result.pi_ir_pct, 3, ""), fmt(result.artifact_ir_pct, 1, ""),
+                    fmt(result.retained_pct, 1, ""), fmt(result.discarded_pct, 1, ""),
+                    fmt(result.spo2_est_pct, 1, ""), fmt(result.spo2_quality, 0, ""),
+                    fmt(result.resp_rate_rpm, 1, ""), fmt(result.resp_quality, 0, ""),
+                    fmt(result.saturation_pct, 1, ""),
+                    fmt(result.hz_jitter_pct, 1, ""), fmt(result.duration_s, 1, ""), str(result.n), result.file.name,
+                ]
+                for col, value in enumerate(values, start=1):
+                    item = QtWidgets.QTableWidgetItem(value)
+                    if col == 1:
+                        item.setData(QtCore.Qt.ItemDataRole.UserRole, row)
+                    if result.score >= 75:
+                        item.setBackground(QtGui.QColor("#dff3e4"))
+                        item.setForeground(QtGui.QBrush(QtGui.QColor("#17202a")))
+                    elif result.score < 42:
+                        item.setBackground(QtGui.QColor("#f8d7da"))
+                        item.setForeground(QtGui.QBrush(QtGui.QColor("#17202a")))
+                    self.results_table.setItem(row, col, item)
+        finally:
+            self._updating_raw_table = False
         self.results_table.resizeColumnsToContents()
         if self.results:
             self.results_table.selectRow(0)
