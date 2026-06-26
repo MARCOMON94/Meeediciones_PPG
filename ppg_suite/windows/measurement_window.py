@@ -914,14 +914,19 @@ class PPGSuite(QtWidgets.QMainWindow):
         info = QtWidgets.QLabel(
             "No has puesto pulso inicial.\n\n"
             "Ahora se usa para comparar las BPM del sensor con la referencia manual. "
-            "Puedes introducirlo ahora, iniciar igualmente sin BPM o cancelar."
+            "Puedes introducirlo ahora, revisar tambien la temperatura manual inicial, "
+            "iniciar igualmente sin BPM o cancelar."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
         pulse_edit = QtWidgets.QLineEdit()
         pulse_edit.setPlaceholderText("Ej.: 72")
+        temp_edit = QtWidgets.QLineEdit()
+        temp_edit.setText(self.temp_manual_initial_edit.text().strip() if hasattr(self, "temp_manual_initial_edit") else "")
+        temp_edit.setPlaceholderText("Opcional. Ej.: 38.6")
         form = QtWidgets.QFormLayout()
         form.addRow("BPM inicial:", pulse_edit)
+        form.addRow("Temp. manual inicio (C):", temp_edit)
         layout.addLayout(form)
         buttons = QtWidgets.QDialogButtonBox()
         start_with_bpm = buttons.addButton("Iniciar con BPM", QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
@@ -942,6 +947,9 @@ class PPGSuite(QtWidgets.QMainWindow):
         button = chosen.get("button")
         if button is cancel_btn or button is None:
             return None
+        temp_value = safe_float_text(temp_edit.text())
+        if hasattr(self, "temp_manual_initial_edit"):
+            self.temp_manual_initial_edit.setText(temp_value)
         if button is start_without_bpm:
             return ""
         value = safe_float_text(pulse_edit.text())
