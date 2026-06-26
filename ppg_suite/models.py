@@ -91,6 +91,7 @@ class CaptureState:
     crotal_id: str = "SIN_CROTAL"
     animal_type: str = "oveja"
     pulse_prev: str = ""
+    temp_manual_initial_c: str = ""
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
     measurement_condition: str = ""

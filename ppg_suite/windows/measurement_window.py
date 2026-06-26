@@ -322,6 +322,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(90.0); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.temp_manual_initial_edit = QtWidgets.QLineEdit()
+        self.temp_manual_initial_edit.setPlaceholderText("Opcional. Ej.: 38.6")
         self.animal_combo = QtWidgets.QComboBox()
         self.configure_animal_combo(self.animal_combo)
         self.udder_combo = QtWidgets.QComboBox()
@@ -337,6 +339,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         cap.addRow("Animal:", self.animal_combo)
         cap.addRow("Duración:", self.duration_spin)
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
+        cap.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)
         cap.addRow("Sensor:", self.udder_combo)
         cap.addRow("Termometros:", self.temp_mapping_widget)
         cap.addRow("Temperatura:", self.temp_monitor_widget)
@@ -1182,6 +1185,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                     cfg.skip,
                     1 if cfg.debug else 0,
                     st.pulse_prev,
+                    st.temp_manual_initial_c,
                     st.pulse_final_pulsio,
                     st.pulse_final_fonendo,
                     self.last_config_ack,
@@ -1199,6 +1203,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         crotal = old.crotal_id if keep_identity else sanitize_id(self.crotal_edit.text())
         animal_type = old.animal_type if keep_identity else self.current_animal_type()
         prev = old.pulse_prev if keep_identity else safe_float_text(self.prev_pulse_edit.text())
+        temp_manual_initial = old.temp_manual_initial_c if keep_identity else safe_float_text(self.temp_manual_initial_edit.text())
         condition = old.measurement_condition if keep_identity else self.current_condition_text()
         udder = old.udder_side if keep_identity else self.current_udder_text()
         temp_mapping = old.temp_mapping if keep_identity else self.current_temp_mapping()
@@ -1211,6 +1216,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             crotal_id=crotal,
             animal_type=animal_type,
             pulse_prev=prev,
+            temp_manual_initial_c=temp_manual_initial,
             measurement_condition=condition,
             final_annotations=final_annotations,
             udder_side=udder,
@@ -1234,7 +1240,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
             "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
-            "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
+            "pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo",
             "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales"
         ])
         st.raw_handle.flush()
@@ -1679,11 +1685,12 @@ class PPGSuite(QtWidgets.QMainWindow):
         if not rows:
             return
         fieldnames = list(rows[0].keys())
-        for field in ("pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales"):
+        for field in ("pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales"):
             if field not in fieldnames:
                 fieldnames.append(field)
         for row in rows:
             row["pulso_previo"] = st.pulse_prev
+            row["temperatura_manual_inicio_c"] = st.temp_manual_initial_c
             row["pulso_final_pulsio"] = st.pulse_final_pulsio
             row["pulso_final_fonendo"] = st.pulse_final_fonendo
             row["anotaciones_inicio"] = st.measurement_condition
@@ -1835,6 +1842,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             },
             "manual_reference": {
                 "pulso_previo": st.pulse_prev,
+                "temperatura_manual_inicio_c": st.temp_manual_initial_c,
                 "pulso_final_pulsio": st.pulse_final_pulsio,
                 "pulso_final_fonendo": st.pulse_final_fonendo,
             },
@@ -1874,7 +1882,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_rlt_c_final_max_5s", "temp_rlt_c_final_time_s", "temp_rlt_c_final_raw_at_max", "temp_rlt_c_ultima", "temp_rlt_c_media", "temp_rlt_raw_ultima",
             "temp_rrt_c_final_max_5s", "temp_rrt_c_final_time_s", "temp_rrt_c_final_raw_at_max", "temp_rrt_c_ultima", "temp_rrt_c_media", "temp_rrt_raw_ultima",
             "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto",
-            "cfg_confirmacion", "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_finales",
+            "cfg_confirmacion", "pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_finales",
             "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file",
         ]
         self.session_writer.writerow(header); self.session_handle.flush()
@@ -1901,7 +1909,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             fmt(temp["temp_rlt_c_final_max_5s"], 2, ""), fmt(temp["temp_rlt_c_final_time_s"], 3, ""), fmt(temp["temp_rlt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rlt_c_last"], 2, ""), fmt(temp["temp_rlt_c_mean"], 2, ""), fmt(temp["temp_rlt_raw_last"], 0, ""),
             fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""),
-            m.contact_label, self.last_config_ack, st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo,
+            m.contact_label, self.last_config_ack, st.pulse_prev, st.temp_manual_initial_c, st.pulse_final_pulsio, st.pulse_final_fonendo,
             st.final_annotations,
             st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "",
             st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "",

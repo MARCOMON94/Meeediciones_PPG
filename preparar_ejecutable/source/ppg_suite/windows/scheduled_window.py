@@ -33,6 +33,7 @@ class ScheduledSegment:
     start_sample: int
     end_sample: int | None = None
     pulse_prev: str = ""
+    temp_manual_initial_c: str = ""
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
     final_annotations: str = ""
@@ -170,6 +171,8 @@ class ScheduledConfigWindow(PPGSuite):
         form = QtWidgets.QFormLayout(capture_group)
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
+        self.temp_manual_initial_edit = QtWidgets.QLineEdit()
+        self.temp_manual_initial_edit.setPlaceholderText("Opcional. Ej.: 38.6")
         self.animal_combo = QtWidgets.QComboBox()
         self.configure_animal_combo(self.animal_combo)
         self.udder_combo = QtWidgets.QComboBox()
@@ -188,6 +191,7 @@ class ScheduledConfigWindow(PPGSuite):
         form.addRow("Crotal:", self.crotal_edit)
         form.addRow("Animal:", self.animal_combo)
         form.addRow("Pulso previo ref.:", self.prev_pulse_edit)
+        form.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)
         form.addRow("Sensor:", self.udder_combo)
         form.addRow("Termometros:", self.temp_mapping_widget)
         form.addRow("Temperatura:", self.temp_monitor_widget)
@@ -288,6 +292,7 @@ class ScheduledConfigWindow(PPGSuite):
         if pulse_prev is None:
             return
         st.pulse_prev = pulse_prev
+        st.temp_manual_initial_c = safe_float_text(self.temp_manual_initial_edit.text())
         st.measurement_condition = self.current_condition_text() or self.scheduled_condition
         st.udder_side = self.current_udder_text()
         st.temp_mapping = self.current_temp_mapping()
@@ -314,7 +319,7 @@ class ScheduledConfigWindow(PPGSuite):
         except Exception:
             pass
         self.open_raw_file()
-        self.scheduled_segments.append(ScheduledSegment(first_step, 0, 0, pulse_prev=st.pulse_prev))
+        self.scheduled_segments.append(ScheduledSegment(first_step, 0, 0, pulse_prev=st.pulse_prev, temp_manual_initial_c=st.temp_manual_initial_c))
         self.save_current_config_json(prefix=f"config_{st.base_name}")
         self.send_command("START_CONTINUOUS")
         self.scheduled_step_start_wall = time.time()
@@ -417,7 +422,7 @@ class ScheduledConfigWindow(PPGSuite):
             self.serial_port.reset_input_buffer()
         except Exception:
             pass
-        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t), pulse_prev=self.state.pulse_prev))
+        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t), pulse_prev=self.state.pulse_prev, temp_manual_initial_c=self.state.temp_manual_initial_c))
         self.send_command("START_CONTINUOUS")
         self.scheduled_step_start_wall = time.time()
         self.state.capturing = True
@@ -670,7 +675,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
                 "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
-                "pulso_previo", "pulso_final_pulsio", "pulso_final_fonendo",
+                "pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo",
                 "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales",
             ])
             for i in range(t.size):
@@ -690,7 +695,7 @@ class ScheduledConfigWindow(PPGSuite):
                     fmt(position_values.get("RRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RRT", (math.nan, math.nan))[1], 0, ""),
                     step.config.red, step.config.ir, step.config.avg, step.config.rate, step.config.width, step.config.adc,
                     step.config.skip, 1 if step.config.debug else 0,
-                    segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo,
+                    segment.pulse_prev, segment.temp_manual_initial_c, segment.pulse_final_pulsio, segment.pulse_final_fonendo,
                     self.last_config_ack, datetime.now().isoformat(timespec="milliseconds"),
                     st.measurement_condition, segment.final_annotations,
                 ])
@@ -777,6 +782,7 @@ class ScheduledConfigWindow(PPGSuite):
                 },
                 "manual_reference": {
                     "pulso_previo": segment.pulse_prev,
+                    "temperatura_manual_inicio_c": segment.temp_manual_initial_c,
                     "pulso_final_pulsio": segment.pulse_final_pulsio,
                     "pulso_final_fonendo": segment.pulse_final_fonendo,
                 },
@@ -807,7 +813,7 @@ class ScheduledConfigWindow(PPGSuite):
             fmt(temp["temp_rlt_c_final_max_5s"], 2, ""), fmt(temp["temp_rlt_c_final_time_s"], 3, ""), fmt(temp["temp_rlt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rlt_c_last"], 2, ""), fmt(temp["temp_rlt_c_mean"], 2, ""), fmt(temp["temp_rlt_raw_last"], 0, ""),
             fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(metrics.pi_ir_pct, 4, ""), fmt(metrics.pi_red_pct, 4, ""), fmt(metrics.artifact_ir_pct, 1, ""),
-            fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, segment.pulse_prev,
+            fmt(metrics.artifact_red_pct, 1, ""), metrics.contact_label, self.last_config_ack, segment.pulse_prev, segment.temp_manual_initial_c,
             segment.pulse_final_pulsio, segment.pulse_final_fonendo, segment.final_annotations, raw_file.name, processed_file.name, plot_file.name,
             "", summary_file.name, st.config_file.name if st.config_file else "", json.dumps(blocks, ensure_ascii=False),
             blocks_file.name,
@@ -1638,7 +1644,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
             self.serial_port.reset_input_buffer()
         except Exception:
             pass
-        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t), pulse_prev=self.state.pulse_prev))
+        self.scheduled_segments.append(ScheduledSegment(step, index, len(self.state.t), pulse_prev=self.state.pulse_prev, temp_manual_initial_c=self.state.temp_manual_initial_c))
         self.send_command("START_CONTINUOUS")
         self.scheduled_step_start_wall = time.time()
         self.state.capturing = True

@@ -101,6 +101,7 @@ HEADER_TOOLTIPS = {
     "Hz": "Frecuencia real estimada a partir de los tiempos guardados.",
     "Muestras": "Numero de muestras disponibles o analizadas.",
     "Pulso previo": "BPM manual anotado antes de la toma.",
+    "Temp manual inicio": "Temperatura manual anotada al inicio; es solo referencia y no afecta a ningun calculo.",
     "Pulso final pulsio": "BPM manual anotado al final con pulsioximetro.",
     "Pulso final fonendo": "BPM manual anotado al final con fonendo.",
     "tipo": "Tipo de archivo asociado a la toma: raw, processed, summary, plot, etc.",
@@ -354,7 +355,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     capture_cow_temp_headers = ["Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final"]
     capture_headers = [
         "Correo", "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
-        "Pulso ref.", "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
+        "Pulso ref.", "Temp manual inicio", "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
         "Temp final", "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
         "Duracion", "Hz", "Muestras", "Raw",
     ]
@@ -766,6 +767,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "analysis_ignore_initial_seconds": analysis.get("ignore_initial_seconds"),
             "analysis_spo2_formula": analysis.get("spo2_formula"),
             "pulso_previo": manual.get("pulso_previo"),
+            "temperatura_manual_inicio_c": manual.get("temperatura_manual_inicio_c"),
             "pulso_final_pulsio": manual.get("pulso_final_pulsio"),
             "pulso_final_fonendo": manual.get("pulso_final_fonendo"),
             "anotaciones_finales": annotations.get("final"),
@@ -1121,6 +1123,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Hz": fmt(_as_float(cap.value("hz_real")), 1, ""),
             "Muestras": cap.value("muestras"),
             "Pulso previo": cap.value("pulso_previo"),
+            "Temp manual inicio": cap.value("temperatura_manual_inicio_c"),
             "Pulso final pulsio": cap.value("pulso_final_pulsio"),
             "Pulso final fonendo": cap.value("pulso_final_fonendo"),
             "Raw": raw_path.name if raw_path else "",
@@ -1367,7 +1370,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Condiciones", cap.value("condiciones_medida") or "-"),
             ("Anotaciones finales", cap.value("anotaciones_finales") or "-"),
             ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
-            ("Pulso previo / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
+            ("Pulso previo / temp inicio / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('temperatura_manual_inicio_c') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
             ("Diferencia BPM medio - ref.", f"{fmt(diff_ref, 1, '-')} BPM"),
             ("BPM medio", fmt(bpm, 1, "-")),
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
