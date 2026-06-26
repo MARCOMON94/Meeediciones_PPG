@@ -322,8 +322,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
         self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(90.0); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
-        self.temp_manual_initial_edit = QtWidgets.QLineEdit()
-        self.temp_manual_initial_edit.setPlaceholderText("Opcional. Ej.: 38.6")
+        self.temp_manual_initial_widget = self.create_manual_initial_temp_widget()
         self.animal_combo = QtWidgets.QComboBox()
         self.configure_animal_combo(self.animal_combo)
         self.udder_combo = QtWidgets.QComboBox()
@@ -339,7 +338,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         cap.addRow("Especie:", self.animal_combo)
         cap.addRow("Duración:", self.duration_spin)
         cap.addRow("Pulso previo ref.:", self.prev_pulse_edit)
-        cap.addRow("Temp. manual inicio (C):", self.temp_manual_initial_edit)
+        cap.addRow("Temp. manual inicio (C):", self.temp_manual_initial_widget)
         cap.addRow("Sensor:", self.udder_combo)
         cap.addRow("Termometros:", self.temp_mapping_widget)
         cap.addRow("Temperatura:", self.temp_monitor_widget)
@@ -528,6 +527,60 @@ class PPGSuite(QtWidgets.QMainWindow):
         layout.addWidget(self.temp_alert_threshold_spin, 1, 1)
         return widget
 
+    def create_manual_initial_temp_widget(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QGridLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(6)
+        layout.setVerticalSpacing(4)
+        self.temp_manual_initial_labels: dict[str, QtWidgets.QLabel] = {}
+        self.temp_manual_initial_edits: dict[str, QtWidgets.QLineEdit] = {}
+        for row, position in enumerate(("RT", "LT", "FRT", "FLT", "RRT", "RLT")):
+            label = QtWidgets.QLabel(POSITION_LABELS.get(position, position))
+            edit = QtWidgets.QLineEdit()
+            edit.setPlaceholderText("Opcional")
+            self.temp_manual_initial_labels[position] = label
+            self.temp_manual_initial_edits[position] = edit
+            layout.addWidget(label, row, 0)
+            layout.addWidget(edit, row, 1)
+        return widget
+
+    def refresh_manual_initial_temp_widget(self):
+        if not hasattr(self, "temp_manual_initial_edits"):
+            return
+        active = set(positions_for_animal(self.current_animal_type()))
+        for position, edit in self.temp_manual_initial_edits.items():
+            visible = position in active
+            edit.setVisible(visible)
+            self.temp_manual_initial_labels[position].setVisible(visible)
+
+    def current_manual_initial_temps(self) -> dict[str, str]:
+        if not hasattr(self, "temp_manual_initial_edits"):
+            return {}
+        active = set(positions_for_animal(self.current_animal_type()))
+        values: dict[str, str] = {}
+        for position, edit in self.temp_manual_initial_edits.items():
+            if position not in active:
+                continue
+            value = safe_float_text(edit.text())
+            if value:
+                values[position] = value
+        return values
+
+    def set_manual_initial_temps(self, values: dict[str, str]):
+        if not hasattr(self, "temp_manual_initial_edits"):
+            return
+        for position, edit in self.temp_manual_initial_edits.items():
+            edit.setText(str(values.get(position, "")))
+
+    def manual_initial_temp_summary(self, values: dict[str, str]) -> str:
+        parts = []
+        for position in positions_for_animal(self.current_animal_type()):
+            value = values.get(position, "")
+            if value:
+                parts.append(f"{position}={value}")
+        return "; ".join(parts)
+
     def current_temp_monitor_seconds(self) -> float:
         if hasattr(self, "temp_monitor_seconds_spin"):
             return max(1.0, float(self.temp_monitor_seconds_spin.value()))
@@ -562,6 +615,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                     break
             self.udder_combo.blockSignals(False)
         self.configure_temp_mapping_editor(default_mapping_for_animal(animal_type))
+        self.refresh_manual_initial_temp_widget()
         self.refresh_temperature_curve_channels()
 
     def active_temp_channels(self) -> tuple[str, ...]:
@@ -921,12 +975,15 @@ class PPGSuite(QtWidgets.QMainWindow):
         layout.addWidget(info)
         pulse_edit = QtWidgets.QLineEdit()
         pulse_edit.setPlaceholderText("Ej.: 72")
-        temp_edit = QtWidgets.QLineEdit()
-        temp_edit.setText(self.temp_manual_initial_edit.text().strip() if hasattr(self, "temp_manual_initial_edit") else "")
-        temp_edit.setPlaceholderText("Opcional. Ej.: 38.6")
         form = QtWidgets.QFormLayout()
         form.addRow("BPM inicial:", pulse_edit)
-        form.addRow("Temp. manual inicio (C):", temp_edit)
+        temp_edits: dict[str, QtWidgets.QLineEdit] = {}
+        current_temps = self.current_manual_initial_temps()
+        for position in positions_for_animal(self.current_animal_type()):
+            edit = QtWidgets.QLineEdit(current_temps.get(position, ""))
+            edit.setPlaceholderText("Opcional")
+            temp_edits[position] = edit
+            form.addRow(f"Temp. {POSITION_LABELS.get(position, position)}:", edit)
         layout.addLayout(form)
         buttons = QtWidgets.QDialogButtonBox()
         start_with_bpm = buttons.addButton("Iniciar con BPM", QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
@@ -947,9 +1004,11 @@ class PPGSuite(QtWidgets.QMainWindow):
         button = chosen.get("button")
         if button is cancel_btn or button is None:
             return None
-        temp_value = safe_float_text(temp_edit.text())
-        if hasattr(self, "temp_manual_initial_edit"):
-            self.temp_manual_initial_edit.setText(temp_value)
+        self.set_manual_initial_temps({
+            position: safe_float_text(edit.text())
+            for position, edit in temp_edits.items()
+            if safe_float_text(edit.text())
+        })
         if button is start_without_bpm:
             return ""
         value = safe_float_text(pulse_edit.text())
@@ -1194,6 +1253,12 @@ class PPGSuite(QtWidgets.QMainWindow):
                     1 if cfg.debug else 0,
                     st.pulse_prev,
                     st.temp_manual_initial_c,
+                    st.temp_manual_initial_by_position.get("RT", ""),
+                    st.temp_manual_initial_by_position.get("LT", ""),
+                    st.temp_manual_initial_by_position.get("FRT", ""),
+                    st.temp_manual_initial_by_position.get("FLT", ""),
+                    st.temp_manual_initial_by_position.get("RRT", ""),
+                    st.temp_manual_initial_by_position.get("RLT", ""),
                     st.pulse_final_pulsio,
                     st.pulse_final_fonendo,
                     self.last_config_ack,
@@ -1211,7 +1276,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         crotal = old.crotal_id if keep_identity else sanitize_id(self.crotal_edit.text())
         animal_type = old.animal_type if keep_identity else self.current_animal_type()
         prev = old.pulse_prev if keep_identity else safe_float_text(self.prev_pulse_edit.text())
-        temp_manual_initial = old.temp_manual_initial_c if keep_identity else safe_float_text(self.temp_manual_initial_edit.text())
+        temp_manual_initial_values = old.temp_manual_initial_by_position if keep_identity else self.current_manual_initial_temps()
+        temp_manual_initial = old.temp_manual_initial_c if keep_identity else self.manual_initial_temp_summary(temp_manual_initial_values)
         condition = old.measurement_condition if keep_identity else self.current_condition_text()
         udder = old.udder_side if keep_identity else self.current_udder_text()
         temp_mapping = old.temp_mapping if keep_identity else self.current_temp_mapping()
@@ -1225,6 +1291,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             animal_type=animal_type,
             pulse_prev=prev,
             temp_manual_initial_c=temp_manual_initial,
+            temp_manual_initial_by_position=dict(temp_manual_initial_values),
             measurement_condition=condition,
             final_annotations=final_annotations,
             udder_side=udder,
@@ -1248,7 +1315,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
             "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
             "cfg_red", "cfg_ir", "cfg_avg", "cfg_rate", "cfg_width", "cfg_adc", "cfg_skip", "cfg_debug",
-            "pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo",
+            "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
+            "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
+            "pulso_final_pulsio", "pulso_final_fonendo",
             "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales"
         ])
         st.raw_handle.flush()
@@ -1693,12 +1762,22 @@ class PPGSuite(QtWidgets.QMainWindow):
         if not rows:
             return
         fieldnames = list(rows[0].keys())
-        for field in ("pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales"):
+        for field in (
+            "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
+            "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
+            "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales",
+        ):
             if field not in fieldnames:
                 fieldnames.append(field)
         for row in rows:
             row["pulso_previo"] = st.pulse_prev
             row["temperatura_manual_inicio_c"] = st.temp_manual_initial_c
+            row["temperatura_manual_inicio_rt_c"] = st.temp_manual_initial_by_position.get("RT", "")
+            row["temperatura_manual_inicio_lt_c"] = st.temp_manual_initial_by_position.get("LT", "")
+            row["temperatura_manual_inicio_frt_c"] = st.temp_manual_initial_by_position.get("FRT", "")
+            row["temperatura_manual_inicio_flt_c"] = st.temp_manual_initial_by_position.get("FLT", "")
+            row["temperatura_manual_inicio_rrt_c"] = st.temp_manual_initial_by_position.get("RRT", "")
+            row["temperatura_manual_inicio_rlt_c"] = st.temp_manual_initial_by_position.get("RLT", "")
             row["pulso_final_pulsio"] = st.pulse_final_pulsio
             row["pulso_final_fonendo"] = st.pulse_final_fonendo
             row["anotaciones_inicio"] = st.measurement_condition
@@ -1851,6 +1930,13 @@ class PPGSuite(QtWidgets.QMainWindow):
             "manual_reference": {
                 "pulso_previo": st.pulse_prev,
                 "temperatura_manual_inicio_c": st.temp_manual_initial_c,
+                "temperatura_manual_inicio_por_posicion_c": st.temp_manual_initial_by_position,
+                "temperatura_manual_inicio_rt_c": st.temp_manual_initial_by_position.get("RT", ""),
+                "temperatura_manual_inicio_lt_c": st.temp_manual_initial_by_position.get("LT", ""),
+                "temperatura_manual_inicio_frt_c": st.temp_manual_initial_by_position.get("FRT", ""),
+                "temperatura_manual_inicio_flt_c": st.temp_manual_initial_by_position.get("FLT", ""),
+                "temperatura_manual_inicio_rrt_c": st.temp_manual_initial_by_position.get("RRT", ""),
+                "temperatura_manual_inicio_rlt_c": st.temp_manual_initial_by_position.get("RLT", ""),
                 "pulso_final_pulsio": st.pulse_final_pulsio,
                 "pulso_final_fonendo": st.pulse_final_fonendo,
             },
@@ -1890,7 +1976,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temp_rlt_c_final_max_5s", "temp_rlt_c_final_time_s", "temp_rlt_c_final_raw_at_max", "temp_rlt_c_ultima", "temp_rlt_c_media", "temp_rlt_raw_ultima",
             "temp_rrt_c_final_max_5s", "temp_rrt_c_final_time_s", "temp_rrt_c_final_raw_at_max", "temp_rrt_c_ultima", "temp_rrt_c_media", "temp_rrt_raw_ultima",
             "pi_ir_pct", "pi_red_pct", "artefactos_ir_pct", "artefactos_red_pct", "contacto",
-            "cfg_confirmacion", "pulso_previo", "temperatura_manual_inicio_c", "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_finales",
+            "cfg_confirmacion", "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
+            "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
+            "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_finales",
             "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file",
         ]
         self.session_writer.writerow(header); self.session_handle.flush()
@@ -1917,7 +2005,11 @@ class PPGSuite(QtWidgets.QMainWindow):
             fmt(temp["temp_rlt_c_final_max_5s"], 2, ""), fmt(temp["temp_rlt_c_final_time_s"], 3, ""), fmt(temp["temp_rlt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rlt_c_last"], 2, ""), fmt(temp["temp_rlt_c_mean"], 2, ""), fmt(temp["temp_rlt_raw_last"], 0, ""),
             fmt(temp["temp_rrt_c_final_max_5s"], 2, ""), fmt(temp["temp_rrt_c_final_time_s"], 3, ""), fmt(temp["temp_rrt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rrt_c_last"], 2, ""), fmt(temp["temp_rrt_c_mean"], 2, ""), fmt(temp["temp_rrt_raw_last"], 0, ""),
             fmt(m.pi_ir_pct, 4, ""), fmt(m.pi_red_pct, 4, ""), fmt(m.artifact_ir_pct, 1, ""), fmt(m.artifact_red_pct, 1, ""),
-            m.contact_label, self.last_config_ack, st.pulse_prev, st.temp_manual_initial_c, st.pulse_final_pulsio, st.pulse_final_fonendo,
+            m.contact_label, self.last_config_ack, st.pulse_prev, st.temp_manual_initial_c,
+            st.temp_manual_initial_by_position.get("RT", ""), st.temp_manual_initial_by_position.get("LT", ""),
+            st.temp_manual_initial_by_position.get("FRT", ""), st.temp_manual_initial_by_position.get("FLT", ""),
+            st.temp_manual_initial_by_position.get("RRT", ""), st.temp_manual_initial_by_position.get("RLT", ""),
+            st.pulse_final_pulsio, st.pulse_final_fonendo,
             st.final_annotations,
             st.raw_file.name if st.raw_file else "", st.processed_file.name if st.processed_file else "",
             st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "",

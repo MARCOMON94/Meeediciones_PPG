@@ -92,6 +92,7 @@ class CaptureState:
     animal_type: str = "oveja"
     pulse_prev: str = ""
     temp_manual_initial_c: str = ""
+    temp_manual_initial_by_position: dict[str, str] = field(default_factory=dict)
     pulse_final_pulsio: str = ""
     pulse_final_fonendo: str = ""
     measurement_condition: str = ""

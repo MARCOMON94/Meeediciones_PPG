@@ -102,6 +102,12 @@ HEADER_TOOLTIPS = {
     "Muestras": "Numero de muestras disponibles o analizadas.",
     "Pulso previo": "BPM manual anotado antes de la toma.",
     "Temp manual inicio": "Temperatura manual anotada al inicio; es solo referencia y no afecta a ningun calculo.",
+    "Temp manual RT": "Temperatura manual inicial de la teta derecha.",
+    "Temp manual LT": "Temperatura manual inicial de la teta izquierda.",
+    "Temp manual FLT": "Temperatura manual inicial de la teta delantera izquierda.",
+    "Temp manual FRT": "Temperatura manual inicial de la teta delantera derecha.",
+    "Temp manual RLT": "Temperatura manual inicial de la teta trasera izquierda.",
+    "Temp manual RRT": "Temperatura manual inicial de la teta trasera derecha.",
     "Pulso final pulsio": "BPM manual anotado al final con pulsioximetro.",
     "Pulso final fonendo": "BPM manual anotado al final con fonendo.",
     "tipo": "Tipo de archivo asociado a la toma: raw, processed, summary, plot, etc.",
@@ -353,9 +359,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     session_headers = ["Correo", "Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_two_temp_headers = ["Temp RT final", "Temp LT final"]
     capture_cow_temp_headers = ["Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final"]
+    capture_two_manual_temp_headers = ["Temp manual RT", "Temp manual LT"]
+    capture_cow_manual_temp_headers = ["Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT"]
     capture_headers = [
         "Correo", "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
-        "Pulso ref.", "Temp manual inicio", "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
+        "Pulso ref.", "Temp manual inicio", "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
+        "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
         "Temp final", "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
         "Duracion", "Hz", "Muestras", "Raw",
     ]
@@ -768,6 +777,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "analysis_spo2_formula": analysis.get("spo2_formula"),
             "pulso_previo": manual.get("pulso_previo"),
             "temperatura_manual_inicio_c": manual.get("temperatura_manual_inicio_c"),
+            "temperatura_manual_inicio_rt_c": manual.get("temperatura_manual_inicio_rt_c"),
+            "temperatura_manual_inicio_lt_c": manual.get("temperatura_manual_inicio_lt_c"),
+            "temperatura_manual_inicio_frt_c": manual.get("temperatura_manual_inicio_frt_c"),
+            "temperatura_manual_inicio_flt_c": manual.get("temperatura_manual_inicio_flt_c"),
+            "temperatura_manual_inicio_rrt_c": manual.get("temperatura_manual_inicio_rrt_c"),
+            "temperatura_manual_inicio_rlt_c": manual.get("temperatura_manual_inicio_rlt_c"),
             "pulso_final_pulsio": manual.get("pulso_final_pulsio"),
             "pulso_final_fonendo": manual.get("pulso_final_fonendo"),
             "anotaciones_finales": annotations.get("final"),
@@ -1034,8 +1049,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         capture_headers = self._headers_for_temperature_rows(
             self.capture_headers,
             capture_rows,
-            self.capture_two_temp_headers,
-            self.capture_cow_temp_headers,
+            self.capture_two_temp_headers + self.capture_two_manual_temp_headers,
+            self.capture_cow_temp_headers + self.capture_cow_manual_temp_headers,
         )
         self.captures_model.set_rows(capture_headers, capture_rows)
         self.captures_table.resizeColumnsToContents()
@@ -1124,6 +1139,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Muestras": cap.value("muestras"),
             "Pulso previo": cap.value("pulso_previo"),
             "Temp manual inicio": cap.value("temperatura_manual_inicio_c"),
+            "Temp manual RT": cap.value("temperatura_manual_inicio_rt_c"),
+            "Temp manual LT": cap.value("temperatura_manual_inicio_lt_c"),
+            "Temp manual FLT": cap.value("temperatura_manual_inicio_flt_c"),
+            "Temp manual FRT": cap.value("temperatura_manual_inicio_frt_c"),
+            "Temp manual RLT": cap.value("temperatura_manual_inicio_rlt_c"),
+            "Temp manual RRT": cap.value("temperatura_manual_inicio_rrt_c"),
             "Pulso final pulsio": cap.value("pulso_final_pulsio"),
             "Pulso final fonendo": cap.value("pulso_final_fonendo"),
             "Raw": raw_path.name if raw_path else "",
@@ -1371,6 +1392,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Anotaciones finales", cap.value("anotaciones_finales") or "-"),
             ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
             ("Pulso previo / temp inicio / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('temperatura_manual_inicio_c') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
+            ("Temp manual RT / LT", f"{cap.value('temperatura_manual_inicio_rt_c') or '-'} / {cap.value('temperatura_manual_inicio_lt_c') or '-'}"),
+            ("Temp manual FLT / FRT / RLT / RRT", f"{cap.value('temperatura_manual_inicio_flt_c') or '-'} / {cap.value('temperatura_manual_inicio_frt_c') or '-'} / {cap.value('temperatura_manual_inicio_rlt_c') or '-'} / {cap.value('temperatura_manual_inicio_rrt_c') or '-'}"),
             ("Diferencia BPM medio - ref.", f"{fmt(diff_ref, 1, '-')} BPM"),
             ("BPM medio", fmt(bpm, 1, "-")),
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
