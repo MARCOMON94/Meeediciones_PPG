@@ -63,72 +63,57 @@ class AppController(QtCore.QObject):
         if hasattr(win, "open_statistics_requested"):
             win.open_statistics_requested.connect(self.show_relations)
 
+    def _show_workspace_window(self, win: QtWidgets.QMainWindow):
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.showMaximized()
+
     def show_real(self):
         self.close_current_window()
         win = RealWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_test(self):
         self.close_current_window()
         win = TestWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_reajustes(self):
         self.close_current_window()
         win = ReajustesWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_configurations(self):
         self.close_current_window()
         win = ConfigurationsWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_experiment_3m(self):
         self.close_current_window()
         win = Experiment3MWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_vacuum_experiment(self):
         self.close_current_window()
         win = VacuumExperimentWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_temperature(self):
         self.close_current_window()
         win = TemperatureWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_relations(self):
         self.close_current_window()
         win = RelationExplorerWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_fourier(self):
         self.close_current_window()
         win = FourierAnalysisWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)
 
     def show_animals(self):
         self.close_current_window()
         win = AnimalsWindow()
-        self._wire_common_signals(win)
-        self.current_window = win
-        win.show()
+        self._show_workspace_window(win)

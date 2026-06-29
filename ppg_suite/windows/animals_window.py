@@ -164,15 +164,22 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         self.baseline_min_records = QtWidgets.QSpinBox()
         self.baseline_min_records.setRange(1, 100)
         self.baseline_min_records.setValue(5)
+        self.baseline_enabled = QtWidgets.QCheckBox("Activar avisos para este animal")
+        self.baseline_enabled.toggled.connect(self.update_baseline_controls_enabled)
+        self.btn_save_alerts = QtWidgets.QPushButton("Guardar avisos")
+        self.btn_save_alerts.clicked.connect(self.save_alert_settings)
         form.addRow("Crotal / ID:", self.id_edit)
         form.addRow("Especie:", self.species_combo)
         form.addRow("Nombre:", self.name_edit)
+        form.addRow("Avisos:", self.baseline_enabled)
         form.addRow("Aviso temp futura:", self.baseline_temp_delta)
         form.addRow("Aviso BPM futuro:", self.baseline_bpm_delta)
         form.addRow("Min. tomas basal:", self.baseline_min_records)
+        form.addRow("", self.btn_save_alerts)
         self.summary_text = QtWidgets.QTextEdit()
         self.summary_text.setReadOnly(True)
         form.addRow("Resumen:", self.summary_text)
+        self.update_baseline_controls_enabled(False)
         layout.addWidget(form_panel, stretch=2)
 
         photo_panel = QtWidgets.QWidget()
@@ -342,9 +349,11 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             self.set_species_combo(str(profile.get("animal_type") or species))
             self.name_edit.setText(str(profile.get("display_name") or ""))
             baseline = profile.get("baseline_settings") or {}
+            self.baseline_enabled.setChecked(bool(baseline.get("enabled", False)))
             self.baseline_temp_delta.setValue(float(baseline.get("temp_delta_c", 1.0) or 1.0))
             self.baseline_bpm_delta.setValue(float(baseline.get("bpm_delta", 15.0) or 15.0))
             self.baseline_min_records.setValue(int(baseline.get("min_records", 5) or 5))
+            self.update_baseline_controls_enabled(self.baseline_enabled.isChecked())
         finally:
             self._loading_form = False
         self.update_photo(profile)
@@ -362,7 +371,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             profile.setdefault("animal_type", species)
             profile.setdefault("id", animal_id)
         profile.setdefault("notes", [])
-        profile.setdefault("baseline_settings", {"temp_delta_c": 1.0, "bpm_delta": 15.0, "min_records": 5})
+        profile.setdefault("baseline_settings", {"enabled": False, "temp_delta_c": 1.0, "bpm_delta": 15.0, "min_records": 5})
         return profile
 
     def set_species_combo(self, animal_type: str):
@@ -380,9 +389,11 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             self.id_edit.clear()
             self.set_species_combo("oveja")
             self.name_edit.clear()
+            self.baseline_enabled.setChecked(False)
             self.baseline_temp_delta.setValue(1.0)
             self.baseline_bpm_delta.setValue(15.0)
             self.baseline_min_records.setValue(5)
+            self.update_baseline_controls_enabled(False)
             self.note_text.clear()
         finally:
             self._loading_form = False
@@ -396,6 +407,10 @@ class AnimalsWindow(QtWidgets.QMainWindow):
 
     def current_form_key(self) -> str:
         return animal_key(str(self.species_combo.currentData() or ""), self.id_edit.text())
+
+    def update_baseline_controls_enabled(self, enabled: bool):
+        for widget in (self.baseline_temp_delta, self.baseline_bpm_delta, self.baseline_min_records):
+            widget.setEnabled(bool(enabled))
 
     def save_current_profile(self) -> str:
         key = self.current_form_key()
@@ -411,11 +426,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             "id": sanitize_id(self.id_edit.text()),
             "animal_type": normalize_animal_type(str(self.species_combo.currentData() or "")),
             "display_name": self.name_edit.text().strip(),
-            "baseline_settings": {
-                "temp_delta_c": float(self.baseline_temp_delta.value()),
-                "bpm_delta": float(self.baseline_bpm_delta.value()),
-                "min_records": int(self.baseline_min_records.value()),
-            },
+            "baseline_settings": existing.get("baseline_settings") or {"enabled": False, "temp_delta_c": 1.0, "bpm_delta": 15.0, "min_records": 5},
             "created": existing.get("created") or now,
             "updated": now,
         }
@@ -430,6 +441,36 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         self.reload_data()
         self.select_animal(key)
         return key
+
+    def save_alert_settings(self):
+        enabled = bool(self.baseline_enabled.isChecked())
+        key = self.current_form_key()
+        if not key:
+            QtWidgets.QMessageBox.warning(self, "Animales", "Guarda primero un crotal/ID real para activar avisos.")
+            return
+        now = datetime.now().isoformat()
+        existing = self.profile_for_key(key)
+        profile = {
+            **existing,
+            "animal_key": key,
+            "id": sanitize_id(self.id_edit.text()),
+            "animal_type": normalize_animal_type(str(self.species_combo.currentData() or "")),
+            "display_name": self.name_edit.text().strip(),
+            "baseline_settings": {
+                "enabled": enabled,
+                "temp_delta_c": float(self.baseline_temp_delta.value()),
+                "bpm_delta": float(self.baseline_bpm_delta.value()),
+                "min_records": int(self.baseline_min_records.value()),
+                "updated": now,
+            },
+            "created": existing.get("created") or now,
+            "updated": now,
+        }
+        self.profiles[key] = profile
+        self.current_key = key
+        self.save_profiles()
+        self.reload_data()
+        self.select_animal(key)
 
     def pick_photo(self):
         path_text, _filter = QtWidgets.QFileDialog.getOpenFileName(
@@ -537,7 +578,16 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         for label, value in values.items():
             lines.append(f"{label}: {fmt(value, 1, '-')}")
         lines.append("")
-        lines.append("La configuracion basal queda guardada para avisos futuros; no activa alertas todavia.")
+        baseline = self.profile_for_key(self.current_key).get("baseline_settings") or {}
+        if baseline.get("enabled"):
+            lines.append(
+                "Avisos basales guardados: "
+                f"temp +{fmt(_as_float(baseline.get('temp_delta_c')), 1, '-')} C, "
+                f"BPM +{fmt(_as_float(baseline.get('bpm_delta')), 0, '-')} "
+                f"con minimo {baseline.get('min_records', 5)} tomas."
+            )
+        else:
+            lines.append("Avisos basales desactivados. No se usaran hasta pulsar Guardar avisos con la casilla activada.")
         self.summary_text.setPlainText("\n".join(lines))
 
     def populate_history(self):
