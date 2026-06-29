@@ -4,6 +4,7 @@ import csv
 import html
 import json
 import math
+import re
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -163,6 +164,8 @@ class RawFileInfo:
     animal: str = ""
     date: str = ""
     config_summary: str = ""
+    is_aggregate: bool = False
+    hidden_reason: str = ""
 
 
 @dataclass
@@ -505,6 +508,11 @@ def _group_rows(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
         ])
         groups.setdefault(key, []).append(row)
     return list(groups.values())
+
+
+def _aggregate_stem_for_child(path: Path) -> str:
+    match = re.match(r"^(raw_BLOQUE_.+?)_CFG\d{3}_.+$", path.stem)
+    return match.group(1) if match else ""
 
 
 def _drop_leading_timestamp_gap(t: np.ndarray, red: np.ndarray, ir: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
@@ -885,6 +893,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.raw_files: list[RawFileInfo] = []
         self.results: list[SpectrumResult] = []
         self.mail_paths: dict[str, Path] = {}
+        self.selected_raw_paths: dict[str, Path] = {}
         self._updating_raw_table = False
         self._build_ui()
         self.reload_raws()
@@ -914,6 +923,8 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.animal_filter = QtWidgets.QComboBox()
         self.text_filter = QtWidgets.QLineEdit()
         self.text_filter.setPlaceholderText("Filtrar por archivo, sesion o configuracion")
+        self.chk_show_aggregates = QtWidgets.QCheckBox("Mostrar agregados")
+        self.chk_show_aggregates.setToolTip("Muestra raws BLOQUE completos aunque existan sus raws separados por configuracion.")
         self.btn_select_visible = QtWidgets.QPushButton("Marcar visibles")
         self.btn_clear = QtWidgets.QPushButton("Desmarcar")
         self.btn_analyze = QtWidgets.QPushButton("Analizar seleccionados")
@@ -931,16 +942,18 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         cl.addWidget(self.animal_filter, 0, 1)
         cl.addWidget(QtWidgets.QLabel("Texto"), 0, 2)
         cl.addWidget(self.text_filter, 0, 3)
-        cl.addWidget(self.btn_select_visible, 0, 4)
-        cl.addWidget(self.btn_clear, 0, 5)
-        cl.addWidget(self.btn_analyze, 0, 6)
-        cl.addWidget(self.btn_export, 0, 7)
+        cl.addWidget(self.chk_show_aggregates, 0, 4)
+        cl.addWidget(self.btn_select_visible, 0, 5)
+        cl.addWidget(self.btn_clear, 0, 6)
+        cl.addWidget(self.btn_analyze, 0, 7)
+        cl.addWidget(self.btn_export, 0, 8)
         cl.addWidget(self.mail_status, 1, 0, 1, 2)
-        cl.addWidget(self.btn_prepare_mail, 1, 4)
-        cl.addWidget(self.btn_clear_mail, 1, 5)
+        cl.addWidget(self.btn_prepare_mail, 1, 5)
+        cl.addWidget(self.btn_clear_mail, 1, 6)
         root.addWidget(controls)
         self.animal_filter.currentTextChanged.connect(self.apply_filters)
         self.text_filter.textChanged.connect(self.apply_filters)
+        self.chk_show_aggregates.toggled.connect(self.apply_filters)
         self.btn_select_visible.clicked.connect(self.select_visible)
         self.btn_clear.clicked.connect(self.clear_selection)
         self.btn_analyze.clicked.connect(self.analyze_selected)
@@ -993,19 +1006,29 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
 
     def reload_raws(self):
         infos: list[RawFileInfo] = []
-        for path in sorted(RAW_DIR.glob("raw_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True):
+        paths = sorted(RAW_DIR.glob("raw_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+        aggregate_stems_with_children = {_aggregate_stem_for_child(path) for path in paths}
+        aggregate_stems_with_children.discard("")
+        for path in paths:
             rows = _read_csv(path)
             if not rows:
                 continue
             configs = sorted({r.get("config_label", "") for r in rows if r.get("config_label", "")})
             animals = sorted({r.get("id", "") for r in rows if r.get("id", "")})
             date = rows[0].get("system_time", "")[:19].replace("T", " ")
+            is_aggregate = path.stem in aggregate_stems_with_children
+            hidden_reason = "Raw agregado oculto porque existen raws separados por configuracion." if is_aggregate else ""
+            config_summary = f"{len(configs)} config." if len(configs) > 3 else ", ".join(configs)
+            if is_aggregate:
+                config_summary = f"{config_summary} | agregado".strip()
             infos.append(RawFileInfo(
                 path=path,
                 rows=len(rows),
                 animal=", ".join(animals) or "-",
                 date=date,
-                config_summary=f"{len(configs)} config." if len(configs) > 3 else ", ".join(configs),
+                config_summary=config_summary,
+                is_aggregate=is_aggregate,
+                hidden_reason=hidden_reason,
             ))
         self.raw_files = infos
         current = self.animal_filter.currentText()
@@ -1021,10 +1044,13 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     def apply_filters(self):
         animal = self.animal_filter.currentText()
         text = self.text_filter.text().strip().lower()
+        show_aggregates = self.chk_show_aggregates.isChecked()
         self._updating_raw_table = True
         try:
             self.raw_table.setRowCount(0)
             for info in self.raw_files:
+                if info.is_aggregate and not show_aggregates:
+                    continue
                 haystack = f"{info.path.name} {info.animal} {info.date} {info.config_summary}".lower()
                 if animal != "Todos" and animal not in info.animal:
                     continue
@@ -1034,15 +1060,16 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 self.raw_table.insertRow(row)
                 check = QtWidgets.QTableWidgetItem("")
                 check.setFlags(check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
-                check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+                raw_key = self.mail_key(info.path)
+                check.setCheckState(QtCore.Qt.CheckState.Checked if raw_key in self.selected_raw_paths else QtCore.Qt.CheckState.Unchecked)
                 check.setData(QtCore.Qt.ItemDataRole.UserRole, str(info.path))
-                check.setToolTip("Marcar raw para incluirlo en el analisis comparativo")
+                check.setToolTip(info.hidden_reason or "Marcar raw para incluirlo en el analisis comparativo")
                 self.raw_table.setItem(row, 0, check)
                 mail_check = QtWidgets.QTableWidgetItem("")
                 mail_check.setFlags(mail_check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
-                mail_check.setCheckState(QtCore.Qt.CheckState.Checked if self.mail_key(info.path) in self.mail_paths else QtCore.Qt.CheckState.Unchecked)
+                mail_check.setCheckState(QtCore.Qt.CheckState.Checked if raw_key in self.mail_paths else QtCore.Qt.CheckState.Unchecked)
                 mail_check.setData(QtCore.Qt.ItemDataRole.UserRole, str(info.path))
-                mail_check.setToolTip("Marcar raw para incluirlo en el ZIP de correo")
+                mail_check.setToolTip(info.hidden_reason or "Marcar raw para incluirlo en el ZIP de correo")
                 self.raw_table.setItem(row, 1, mail_check)
                 values = [info.animal, info.date, str(info.rows), info.config_summary, info.path.name]
                 for col, value in enumerate(values, start=2):
@@ -1062,9 +1089,12 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
             return str(path)
 
     def on_raw_table_item_changed(self, item: QtWidgets.QTableWidgetItem):
-        if self._updating_raw_table or item.column() != 1:
+        if self._updating_raw_table:
             return
-        self.set_mail_checked_from_item(item)
+        if item.column() == 0:
+            self.set_use_checked_from_item(item)
+        elif item.column() == 1:
+            self.set_mail_checked_from_item(item)
 
     def on_results_table_item_changed(self, item: QtWidgets.QTableWidgetItem):
         if self._updating_raw_table or item.column() != 0:
@@ -1083,6 +1113,17 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
             self.mail_paths.pop(key, None)
         self.update_mail_status()
         self.sync_mail_check_states()
+
+    def set_use_checked_from_item(self, item: QtWidgets.QTableWidgetItem):
+        path_text = item.data(QtCore.Qt.ItemDataRole.UserRole) or ""
+        if not path_text:
+            return
+        path = Path(path_text)
+        key = self.mail_key(path)
+        if item.checkState() == QtCore.Qt.CheckState.Checked:
+            self.selected_raw_paths[key] = path
+        else:
+            self.selected_raw_paths.pop(key, None)
 
     def update_mail_status(self):
         count = len(self.mail_paths)
@@ -1142,10 +1183,11 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
 
     def selected_paths(self) -> list[Path]:
         paths: list[Path] = []
-        for row in range(self.raw_table.rowCount()):
-            item = self.raw_table.item(row, 0)
-            if item and item.checkState() == QtCore.Qt.CheckState.Checked:
-                paths.append(Path(item.data(QtCore.Qt.ItemDataRole.UserRole)))
+        for info in self.raw_files:
+            key = self.mail_key(info.path)
+            path = self.selected_raw_paths.get(key)
+            if path and path.exists() and path not in paths:
+                paths.append(path)
         return paths
 
     def open_path(self, path: Path | None):
@@ -1178,10 +1220,16 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 item.setCheckState(QtCore.Qt.CheckState.Checked)
 
     def clear_selection(self):
+        visible_keys: set[str] = set()
         for row in range(self.raw_table.rowCount()):
             item = self.raw_table.item(row, 0)
             if item:
+                path_text = item.data(QtCore.Qt.ItemDataRole.UserRole) or ""
+                if path_text:
+                    visible_keys.add(self.mail_key(Path(path_text)))
                 item.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        for key in visible_keys:
+            self.selected_raw_paths.pop(key, None)
 
     def analyze_selected(self):
         paths = self.selected_paths()
@@ -1203,15 +1251,24 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     def populate_results(self):
         self._updating_raw_table = True
         self.results_table.setRowCount(0)
+        file_counts: dict[str, int] = {}
+        for result in self.results:
+            key = self.mail_key(result.file)
+            file_counts[key] = file_counts.get(key, 0) + 1
         try:
             for result in self.results:
                 row = self.results_table.rowCount()
                 self.results_table.insertRow(row)
+                result_file_key = self.mail_key(result.file)
                 mail_check = QtWidgets.QTableWidgetItem("")
                 mail_check.setFlags(mail_check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
-                mail_check.setCheckState(QtCore.Qt.CheckState.Checked if self.mail_key(result.file) in self.mail_paths else QtCore.Qt.CheckState.Unchecked)
+                mail_check.setCheckState(QtCore.Qt.CheckState.Checked if result_file_key in self.mail_paths else QtCore.Qt.CheckState.Unchecked)
                 mail_check.setData(QtCore.Qt.ItemDataRole.UserRole, str(result.file))
-                mail_check.setToolTip("Marcar raw para incluirlo en el ZIP de correo")
+                shared_count = file_counts.get(result_file_key, 0)
+                if shared_count > 1:
+                    mail_check.setToolTip(f"Este CSV fisico genera {shared_count} filas de resultado; Correo marca/desmarca el archivo completo.")
+                else:
+                    mail_check.setToolTip("Marcar raw para incluirlo en el ZIP de correo")
                 self.results_table.setItem(row, 0, mail_check)
                 values = [
                     fmt(result.score, 1, ""), result.verdict, result.animal, result.config_label,
@@ -1230,6 +1287,8 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 ]
                 for col, value in enumerate(values, start=1):
                     item = QtWidgets.QTableWidgetItem(value)
+                    if shared_count > 1 and col == len(self.result_headers) - 1:
+                        item.setToolTip(f"{result.file}\nCSV compartido por {shared_count} resultados.")
                     if col == 1:
                         item.setData(QtCore.Qt.ItemDataRole.UserRole, row)
                     if result.score >= 75:

@@ -385,6 +385,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_source_rows: list[dict[str, str]] = []
         self.temporal_rel_t = np.asarray([], dtype=float)
         self.mail_paths: dict[str, Path] = {}
+        self.compare_items: dict[str, CaptureRecord] = {}
         self._build_ui()
         self.update_mail_status()
         self.reload_data()
@@ -400,15 +401,27 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_back.setMinimumHeight(42)
         top.addWidget(self.btn_back)
         self.mail_status = QtWidgets.QLabel("0 archivos seleccionados")
+        self.btn_compare = QtWidgets.QPushButton("Comparar")
+        self.btn_add_compare = QtWidgets.QPushButton("Anadir raw")
+        self.btn_clear_compare = QtWidgets.QPushButton("Limpiar comparacion")
         self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
         self.btn_clear_mail = QtWidgets.QPushButton("Limpiar seleccion")
+        self.btn_compare.setMinimumHeight(42)
+        self.btn_add_compare.setMinimumHeight(42)
+        self.btn_clear_compare.setMinimumHeight(42)
         self.btn_prepare_mail.setMinimumHeight(42)
         self.btn_clear_mail.setMinimumHeight(42)
         top.addStretch(1)
         top.addWidget(self.mail_status)
+        top.addWidget(self.btn_compare)
+        top.addWidget(self.btn_add_compare)
+        top.addWidget(self.btn_clear_compare)
         top.addWidget(self.btn_prepare_mail)
         top.addWidget(self.btn_clear_mail)
         self.btn_back.clicked.connect(self.back_to_menu.emit)
+        self.btn_compare.clicked.connect(self.show_compare_tab)
+        self.btn_add_compare.clicked.connect(self.add_current_capture_to_compare)
+        self.btn_clear_compare.clicked.connect(self.clear_compare)
         self.btn_prepare_mail.clicked.connect(self.prepare_mail_zip)
         self.btn_clear_mail.clicked.connect(self.clear_mail_selection)
 
@@ -582,6 +595,36 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_open_selected_files.clicked.connect(self.open_selected_files)
         self.btn_copy_file_paths.clicked.connect(self.copy_selected_file_paths)
         self.detail_tabs.addTab(files_page, "Archivos")
+
+        compare_page = QtWidgets.QWidget()
+        compare_layout = QtWidgets.QVBoxLayout(compare_page)
+        compare_controls = QtWidgets.QHBoxLayout()
+        compare_layout.addLayout(compare_controls)
+        self.compare_view_combo = QtWidgets.QComboBox()
+        self.compare_view_combo.addItems(["Senal IR/RED", "BPM", "SpO2", "Temperatura", "Calidad"])
+        self.btn_remove_compare = QtWidgets.QPushButton("Quitar seleccionado")
+        compare_controls.addWidget(QtWidgets.QLabel("Vista"))
+        compare_controls.addWidget(self.compare_view_combo)
+        compare_controls.addWidget(self.btn_remove_compare)
+        compare_controls.addStretch(1)
+        self.compare_table = QtWidgets.QTableWidget(0, 6)
+        self.compare_table.setHorizontalHeaderLabels(["Animal", "Fecha", "Modo", "Configuracion", "Fuente", "Archivo"])
+        self.compare_table.verticalHeader().setVisible(False)
+        self.compare_table.setAlternatingRowColors(True)
+        self.compare_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.compare_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.compare_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.compare_table.doubleClicked.connect(self.open_compare_source)
+        compare_layout.addWidget(self.compare_table, stretch=1)
+        self.compare_plot = pg.PlotWidget(title="Comparacion de raws")
+        self.compare_plot.setBackground("w")
+        self.compare_plot.showGrid(x=True, y=True, alpha=0.25)
+        self.compare_plot.setLabel("bottom", "Tiempo relativo", units="s")
+        self.compare_plot.addLegend()
+        compare_layout.addWidget(self.compare_plot, stretch=3)
+        self.compare_view_combo.currentTextChanged.connect(self.update_compare_plot)
+        self.btn_remove_compare.clicked.connect(self.remove_selected_compare)
+        self.detail_tabs.addTab(compare_page, "Comparar")
 
     def pick_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Seleccionar carpeta con CSV", str(RESULTS_DIR))
@@ -1334,6 +1377,177 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return
         QtWidgets.QApplication.clipboard().setText("\n".join(str(path) for path in paths))
         QtWidgets.QMessageBox.information(self, "Archivos", f"Copiadas {len(paths)} ruta(s) al portapapeles.")
+
+    def show_compare_tab(self):
+        for idx in range(self.detail_tabs.count()):
+            if self.detail_tabs.tabText(idx) == "Comparar":
+                self.detail_tabs.setCurrentIndex(idx)
+                break
+
+    def compare_source_for_capture(self, cap: CaptureRecord) -> tuple[str, Path | None]:
+        processed = cap.files.get("processed")
+        if processed and processed.exists():
+            return "processed", processed
+        raw = self.capture_raw_path(cap)
+        if raw and raw.exists():
+            return "raw", raw
+        return "", None
+
+    def add_current_capture_to_compare(self):
+        cap = self.current_capture
+        if cap is None:
+            QtWidgets.QMessageBox.information(self, "Comparar", "Selecciona primero una toma/raw.")
+            return
+        _kind, path = self.compare_source_for_capture(cap)
+        if path is None:
+            QtWidgets.QMessageBox.information(self, "Comparar", "La toma seleccionada no tiene raw o processed localizado.")
+            return
+        key = self.mail_key(path)
+        self.compare_items[key] = cap
+        self.populate_compare_table()
+        self.update_compare_plot()
+        self.show_compare_tab()
+
+    def clear_compare(self):
+        self.compare_items.clear()
+        self.populate_compare_table()
+        self.update_compare_plot()
+        self.show_compare_tab()
+
+    def remove_selected_compare(self):
+        rows = sorted({index.row() for index in self.compare_table.selectedIndexes()}, reverse=True)
+        if not rows:
+            return
+        keys: list[str] = []
+        for row in rows:
+            item = self.compare_table.item(row, 0)
+            key = item.data(QtCore.Qt.ItemDataRole.UserRole) if item else ""
+            if key:
+                keys.append(str(key))
+        for key in keys:
+            self.compare_items.pop(key, None)
+        self.populate_compare_table()
+        self.update_compare_plot()
+
+    def populate_compare_table(self):
+        self.compare_table.setRowCount(0)
+        for key, cap in self.compare_items.items():
+            kind, path = self.compare_source_for_capture(cap)
+            row = self.compare_table.rowCount()
+            self.compare_table.insertRow(row)
+            values = [
+                cap.value("id"),
+                f"{cap.value('fecha')} {cap.value('hora')}".strip(),
+                _mode_label(cap.value("modo")),
+                cap.value("config_label"),
+                kind,
+                path.name if path else "",
+            ]
+            for col, value in enumerate(values):
+                item = QtWidgets.QTableWidgetItem(value)
+                item.setData(QtCore.Qt.ItemDataRole.UserRole, key)
+                item.setToolTip(str(path or ""))
+                self.compare_table.setItem(row, col, item)
+        self.compare_table.resizeColumnsToContents()
+
+    def open_compare_source(self, index: QtCore.QModelIndex):
+        if not index.isValid():
+            return
+        item = self.compare_table.item(index.row(), 0)
+        key = str(item.data(QtCore.Qt.ItemDataRole.UserRole) or "") if item else ""
+        cap = self.compare_items.get(key)
+        if cap is None:
+            return
+        _kind, path = self.compare_source_for_capture(cap)
+        self.open_path(path)
+
+    def update_compare_plot(self):
+        self.compare_plot.clear()
+        self.compare_plot.setLabel("bottom", "Tiempo relativo", units="s")
+        view = self.compare_view_combo.currentText() if hasattr(self, "compare_view_combo") else "Senal IR/RED"
+        colors = [
+            (0, 80, 220), (220, 40, 35), (40, 150, 70), (150, 70, 160),
+            (220, 130, 30), (20, 130, 140), (110, 90, 200), (120, 120, 120),
+        ]
+        plotted = 0
+        for idx, cap in enumerate(self.compare_items.values()):
+            kind, path = self.compare_source_for_capture(cap)
+            if path is None:
+                continue
+            rows = _read_csv(path)
+            if not rows:
+                continue
+            t = self._compare_time(rows)
+            if not t.size:
+                continue
+            color = colors[idx % len(colors)]
+            label = self._compare_label(cap, kind)
+            if view == "Senal IR/RED":
+                ir = self._compare_series(rows, "ir_proc_norm", "ir_raw")
+                red = self._compare_series(rows, "red_proc_norm", "red_raw")
+                plotted += self._plot_compare_series(t, ir, color, f"{label} IR", QtCore.Qt.PenStyle.SolidLine, width=2)
+                plotted += self._plot_compare_series(t, red, color, f"{label} RED", QtCore.Qt.PenStyle.DashLine, width=1)
+                self.compare_plot.setLabel("left", "Senal")
+            elif view == "BPM":
+                plotted += self._plot_compare_series(t, self._compare_series(rows, "bpm_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
+                self.compare_plot.setLabel("left", "BPM")
+            elif view == "SpO2":
+                plotted += self._plot_compare_series(t, self._compare_series(rows, "spo2_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
+                self.compare_plot.setLabel("left", "SpO2", units="%")
+            elif view == "Temperatura":
+                temp = self._compare_series(rows, "temp_c", "temp_rt_c", "temp_a0_c", "temp_lt_c", "temp_a1_c")
+                plotted += self._plot_compare_series(t, temp, color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
+                self.compare_plot.setLabel("left", "Temperatura", units="C")
+            elif view == "Calidad":
+                plotted += self._plot_compare_series(t, self._compare_series(rows, "quality_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
+                self.compare_plot.setLabel("left", "Calidad")
+        self.compare_plot.setTitle(f"Comparacion de raws | {view} | {len(self.compare_items)} seleccionado(s), {plotted} curva(s)")
+
+    def _compare_label(self, cap: CaptureRecord, kind: str) -> str:
+        pieces = [cap.value("id") or cap.base_name, cap.value("config_label") or kind]
+        return " | ".join(piece for piece in pieces if piece)
+
+    def _compare_time(self, rows: list[dict[str, str]]) -> np.ndarray:
+        t = np.asarray([_as_float(row.get("tiempo_s", "")) for row in rows], dtype=float)
+        finite = t[np.isfinite(t)]
+        if not finite.size:
+            return np.asarray([], dtype=float)
+        return t - float(finite[0])
+
+    def _compare_series(self, rows: list[dict[str, str]], *keys: str) -> np.ndarray:
+        values: list[float] = []
+        for row in rows:
+            value = math.nan
+            for key in keys:
+                value = _as_float(row.get(key, ""))
+                if np.isfinite(value):
+                    break
+            values.append(value)
+        return np.asarray(values, dtype=float)
+
+    def _plot_compare_series(
+        self,
+        t: np.ndarray,
+        values: np.ndarray,
+        color: tuple[int, int, int],
+        name: str,
+        style: QtCore.Qt.PenStyle,
+        *,
+        width: int = 2,
+    ) -> int:
+        n = min(t.size, values.size)
+        if n <= 0:
+            return 0
+        x = t[:n]
+        y = values[:n]
+        mask = np.isfinite(x) & np.isfinite(y)
+        if not np.any(mask):
+            return 0
+        x = x[mask]
+        y = y[mask]
+        step = max(1, int(math.ceil(x.size / 3500)))
+        self.compare_plot.plot(x[::step], y[::step], pen=pg.mkPen(color, width=width, style=style), name=name)
+        return 1
 
     def _summary_html(self, cap: CaptureRecord) -> str:
         quality = _as_float(cap.value("calidad"))

@@ -11,6 +11,7 @@ from ppg_suite.windows.temperature_window import TemperatureWindow
 from ppg_suite.windows.relations_window import RelationExplorerWindow
 from ppg_suite.windows.fourier_window import FourierAnalysisWindow
 from ppg_suite.windows.vacuum_window import VacuumExperimentWindow
+from ppg_suite.windows.animals_window import AnimalsWindow
 
 
 class AppController(QtCore.QObject):
@@ -54,6 +55,8 @@ class AppController(QtCore.QObject):
             self.show_relations()
         elif dialog.selected_mode == "fourier":
             self.show_fourier()
+        elif dialog.selected_mode == "animals":
+            self.show_animals()
 
     def _wire_common_signals(self, win):
         win.back_to_menu.connect(self.show_menu)
@@ -119,6 +122,13 @@ class AppController(QtCore.QObject):
     def show_fourier(self):
         self.close_current_window()
         win = FourierAnalysisWindow()
+        self._wire_common_signals(win)
+        self.current_window = win
+        win.show()
+
+    def show_animals(self):
+        self.close_current_window()
+        win = AnimalsWindow()
         self._wire_common_signals(win)
         self.current_window = win
         win.show()

@@ -8,7 +8,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from .paths import BASE_DIR
 
 
-AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "experimento_vacio", "temp", "relations", "fourier"]
+AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "experimento_vacio", "temp", "relations", "fourier", "animals"]
 
 
 class ModeSelectDialog(QtWidgets.QDialog):
@@ -40,12 +40,14 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_3m = QtWidgets.QPushButton("Experimento 3M")
         self.btn_vacuum = QtWidgets.QPushButton("Experimento con vacio")
         self.btn_relations = QtWidgets.QPushButton("Estadisticas")
+        self.btn_animals = QtWidgets.QPushButton("Animales")
         self.btn_fourier = QtWidgets.QPushButton("Analisis experimental de Fourier")
 
-        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_vacuum, self.btn_relations, self.btn_fourier]:
+        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_vacuum, self.btn_relations, self.btn_animals, self.btn_fourier]:
             button.setMinimumHeight(38)
 
         layout.addWidget(self.btn_relations)
+        layout.addWidget(self.btn_animals)
         layout.addWidget(self.btn_fourier)
         layout.addWidget(self.btn_configurations)
 
@@ -73,6 +75,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
             "Experimento 3M: optimizacion adaptativa del sensor usando BPM manual, pulso PPG, SpO2, ruido, PI y saturacion.\n"
             "Experimento con vacio: PPG y microfono sincronizados; el notch se aplica solo al informe final.\n"
             "Estadisticas: sesiones, resultados, configuraciones y graficas comparativas.\n"
+            "Animales: fichas, notas, archivos, medias e historico por animal.\n"
             "Fourier experimental: compara varios raw y razona que configuracion separa mejor el pulso."
         )
         info.setWordWrap(True)
@@ -97,6 +100,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_3m.clicked.connect(lambda: self.choose("experimento_3m"))
         self.btn_vacuum.clicked.connect(lambda: self.choose("experimento_vacio"))
         self.btn_relations.clicked.connect(lambda: self.choose("relations"))
+        self.btn_animals.clicked.connect(lambda: self.choose("animals"))
         self.btn_fourier.clicked.connect(lambda: self.choose("fourier"))
         self.btn_other_toggle.toggled.connect(self.other_modes_widget.setVisible)
         self.btn_updates.clicked.connect(self.show_latest_updates)
