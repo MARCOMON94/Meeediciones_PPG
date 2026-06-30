@@ -14,10 +14,7 @@ def main():
     pg.setConfigOptions(antialias=False)
 
     controller = AppController(app)
-    # TEMP 2026-06-30: no abrir la primera ventana con opciones.
-    # Para revertir: descomentar controller.show_menu() y quitar este return.
-    # controller.show_menu()
-    return
+    controller.show_menu()
 
     sys.exit(app.exec())
 
