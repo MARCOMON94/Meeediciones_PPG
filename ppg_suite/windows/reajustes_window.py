@@ -26,22 +26,28 @@ class ReajustesWindow(PPGSuite):
     def __init__(self):
         super().__init__("reajustes")
         self.setWindowTitle("PPG Suite v8 | Reajustes / larga duración")
-        self.resize(1150, 760)
+        self.resize(1360, 820)
 
     def build_ui(self):
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
         root = QtWidgets.QHBoxLayout(central)
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(10)
 
+        left_width = 460
         left_scroll = QtWidgets.QScrollArea()
         left_scroll.setWidgetResizable(True)
-        left_scroll.setFixedWidth(430)
+        left_scroll.setMinimumWidth(left_width)
+        left_scroll.setMaximumWidth(left_width + 120)
         left_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
         left_widget = QtWidgets.QWidget()
-        left_widget.setMinimumWidth(400)
-        left_widget.setMaximumWidth(400)
+        left_widget.setMinimumWidth(left_width - 30)
         left_scroll.setWidget(left_widget)
         left = QtWidgets.QVBoxLayout(left_widget)
+        left.setContentsMargins(8, 8, 8, 8)
+        left.setSpacing(8)
         root.addWidget(left_scroll, stretch=0)
 
         serial_group = QtWidgets.QGroupBox("Puerto")

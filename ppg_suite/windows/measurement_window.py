@@ -232,11 +232,11 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.app_mode: AppMode = app_mode
         self.setWindowTitle(f"PPG Suite v8 | MAX3010x | BPM + SpO2 | modo {app_mode}")
         if app_mode == "real":
-            self.resize(1120, 740)
+            self.resize(1360, 820)
         elif app_mode == "test":
-            self.resize(1220, 780)
+            self.resize(1420, 840)
         else:
-            self.resize(1250, 800)
+            self.resize(1420, 840)
         self.state = CaptureState()
         self.results_dir = getattr(self, "results_dir", RESULTS_DIR)
         self.raw_dir = getattr(self, "raw_dir", RAW_DIR)
@@ -292,17 +292,21 @@ class PPGSuite(QtWidgets.QMainWindow):
     def build_ui(self):
         central = QtWidgets.QWidget(); self.setCentralWidget(central)
         root = QtWidgets.QHBoxLayout(central)
-        left_width = 390 if self.app_mode == "real" else 430
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(10)
+        left_width = 440 if self.app_mode == "real" else 460
         left_scroll = QtWidgets.QScrollArea()
         left_scroll.setWidgetResizable(True)
-        left_scroll.setFixedWidth(left_width)
+        left_scroll.setMinimumWidth(left_width)
+        left_scroll.setMaximumWidth(left_width + 120)
         left_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        left_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
+        left_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
         left_widget = QtWidgets.QWidget()
-        left_widget.setMinimumWidth(left_width - 24)
-        left_widget.setMaximumWidth(left_width - 24)
+        left_widget.setMinimumWidth(left_width - 30)
         left_scroll.setWidget(left_widget)
         left = QtWidgets.QVBoxLayout(left_widget)
+        left.setContentsMargins(8, 8, 8, 8)
+        left.setSpacing(8)
         root.addWidget(left_scroll, stretch=0)
 
         serial_group = QtWidgets.QGroupBox("Puerto")
@@ -391,11 +395,11 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.info.setFont(QtGui.QFont("Consolas", 9))
         self.info.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         self.info.setWordWrap(True)
-        self.info.setMaximumWidth(left_width - 38)
         left.addWidget(self.info, stretch=1)
 
         self.tabs = QtWidgets.QTabWidget()
-        self.tabs.setMaximumWidth(680 if self.app_mode == "real" else 820)
+        self.tabs.setMinimumWidth(640)
+        self.tabs.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         root.addWidget(self.tabs, stretch=1)
         self.plot_main = pg.PlotWidget(title="IR y RED normalizadas/procesadas")
         self.plot_main.setBackground("w"); self.plot_main.showGrid(x=True, y=True, alpha=0.25); self.plot_main.setLabel("bottom", "Tiempo", units="s")

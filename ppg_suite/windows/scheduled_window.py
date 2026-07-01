@@ -128,7 +128,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.scheduled_segments: list[ScheduledSegment] = []
         super().__init__("test")
         self.setWindowTitle(f"PPG Suite v8 | {title}")
-        self.resize(1120, 740)
+        self.resize(1360, 820)
 
     def capture_mode_name(self) -> str:
         return "configurations"
@@ -137,18 +137,22 @@ class ScheduledConfigWindow(PPGSuite):
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
         root = QtWidgets.QHBoxLayout(central)
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(10)
 
-        left_width = 430
+        left_width = 460
         left_scroll = QtWidgets.QScrollArea()
         left_scroll.setWidgetResizable(True)
-        left_scroll.setFixedWidth(left_width)
+        left_scroll.setMinimumWidth(left_width)
+        left_scroll.setMaximumWidth(left_width + 120)
         left_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        left_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
+        left_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
         left_widget = QtWidgets.QWidget()
-        left_widget.setMinimumWidth(left_width - 24)
-        left_widget.setMaximumWidth(left_width - 24)
+        left_widget.setMinimumWidth(left_width - 30)
         left_scroll.setWidget(left_widget)
         left = QtWidgets.QVBoxLayout(left_widget)
+        left.setContentsMargins(8, 8, 8, 8)
+        left.setSpacing(8)
         root.addWidget(left_scroll, stretch=0)
 
         serial_group = QtWidgets.QGroupBox("Puerto")
@@ -228,6 +232,8 @@ class ScheduledConfigWindow(PPGSuite):
         left.addWidget(self.info, stretch=1)
 
         self.tabs = QtWidgets.QTabWidget()
+        self.tabs.setMinimumWidth(640)
+        self.tabs.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         root.addWidget(self.tabs, stretch=1)
         self.build_plot_tabs()
 
