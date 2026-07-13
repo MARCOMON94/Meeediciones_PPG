@@ -113,6 +113,7 @@ class ReajustesWindow(PPGSuite):
         self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.analysis_widget = AnalysisConfigWidget("Análisis en vivo")
         left.addWidget(self.analysis_widget)
+        self.apply_current_animal_profile_to_controls()
 
         self.btn_apply_config = QtWidgets.QPushButton("Aplicar configuración al Arduino")
         self.btn_start = QtWidgets.QPushButton("Iniciar larga duración")

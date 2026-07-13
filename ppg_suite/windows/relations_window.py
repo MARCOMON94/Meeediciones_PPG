@@ -362,16 +362,17 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     capture_two_manual_temp_headers = ["Temp manual RT", "Temp manual LT"]
     capture_cow_manual_temp_headers = ["Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT"]
     capture_headers = [
-        "Correo", "Hora", "Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Estado",
-        "Pulso ref.", "Temp manual inicio", "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
-        "Dif. BPM-ref", "BPM medio", "Oxigeno medio", "Calidad", "Contacto",
-        "Temp final", "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
-        "Duracion", "Hz", "Muestras", "Raw",
+        "Correo", "Animal", "Especie", "Modo", "Sensor", "Termometros",
+        "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
+        "BPM medio", "Oxigeno medio", "Calidad", "Contacto", "Estado",
+        "Pulso ref.", "Dif. BPM-ref", "Medicion", "Configuracion",
+        "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
+        "Hora", "Duracion", "Hz", "Muestras", "Raw",
     ]
     files_headers = ["Correo", "tipo", "archivo", "filas", "ruta"]
     temporal_two_temp_headers = ["Temp RT max tramo", "Temp LT max tramo"]
     temporal_cow_temp_headers = ["Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo"]
-    temporal_headers = ["Tramo", "Inicio s", "Fin s", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Temp max tramo", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "Muestras tramo"]
+    temporal_headers = ["Tramo", "Inicio s", "Fin s", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Muestras tramo"]
 
     def __init__(self):
         super().__init__()
@@ -404,21 +405,25 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_add_compare = QtWidgets.QPushButton("Anadir raw")
         self.btn_clear_compare = QtWidgets.QPushButton("Limpiar comparacion")
         self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
+        self.btn_delete = QtWidgets.QPushButton("Eliminar")
         self.btn_clear_mail = QtWidgets.QPushButton("Limpiar seleccion")
         self.btn_add_compare.setMinimumHeight(42)
         self.btn_clear_compare.setMinimumHeight(42)
         self.btn_prepare_mail.setMinimumHeight(42)
+        self.btn_delete.setMinimumHeight(42)
         self.btn_clear_mail.setMinimumHeight(42)
         top.addStretch(1)
         top.addWidget(self.mail_status)
         top.addWidget(self.btn_add_compare)
         top.addWidget(self.btn_clear_compare)
         top.addWidget(self.btn_prepare_mail)
+        top.addWidget(self.btn_delete)
         top.addWidget(self.btn_clear_mail)
         self.btn_back.clicked.connect(self.back_to_menu.emit)
         self.btn_add_compare.clicked.connect(self.add_current_capture_to_compare)
         self.btn_clear_compare.clicked.connect(self.clear_compare)
         self.btn_prepare_mail.clicked.connect(self.prepare_mail_zip)
+        self.btn_delete.clicked.connect(self.delete_checked_items)
         self.btn_clear_mail.clicked.connect(self.clear_mail_selection)
 
         filters = QtWidgets.QGroupBox("Buscar en sesiones")
@@ -1141,22 +1146,22 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Ratio R": fmt(_as_float(cap.value("ratio_r")), 4, ""),
             "Resp/min (experimental)": fmt(_as_float(_cap_first(cap, "resp_rate_rpm", "resp_min_exp")), 1, ""),
             "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
-            "Temp final": fmt(_as_float(_cap_temp_final(cap, "temp_c_final_max_5s", "temp_c_media")), 1, ""),
+            "Temp final": fmt(_as_float(cap.value("temp_c_final_max_5s")), 1, ""),
             "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
-            "Temp RT final": fmt(_as_float(_cap_temp_final(cap, "temp_rt_c_final_max_5s", "temp_rt_c_media", "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s")), 1, ""),
+            "Temp RT final": fmt(_as_float(_cap_first(cap, "temp_rt_c_final_max_5s", "temp_a0_c_final_max_5s")), 1, ""),
             "Temp RT ult.": fmt(_as_float(_cap_first(cap, "temp_rt_c_ultima", "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
             "Temp RT raw": fmt(_as_float(_cap_first(cap, "temp_rt_raw_ultima", "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
-            "Temp LT final": fmt(_as_float(_cap_temp_final(cap, "temp_lt_c_final_max_5s", "temp_lt_c_media", "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
+            "Temp LT final": fmt(_as_float(_cap_first(cap, "temp_lt_c_final_max_5s", "temp_a1_c_final_max_5s")), 1, ""),
             "Temp LT ult.": fmt(_as_float(_cap_first(cap, "temp_lt_c_ultima", "temp_a1_c_ultima")), 1, ""),
             "Temp LT raw": fmt(_as_float(_cap_first(cap, "temp_lt_raw_ultima", "temp_a1_raw_ultima")), 0, ""),
-            "Temp FLT final": fmt(_as_float(_cap_temp_final(cap, "temp_flt_c_final_max_5s", "temp_flt_c_media")), 1, ""),
-            "Temp FRT final": fmt(_as_float(_cap_temp_final(cap, "temp_frt_c_final_max_5s", "temp_frt_c_media")), 1, ""),
-            "Temp RLT final": fmt(_as_float(_cap_temp_final(cap, "temp_rlt_c_final_max_5s", "temp_rlt_c_media")), 1, ""),
-            "Temp RRT final": fmt(_as_float(_cap_temp_final(cap, "temp_rrt_c_final_max_5s", "temp_rrt_c_media")), 1, ""),
-            "Temp A0 final": fmt(_as_float(_cap_temp_final(cap, "temp_a0_c_final_max_5s", "temp_a0_c_media", "temp_c_final_max_5s", "temp_c_media")), 1, ""),
+            "Temp FLT final": fmt(_as_float(cap.value("temp_flt_c_final_max_5s")), 1, ""),
+            "Temp FRT final": fmt(_as_float(cap.value("temp_frt_c_final_max_5s")), 1, ""),
+            "Temp RLT final": fmt(_as_float(cap.value("temp_rlt_c_final_max_5s")), 1, ""),
+            "Temp RRT final": fmt(_as_float(cap.value("temp_rrt_c_final_max_5s")), 1, ""),
+            "Temp A0 final": fmt(_as_float(_cap_first(cap, "temp_a0_c_final_max_5s", "temp_c_final_max_5s")), 1, ""),
             "Temp A0 ult.": fmt(_as_float(_cap_first(cap, "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
             "Temp A0 raw": fmt(_as_float(_cap_first(cap, "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
-            "Temp A1 final": fmt(_as_float(_cap_temp_final(cap, "temp_a1_c_final_max_5s", "temp_a1_c_media")), 1, ""),
+            "Temp A1 final": fmt(_as_float(cap.value("temp_a1_c_final_max_5s")), 1, ""),
             "Temp A1 ult.": fmt(_as_float(cap.value("temp_a1_c_ultima")), 1, ""),
             "Temp A1 raw": fmt(_as_float(cap.value("temp_a1_raw_ultima")), 0, ""),
             "Temp raw": fmt(_as_float(cap.value("temp_raw_ultima")), 0, ""),
@@ -1374,6 +1379,235 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         QtWidgets.QApplication.clipboard().setText("\n".join(str(path) for path in paths))
         QtWidgets.QMessageBox.information(self, "Archivos", f"Copiadas {len(paths)} ruta(s) al portapapeles.")
 
+    def delete_checked_items(self):
+        capture_choices, standalone_paths = self._checked_delete_choices()
+        if not capture_choices and not standalone_paths:
+            QtWidgets.QMessageBox.information(self, "Eliminar", "Marca primero una sesion, toma/raw o archivo con la casilla Correo.")
+            return
+        selected_captures, selected_paths = self._pick_delete_targets(capture_choices, standalone_paths)
+        if not selected_captures and not selected_paths:
+            return
+        paths = self._delete_paths_for_targets(selected_captures, selected_paths)
+        if not paths:
+            QtWidgets.QMessageBox.information(self, "Eliminar", "No hay archivos existentes asociados a la seleccion.")
+            return
+        detail_lines = [str(path) for path in paths]
+        session_notes = self._session_update_notes(selected_captures)
+        preview_lines = detail_lines[:25]
+        if len(detail_lines) > len(preview_lines):
+            preview_lines.append(f"... y {len(detail_lines) - len(preview_lines)} archivo(s) mas")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg.setWindowTitle("Confirmar eliminacion")
+        msg.setText(f"Se van a eliminar {len(paths)} archivo(s).")
+        msg.setInformativeText("\n".join(preview_lines + session_notes) + "\n\nEsta accion no se puede deshacer.")
+        msg.setDetailedText("\n".join(detail_lines + session_notes))
+        delete_btn = msg.addButton("Eliminar seleccionados", QtWidgets.QMessageBox.ButtonRole.DestructiveRole)
+        msg.addButton("Cancelar", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+        if msg.clickedButton() != delete_btn:
+            return
+        deleted = 0
+        errors: list[str] = []
+        for path in paths:
+            try:
+                path.unlink()
+                deleted += 1
+            except OSError as exc:
+                errors.append(f"{path}: {exc}")
+        self._remove_capture_rows_from_sessions(selected_captures)
+        self.mail_paths.clear()
+        self.reload_data()
+        if errors:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Eliminar",
+                f"Eliminados {deleted} archivo(s), pero hubo {len(errors)} error(es).\n\n" + "\n".join(errors[:10]),
+            )
+        else:
+            QtWidgets.QMessageBox.information(self, "Eliminar", f"Eliminados {deleted} archivo(s).")
+
+    def _checked_delete_choices(self) -> tuple[dict[str, tuple[CaptureRecord, bool]], list[Path]]:
+        captures: dict[str, tuple[CaptureRecord, bool]] = {}
+        standalone_paths: list[Path] = []
+        for row in self.sessions_model.rows:
+            if row.get("_mail_checked") != "1":
+                continue
+            try:
+                session_index = int(row.get("_session_index", "-1"))
+            except ValueError:
+                session_index = -1
+            if 0 <= session_index < len(self.filtered_sessions):
+                for cap in self.filtered_sessions[session_index].captures:
+                    captures.setdefault(self._capture_delete_key(cap), (cap, False))
+        if self.current_session is not None:
+            for row in self.captures_model.rows:
+                if row.get("_mail_checked") != "1":
+                    continue
+                try:
+                    capture_index = int(row.get("_capture_index", "-1"))
+                except ValueError:
+                    capture_index = -1
+                if 0 <= capture_index < len(self.current_session.captures):
+                    cap = self.current_session.captures[capture_index]
+                    captures[self._capture_delete_key(cap)] = (cap, True)
+        for row in self.files_model.rows:
+            if row.get("_mail_checked") != "1":
+                continue
+            path_text = row.get("_mail_path") or row.get("ruta", "")
+            if path_text:
+                path = Path(path_text)
+                if path.exists() and path not in standalone_paths:
+                    standalone_paths.append(path)
+        return captures, standalone_paths
+
+    def _pick_delete_targets(
+        self,
+        capture_choices: dict[str, tuple[CaptureRecord, bool]],
+        standalone_paths: list[Path],
+    ) -> tuple[list[CaptureRecord], list[Path]]:
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Seleccionar que eliminar")
+        dialog.resize(780, 520)
+        layout = QtWidgets.QVBoxLayout(dialog)
+        info = QtWidgets.QLabel(
+            "Revisa la seleccion antes de borrar. Las sesiones muestran sus raws para que marques solo los que quieres eliminar."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        tree = QtWidgets.QTreeWidget()
+        tree.setHeaderLabels(["Eliminar", "Toma o archivo", "Relacionados"])
+        tree.setRootIsDecorated(True)
+        capture_by_key = {key: cap for key, (cap, _checked) in capture_choices.items()}
+        path_by_key = {str(path): path for path in standalone_paths}
+        for key, (cap, checked) in capture_choices.items():
+            paths = self._delete_paths_for_capture(cap)
+            item = QtWidgets.QTreeWidgetItem(["", self._capture_delete_label(cap), f"{len(paths)} archivo(s)"])
+            item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(0, QtCore.Qt.CheckState.Checked if checked else QtCore.Qt.CheckState.Unchecked)
+            item.setData(0, QtCore.Qt.ItemDataRole.UserRole, f"capture:{key}")
+            for path in paths:
+                child = QtWidgets.QTreeWidgetItem(["", path.name, str(path.parent)])
+                item.addChild(child)
+            tree.addTopLevelItem(item)
+        for path in standalone_paths:
+            item = QtWidgets.QTreeWidgetItem(["", path.name, str(path.parent)])
+            item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(0, QtCore.Qt.CheckState.Checked)
+            item.setData(0, QtCore.Qt.ItemDataRole.UserRole, f"path:{path}")
+            tree.addTopLevelItem(item)
+        tree.expandAll()
+        tree.resizeColumnToContents(0)
+        tree.resizeColumnToContents(1)
+        layout.addWidget(tree, stretch=1)
+        buttons = QtWidgets.QHBoxLayout()
+        btn_all = QtWidgets.QPushButton("Marcar todos")
+        btn_none = QtWidgets.QPushButton("Desmarcar")
+        btn_delete = QtWidgets.QPushButton("Eliminar seleccionados")
+        btn_cancel = QtWidgets.QPushButton("Cancelar")
+        buttons.addWidget(btn_all)
+        buttons.addWidget(btn_none)
+        buttons.addStretch(1)
+        buttons.addWidget(btn_delete)
+        buttons.addWidget(btn_cancel)
+        layout.addLayout(buttons)
+
+        def set_all(state: QtCore.Qt.CheckState):
+            for row in range(tree.topLevelItemCount()):
+                tree.topLevelItem(row).setCheckState(0, state)
+
+        btn_all.clicked.connect(lambda: set_all(QtCore.Qt.CheckState.Checked))
+        btn_none.clicked.connect(lambda: set_all(QtCore.Qt.CheckState.Unchecked))
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_delete.clicked.connect(dialog.accept)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return [], []
+        captures: list[CaptureRecord] = []
+        paths: list[Path] = []
+        for row in range(tree.topLevelItemCount()):
+            item = tree.topLevelItem(row)
+            if item.checkState(0) != QtCore.Qt.CheckState.Checked:
+                continue
+            marker = str(item.data(0, QtCore.Qt.ItemDataRole.UserRole) or "")
+            if marker.startswith("capture:"):
+                cap = capture_by_key.get(marker.removeprefix("capture:"))
+                if cap is not None:
+                    captures.append(cap)
+            elif marker.startswith("path:"):
+                path = path_by_key.get(marker.removeprefix("path:"))
+                if path is not None:
+                    paths.append(path)
+        return captures, paths
+
+    def _capture_delete_key(self, cap: CaptureRecord) -> str:
+        return "|".join([cap.session_key, cap.capture_id, cap.base_name])
+
+    def _capture_delete_label(self, cap: CaptureRecord) -> str:
+        pieces = [
+            cap.value("id") or cap.base_name,
+            f"{cap.value('fecha')} {cap.value('hora')}".strip(),
+            _mode_label(cap.value("modo")),
+            cap.value("config_label"),
+            cap.files.get("raw").name if cap.files.get("raw") else cap.base_name,
+        ]
+        return " | ".join(piece for piece in pieces if piece)
+
+    def _delete_paths_for_capture(self, cap: CaptureRecord) -> list[Path]:
+        kinds = ("raw", "processed", "summary", "blocks", "plot", "screenshot", "config")
+        paths: list[Path] = []
+        for kind in kinds:
+            path = cap.files.get(kind)
+            if path and path.exists() and path not in paths:
+                paths.append(path)
+        return paths
+
+    def _delete_paths_for_targets(self, captures: list[CaptureRecord], standalone_paths: list[Path]) -> list[Path]:
+        paths: list[Path] = []
+        for cap in captures:
+            for path in self._delete_paths_for_capture(cap):
+                if path not in paths:
+                    paths.append(path)
+        for path in standalone_paths:
+            if path.exists() and path not in paths:
+                paths.append(path)
+        return paths
+
+    def _session_update_notes(self, captures: list[CaptureRecord]) -> list[str]:
+        sessions = sorted({cap.files["session"] for cap in captures if cap.files.get("session")})
+        if not sessions:
+            return []
+        return [f"Actualizar CSV de sesion sin borrar el archivo: {path}" for path in sessions]
+
+    def _remove_capture_rows_from_sessions(self, captures: list[CaptureRecord]):
+        by_session: dict[Path, set[str]] = {}
+        for cap in captures:
+            session_path = cap.files.get("session")
+            if not session_path or not session_path.exists():
+                continue
+            keys = by_session.setdefault(session_path, set())
+            keys.add(cap.base_name)
+            keys.add(cap.capture_id)
+            keys.add(cap.value("session_id"))
+        for session_path, keys in by_session.items():
+            rows = _read_csv(session_path)
+            if not rows:
+                continue
+            fieldnames = list(rows[0].keys())
+            kept = []
+            for row in rows:
+                base = _base_from_row(row)
+                row_keys = {base, row.get("base_name", ""), row.get("session_id", "")}
+                if row_keys & keys:
+                    continue
+                kept.append(row)
+            try:
+                with open(session_path, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
+                    writer.writeheader()
+                    writer.writerows(kept)
+            except OSError:
+                continue
+
     def show_compare_tab(self):
         for idx in range(self.detail_tabs.count()):
             if self.detail_tabs.tabText(idx) == "Comparar":
@@ -1491,8 +1725,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 plotted += self._plot_compare_series(t, self._compare_series(rows, "spo2_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
                 self.compare_plot.setLabel("left", "SpO2", units="%")
             elif view == "Temperatura":
-                temp = self._compare_series(rows, "temp_c", "temp_rt_c", "temp_a0_c", "temp_lt_c", "temp_a1_c")
-                plotted += self._plot_compare_series(t, temp, color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
+                for temp_label, temp_values, style in self._temperature_series_for_rows(rows):
+                    plotted += self._plot_compare_series(t, temp_values, color, f"{label} {temp_label}", style, width=2)
                 self.compare_plot.setLabel("left", "Temperatura", units="C")
             elif view == "Calidad":
                 plotted += self._plot_compare_series(t, self._compare_series(rows, "quality_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
@@ -1520,6 +1754,46 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     break
             values.append(value)
         return np.asarray(values, dtype=float)
+
+    def _temperature_series_for_rows(self, rows: list[dict[str, str]]) -> list[tuple[str, np.ndarray, QtCore.Qt.PenStyle]]:
+        cow_specs = [
+            ("FLT", ("temp_flt_c",), QtCore.Qt.PenStyle.SolidLine),
+            ("FRT", ("temp_frt_c",), QtCore.Qt.PenStyle.DashLine),
+            ("RLT", ("temp_rlt_c",), QtCore.Qt.PenStyle.DotLine),
+            ("RRT", ("temp_rrt_c",), QtCore.Qt.PenStyle.DashDotLine),
+        ]
+        two_sensor_specs = [
+            ("RT", ("temp_rt_c", "temp_a0_c"), QtCore.Qt.PenStyle.SolidLine),
+            ("LT", ("temp_lt_c", "temp_a1_c"), QtCore.Qt.PenStyle.DashLine),
+        ]
+        channel_specs = [
+            ("A0", ("temp_a0_c",), QtCore.Qt.PenStyle.SolidLine),
+            ("A1", ("temp_a1_c",), QtCore.Qt.PenStyle.DashLine),
+            ("A2", ("temp_a2_c",), QtCore.Qt.PenStyle.DotLine),
+            ("A3", ("temp_a3_c",), QtCore.Qt.PenStyle.DashDotLine),
+        ]
+        series: list[tuple[str, np.ndarray, QtCore.Qt.PenStyle]] = []
+        for label, keys, style in cow_specs:
+            values = self._compare_series(rows, *keys)
+            if np.any(np.isfinite(values)):
+                series.append((label, values, style))
+        if series:
+            return series
+        for label, keys, style in two_sensor_specs:
+            values = self._compare_series(rows, *keys)
+            if np.any(np.isfinite(values)):
+                series.append((label, values, style))
+        if series:
+            return series
+        for label, keys, style in channel_specs:
+            values = self._compare_series(rows, *keys)
+            if np.any(np.isfinite(values)):
+                series.append((label, values, style))
+        if not series:
+            values = self._compare_series(rows, "temp_c")
+            if np.any(np.isfinite(values)):
+                series.append(("Temp", values, QtCore.Qt.PenStyle.SolidLine))
+        return series
 
     def _plot_compare_series(
         self,
@@ -1615,15 +1889,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
             ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
-            ("Temperatura primaria final / ultima", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_c_ultima')), 2, '-')} C"),
-            ("Temperatura RT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_rt_c_final_max_5s', 'temp_rt_c_media', 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_rt_c_ultima', 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_rt_raw_ultima', 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
-            ("Temperatura LT final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_lt_c_final_max_5s', 'temp_lt_c_media', 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_lt_c_ultima', 'temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_lt_raw_ultima', 'temp_a1_raw_ultima')), 0, '-')}"),
-            ("Temperatura A0 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a0_c_final_max_5s', 'temp_a0_c_media', 'temp_c_final_max_5s', 'temp_c_media')), 2, '-')} / {fmt(_as_float(_cap_first(cap, 'temp_a0_c_ultima', 'temp_c_ultima')), 2, '-')} C / {fmt(_as_float(_cap_first(cap, 'temp_a0_raw_ultima', 'temp_raw_ultima')), 0, '-')}"),
-            ("Temperatura A1 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a1_c_final_max_5s', 'temp_a1_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a1_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a1_raw_ultima')), 0, '-')}"),
-            ("Temperatura A2 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a2_c_final_max_5s', 'temp_a2_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a2_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a2_raw_ultima')), 0, '-')}"),
-            ("Temperatura A3 final / ultima / raw", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_a3_c_final_max_5s', 'temp_a3_c_media')), 2, '-')} / {fmt(_as_float(cap.value('temp_a3_c_ultima')), 2, '-')} C / {fmt(_as_float(cap.value('temp_a3_raw_ultima')), 0, '-')}"),
-            ("Vaca FLT / FRT final", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_flt_c_final_max_5s', 'temp_flt_c_media')), 2, '-')} / {fmt(_as_float(_cap_temp_final(cap, 'temp_frt_c_final_max_5s', 'temp_frt_c_media')), 2, '-')} C"),
-            ("Vaca RLT / RRT final", f"{fmt(_as_float(_cap_temp_final(cap, 'temp_rlt_c_final_max_5s', 'temp_rlt_c_media')), 2, '-')} / {fmt(_as_float(_cap_temp_final(cap, 'temp_rrt_c_final_max_5s', 'temp_rrt_c_media')), 2, '-')} C"),
+            ("Temperatura RT final", f"{fmt(_as_float(_cap_first(cap, 'temp_rt_c_final_max_5s', 'temp_a0_c_final_max_5s')), 2, '-')} C"),
+            ("Temperatura LT final", f"{fmt(_as_float(_cap_first(cap, 'temp_lt_c_final_max_5s', 'temp_a1_c_final_max_5s')), 2, '-')} C"),
+            ("Temperatura FLT final", f"{fmt(_as_float(cap.value('temp_flt_c_final_max_5s')), 2, '-')} C"),
+            ("Temperatura FRT final", f"{fmt(_as_float(cap.value('temp_frt_c_final_max_5s')), 2, '-')} C"),
+            ("Temperatura RLT final", f"{fmt(_as_float(cap.value('temp_rlt_c_final_max_5s')), 2, '-')} C"),
+            ("Temperatura RRT final", f"{fmt(_as_float(cap.value('temp_rrt_c_final_max_5s')), 2, '-')} C"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
@@ -1700,10 +1971,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 if np.any(mask):
                     self.plot_capture.plot(t[mask], spo2[mask], pen=pg.mkPen((150, 70, 160), width=2), name="Oxigeno")
             if self.chk_temp.isChecked():
-                temp = np.asarray([_as_float(r.get("temp_c", "")) for r in rows], dtype=float)
-                mask = mask_t & np.isfinite(temp)
-                if np.any(mask):
-                    self.plot_capture.plot(t[mask], temp[mask], pen=pg.mkPen((220, 120, 30), width=2), name="Temp")
+                temp_colors = [(220, 120, 30), (20, 130, 140), (120, 80, 190), (170, 90, 40), (80, 140, 70), (180, 70, 120)]
+                for idx, (label, temp, style) in enumerate(self._temperature_series_for_rows(rows)):
+                    mask = mask_t & np.isfinite(temp)
+                    if np.any(mask):
+                        self.plot_capture.plot(
+                            t[mask],
+                            temp[mask],
+                            pen=pg.mkPen(temp_colors[idx % len(temp_colors)], width=2, style=style),
+                            name=f"Temp {label}",
+                        )
         if self.chk_blocks.isChecked() and block_rows:
             x = np.asarray([_as_float(r.get("inicio_s", "")) for r in block_rows], dtype=float)
             y = np.asarray([_as_float(r.get("bpm_medio_10s", "")) for r in block_rows], dtype=float)
@@ -1887,8 +2164,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             spo2 = np.asarray([_as_float(r.get("spo2_rolling_5s", "")) for r in rows], dtype=float)
             self._plot_temporal_segment_series(tt, spo2[mask], (150, 70, 160), "SpO2")
         if self.chk_temporal_temp.isChecked():
-            temp = np.asarray([_as_float(r.get("temp_c", "")) for r in rows], dtype=float)
-            self._plot_temporal_segment_series(tt, temp[mask], (220, 120, 30), "Temp")
+            temp_colors = [(220, 120, 30), (20, 130, 140), (120, 80, 190), (170, 90, 40), (80, 140, 70), (180, 70, 120)]
+            for idx, (label, temp, _style) in enumerate(self._temperature_series_for_rows(rows)):
+                self._plot_temporal_segment_series(tt, temp[mask], temp_colors[idx % len(temp_colors)], f"Temp {label}")
         if self.chk_temporal_blocks.isChecked():
             bpm_10s = _as_float(row.get("BPM 10s", ""))
             if np.isfinite(bpm_10s):

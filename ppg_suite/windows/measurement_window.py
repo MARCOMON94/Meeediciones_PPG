@@ -55,8 +55,9 @@ from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWi
 
 TEMP_SETTLE_S = 1.0
 TEMP_FINAL_WINDOW_S = 5.0
-TEMP_MONITOR_DEFAULT_S = 5.0
+TEMP_MONITOR_DEFAULT_S = 15.0
 TEMP_ALERT_DEFAULT_C = 40.0
+SIMPLE_CAPTURE_DEFAULT_S = 30.0
 BLE_PORT_ID = "BLE:MTESTV2_NANO33IOT"
 BLE_DEVICE_NAME_HINTS = ("mtestv2", "Nano33IoT", "Nano 33 IoT")
 BLE_SERVICE_UUID = "7f510001-1b15-4b91-9f4b-3a4d5f6e0001"
@@ -324,7 +325,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         capture_group = QtWidgets.QGroupBox("Toma normal")
         cap = QtWidgets.QFormLayout(capture_group)
         self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
-        self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(90.0); self.duration_spin.setSuffix(" s")
+        self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(SIMPLE_CAPTURE_DEFAULT_S); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.temp_manual_initial_widget = self.create_manual_initial_temp_widget()
         self.animal_combo = QtWidgets.QComboBox()
@@ -358,6 +359,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.btn_save_animal_config.clicked.connect(self.save_animal_profile_clicked)
         self.analysis_widget = AnalysisConfigWidget()
         left.addWidget(self.analysis_widget)
+        self.apply_current_animal_profile_to_controls()
 
         self.btn_toggle_advanced = QtWidgets.QPushButton("Mostrar/ocultar configuración avanzada")
         left.addWidget(self.btn_toggle_advanced)
@@ -618,9 +620,15 @@ class PPGSuite(QtWidgets.QMainWindow):
                     self.udder_combo.setCurrentIndex(i)
                     break
             self.udder_combo.blockSignals(False)
-        self.configure_temp_mapping_editor(default_mapping_for_animal(animal_type))
+        profile = self.profile_for_animal(animal_type)
+        profile_mapping = str(profile.get("temp_mapping") or "") if profile else ""
+        self.configure_temp_mapping_editor(profile_mapping or default_mapping_for_animal(animal_type))
         self.refresh_manual_initial_temp_widget()
         self.refresh_temperature_curve_channels()
+        if profile:
+            self.apply_animal_profile_to_controls(profile)
+        else:
+            self.apply_default_animal_profile_to_controls(animal_type)
 
     def active_temp_channels(self) -> tuple[str, ...]:
         animal_type = getattr(self.state, "animal_type", "")
@@ -702,19 +710,75 @@ class PPGSuite(QtWidgets.QMainWindow):
 
     def current_animal_profile(self) -> dict:
         animal_type = self.current_animal_type()
-        return {
+        profile = {
             "profile_type": "species_sensor_config",
             "animal_type": animal_type,
             "animal_label": animal_label(animal_type),
-            "sensor_config": asdict(self.sensor_widget.get_config()),
+            "temp_mapping": self.current_temp_mapping(),
+            "temp_monitor_seconds": self.current_temp_monitor_seconds(),
+            "temp_alert_threshold_c": self.current_temp_alert_threshold(),
             "updated": datetime.now().isoformat(),
         }
+        if hasattr(self, "sensor_widget"):
+            profile["sensor_config"] = asdict(self.sensor_widget.get_config())
+        if hasattr(self, "duration_spin") and self.duration_spin.suffix().strip() == "s":
+            profile["duration_s"] = float(self.duration_spin.value())
+        return profile
+
+    def profile_for_animal(self, animal_type: str) -> dict:
+        profiles = self.load_animal_profiles()
+        profile = profiles.get(normalize_animal_type(animal_type))
+        return profile if isinstance(profile, dict) else {}
+
+    def apply_current_animal_profile_to_controls(self):
+        self.apply_animal_profile_to_controls(self.profile_for_animal(self.current_animal_type()))
+
+    def apply_default_animal_profile_to_controls(self, animal_type: str):
+        if hasattr(self, "duration_spin") and self.duration_spin.suffix().strip() == "s" and normalize_animal_type(animal_type) != ANIMAL_COW:
+            self.duration_spin.setValue(SIMPLE_CAPTURE_DEFAULT_S)
+        if hasattr(self, "temp_monitor_seconds_spin"):
+            self.temp_monitor_seconds_spin.setValue(TEMP_MONITOR_DEFAULT_S)
+        if hasattr(self, "temp_alert_threshold_spin"):
+            self.temp_alert_threshold_spin.setValue(TEMP_ALERT_DEFAULT_C)
+
+    def apply_animal_profile_to_controls(self, profile: dict | None):
+        if not profile:
+            return
+        sensor_cfg = profile.get("sensor_config") or {}
+        if sensor_cfg and hasattr(self, "sensor_widget"):
+            try:
+                self.sensor_widget.set_config(SensorConfig(**sensor_cfg).clean())
+            except (TypeError, ValueError):
+                pass
+        if hasattr(self, "duration_spin") and self.duration_spin.suffix().strip() == "s":
+            duration = profile.get("duration_s")
+            try:
+                if duration not in (None, ""):
+                    self.duration_spin.setValue(float(duration))
+            except (TypeError, ValueError):
+                pass
+        if hasattr(self, "temp_monitor_seconds_spin"):
+            try:
+                seconds = profile.get("temp_monitor_seconds")
+                if seconds not in (None, ""):
+                    self.temp_monitor_seconds_spin.setValue(float(seconds))
+            except (TypeError, ValueError):
+                pass
+        if hasattr(self, "temp_alert_threshold_spin"):
+            try:
+                threshold = profile.get("temp_alert_threshold_c")
+                if threshold not in (None, ""):
+                    self.temp_alert_threshold_spin.setValue(float(threshold))
+            except (TypeError, ValueError):
+                pass
 
     def profile_summary_text(self, profile: dict) -> str:
         sensor_cfg = profile.get("sensor_config") or {}
         animal_type = normalize_animal_type(str(profile.get("animal_type") or ""))
         return (
             f"Especie: {profile.get('animal_label') or animal_label(animal_type)}\n"
+            f"Duracion={profile.get('duration_s', '-')} s Temp={profile.get('temp_monitor_seconds', '-')} s "
+            f"Aviso>{profile.get('temp_alert_threshold_c', '-')} C Termometros={profile.get('temp_mapping', '-')}\n"
             f"RED={sensor_cfg.get('red', '-')} IR={sensor_cfg.get('ir', '-')} AVG={sensor_cfg.get('avg', '-')} "
             f"RATE={sensor_cfg.get('rate', '-')} WIDTH={sensor_cfg.get('width', '-')} ADC={sensor_cfg.get('adc', '-')} "
             f"SKIP={sensor_cfg.get('skip', '-')} DEBUG={sensor_cfg.get('debug', '-')}"

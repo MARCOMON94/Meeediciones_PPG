@@ -9,7 +9,7 @@ import pyqtgraph as pg
 
 from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
-from .measurement_window import PPGSuite
+from .measurement_window import PPGSuite, SIMPLE_CAPTURE_DEFAULT_S
 
 
 class TemperatureWindow(PPGSuite):
@@ -66,7 +66,7 @@ class TemperatureWindow(PPGSuite):
         self.duration_spin = NoWheelDoubleSpinBox()
         self.duration_spin.setRange(2, 3600)
         self.duration_spin.setDecimals(1)
-        self.duration_spin.setValue(60.0)
+        self.duration_spin.setValue(SIMPLE_CAPTURE_DEFAULT_S)
         self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.temp_manual_initial_widget = self.create_manual_initial_temp_widget()

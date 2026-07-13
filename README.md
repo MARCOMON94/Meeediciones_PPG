@@ -87,6 +87,7 @@ PROJECT_DIR=C:\ruta\a\mtestv2
 PYTHON_REL=.venv\Scripts\python.exe
 MAIN_FILE=main.py
 AUTO_UPDATE_GIT=1
+AUTO_UPDATE_TIMEOUT_SEC=15
 ```
 
 ## Arranque
@@ -102,6 +103,7 @@ El lanzador:
 - Lee la configuracion local desde `.env`.
 - Entra en `PROJECT_DIR`.
 - Intenta actualizar con `git pull --ff-only` si `AUTO_UPDATE_GIT=1`.
+  Si no hay internet o Git tarda demasiado, omite la actualizacion y abre la version local.
 - Comprueba dependencias.
 - Ejecuta `main.py`.
 

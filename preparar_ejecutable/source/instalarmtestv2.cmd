@@ -101,6 +101,7 @@ if not exist ".env" (
     >> ".env" echo PYTHON_REL=.venv\Scripts\python.exe
     >> ".env" echo MAIN_FILE=main.py
     >> ".env" echo AUTO_UPDATE_GIT=1
+    >> ".env" echo AUTO_UPDATE_TIMEOUT_SEC=15
 
     echo [OK] .env creado.
 ) else (
