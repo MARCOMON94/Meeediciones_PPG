@@ -861,10 +861,64 @@ class PPGSuite(QtWidgets.QMainWindow):
         if port:
             self.connect_port(str(port))
 
-    def connect_port(self, port: str):
+    def _close_serial_safely(self, port_obj=None):
+        port_obj = self.serial_port if port_obj is None else port_obj
+        if not port_obj:
+            return
+        close = getattr(port_obj, "close", None)
+        if not close:
+            return
         try:
-            if self.serial_port and self.serial_port.is_open:
-                self.serial_port.close()
+            close()
+        except Exception:
+            log.exception("Error cerrando puerto serie")
+
+    def _finish_capture_after_serial_loss(self, reason: str):
+        st = self.state
+        if not st.capturing:
+            return
+        st.capturing = False
+        had_session = bool(st.raw_file or st.raw_handle or st.t)
+        st.finished = had_session
+        if st.raw_handle:
+            try:
+                st.raw_handle.flush()
+                st.raw_handle.close()
+            except Exception:
+                log.exception("Error cerrando raw tras desconexion serial")
+            finally:
+                st.raw_handle = None
+                st.raw_writer = None
+        if had_session:
+            self.finalize_capture(reason)
+
+    def _mark_serial_disconnected(self, context: str, exc: Exception | None = None, finish_capture: bool = False):
+        detail = f"{context}: {exc}" if exc else context
+        port_obj = self.serial_port
+        self.serial_port = None
+        self.rx_buffer = ""
+        self.port_name = "DESCONECTADO"
+        self.state.sensor_ready = False
+        self.state.last_line = f"ERROR_SERIAL: {detail}"
+        self.state.last_control = "Puerto serie desconectado. Pulsa Actualizar y Conectar."
+        self.last_config_ack = "sin confirmar"
+        self.last_config_line = ""
+        self.state.last_config_ack = self.last_config_ack
+        self.state.last_config_line = self.last_config_line
+        self._close_serial_safely(port_obj)
+        if finish_capture:
+            self._finish_capture_after_serial_loss("DESCONEXION_SERIAL")
+
+    def connect_port(self, port: str):
+        self._close_serial_safely()
+        self.serial_port = None
+        self.rx_buffer = ""
+        self.state.sensor_ready = False
+        self.last_config_ack = "sin confirmar"
+        self.last_config_line = ""
+        self.state.last_config_ack = self.last_config_ack
+        self.state.last_config_line = self.last_config_line
+        try:
             if port == BLE_PORT_ID:
                 log.info("Abriendo BLE Nano 33 IoT")
                 self.serial_port = BleSerialAdapter()
@@ -875,26 +929,32 @@ class PPGSuite(QtWidgets.QMainWindow):
                 self.serial_port.reset_output_buffer()
                 time.sleep(2.0)
                 self.port_name = port
+            self.send_command("REINIT_SENSOR")
             self.send_command("STATUS")
             # El firmware recibe la configuración actual al conectar, no solo al iniciar toma.
             self.last_sensor_config = self.sensor_widget.get_config()
             self.send_command(self.last_sensor_config.command())
         except Exception as exc:
+            self._close_serial_safely()
+            self.serial_port = None
             self.port_name = "ERROR"
             log.exception("Error abriendo puerto")
             QtWidgets.QMessageBox.critical(self, "Error serial", str(exc))
 
-    def send_command(self, cmd: str):
+    def send_command(self, cmd: str) -> bool:
         if not self.serial_port or not self.serial_port.is_open:
             log.warning("TX cancelado, puerto cerrado: %s", cmd)
-            return
+            return False
         payload = (cmd.strip() + "\n").encode("utf-8")
-        self.serial_port.write(payload)
         try:
+            self.serial_port.write(payload)
             self.serial_port.flush()
-        except Exception:
-            pass
+        except Exception as exc:
+            log.exception("Error enviando serial")
+            self._mark_serial_disconnected("envio serial", exc, finish_capture=False)
+            return False
         log.info("TX -> %s", cmd.strip())
+        return True
 
     def apply_sensor_config(self, cfg: SensorConfig):
         self.last_sensor_config = cfg.clean()
@@ -1108,6 +1168,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             self.state.discarded_lines += 1
             self.state.last_line = f"ERROR_SERIAL: {exc}"
             log.exception("Error leyendo serial")
+            self._mark_serial_disconnected("lectura serial", exc, finish_capture=True)
 
     def looks_like_data(self, line: str) -> bool:
         parts = line.split(",")
@@ -2245,8 +2306,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 self.state.raw_handle.flush(); self.state.raw_handle.close()
             if self.session_handle:
                 self.session_handle.flush(); self.session_handle.close()
-            if self.serial_port and self.serial_port.is_open:
-                self.serial_port.close()
+            self._close_serial_safely()
         finally:
             event.accept()
 

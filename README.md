@@ -2,7 +2,7 @@
 
 Aplicacion de escritorio para capturar, analizar y documentar senales PPG con sensor MAX3010x, lectura de temperatura NTC, firmware Arduino y una interfaz PyQt6 pensada para trabajo de campo.
 
-El proyecto combina adquisicion en tiempo real, configuracion del sensor, analisis de pulso, generacion de informes y empaquetado portable para Windows. Esta preparado para publicarse como portfolio sin incluir resultados experimentales ni datos de medicion.
+El proyecto combina adquisicion en tiempo real, configuracion del sensor, analisis de pulso y generacion de informes. Esta preparado para publicarse como portfolio sin incluir resultados experimentales ni datos de medicion.
 
 ## Que hace
 
@@ -16,7 +16,6 @@ El proyecto combina adquisicion en tiempo real, configuracion del sensor, analis
 - Incluye analisis experimental con Fourier, autocorrelacion e Hilbert para comparar configuraciones.
 - Genera CSV, JSON, graficas, capturas y PDFs de informe.
 - Estadisticas permite revisar sesiones, marcar raws de varias sesiones y preparar un ZIP en el Escritorio para correo.
-- Puede empaquetarse como `.exe` portable para uso en Windows sin entorno de desarrollo visible.
 
 ## Tecnologias
 
@@ -28,7 +27,6 @@ El proyecto combina adquisicion en tiempo real, configuracion del sensor, analis
 - bleak para conexion BLE con Arduino Nano 33 IoT
 - sounddevice
 - Arduino / C++
-- PyInstaller para el ejecutable portable
 
 ## Estructura del proyecto
 
@@ -58,9 +56,6 @@ ppg_suite/
     scheduled_window.py         # configuraciones y experimento 3M
     relations_window.py         # estadisticas y explorador de sesiones
     fourier_window.py           # analisis Fourier + Hilbert
-preparar_ejecutable/
-  BUILD_EXE.cmd                 # build del ejecutable portable
-  source/                       # copia adaptada para PyInstaller
 ```
 
 ## Instalacion de desarrollo
@@ -195,6 +190,7 @@ La app sigue aceptando raws y firmware antiguos con solo A0/A1.
 La aplicacion se comunica por serie mediante comandos de texto como:
 
 - `STATUS`
+- `REINIT_SENSOR`
 - `CONFIG RED=... IR=... AVG=... RATE=... WIDTH=... ADC=... SKIP=... DEBUG=...`
 - `CONFIG_TEMP VCC=... RFIX=... RN=... BETA=... OFFSET=... ADCBITS=...`
 - `START_CONTINUOUS`
@@ -204,28 +200,8 @@ La aplicacion se comunica por serie mediante comandos de texto como:
 
 Antes de iniciar una toma, el software verifica que la configuracion confirmada por Arduino coincide con la solicitada.
 
-## Ejecutable portable
-
-Para generar una version portable:
-
-```bat
-preparar_ejecutable\BUILD_EXE.cmd
-```
-
-El script prepara un entorno temporal, instala dependencias de build, usa PyInstaller y genera el ejecutable en:
-
-```txt
-preparar_ejecutable\source\dist\mtestv2.exe
-```
-
-En la version portable, los resultados se guardan fuera del repositorio:
-
-```txt
-%USERPROFILE%\Documents\mtestv2\resultados
-```
-
 ## Notas para publicacion
 
-- `.env`, entornos virtuales, builds, ejecutables y `resultados/` no se versionan.
+- `.env`, entornos virtuales y `resultados/` no se versionan.
 - El repositorio contiene el codigo, scripts de arranque, firmware y documentacion tecnica.
 - Los datos reales de medicion deben mantenerse fuera del historial publico.

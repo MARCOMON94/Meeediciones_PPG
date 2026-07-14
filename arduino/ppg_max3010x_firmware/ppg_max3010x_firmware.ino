@@ -13,6 +13,7 @@ MAX30105 sensor;
 //
 // Comandos desde Python:
 //   STATUS
+//   REINIT_SENSOR
 //   CONFIG RED=63 IR=63 AVG=4 RATE=800 WIDTH=411 ADC=16384 SKIP=50 DEBUG=0
 //   CONFIG_TEMP VCC=3.30 RFIX=10000 RN=10000 BETA=3435 OFFSET=0.0 ADCBITS=12
 //   START_CONTINUOUS
@@ -220,6 +221,20 @@ void applySensorConfig() {
   sensor.setPulseAmplitudeIR(cfg.ir);
   sensor.setPulseAmplitudeGreen(0);
   sensor.clearFIFO();
+}
+
+bool initMax3010x() {
+  Wire.begin();
+  delay(50);
+
+  if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
+    sensorOk = false;
+    return false;
+  }
+
+  sensorOk = true;
+  applySensorConfig();
+  return true;
 }
 
 void applyTempConfig() {
@@ -771,6 +786,20 @@ void handleCommand(const String &cmd) {
     return;
   }
 
+  if (cmd == "REINIT_SENSOR" || cmd == "RESET_SENSOR") {
+    streaming = false;
+    tempOnlyMode = false;
+    skipRemaining = 0;
+
+    if (initMax3010x()) {
+      emitLine("OK_SENSOR_REINIT");
+      printSensorConfig();
+    } else {
+      emitLine("ERR_SENSOR_REINIT");
+    }
+    return;
+  }
+
   if (cmd == "STATUS") {
     emitLine(sensorOk ? "STATUS SENSOR_OK" : "STATUS SENSOR_ERROR");
     printSensorConfig();
@@ -790,7 +819,7 @@ void handleCommand(const String &cmd) {
   }
 
   if (cmd == "START_CONTINUOUS" || cmd == "START") {
-    if (!sensorOk) {
+    if (!initMax3010x()) {
       emitLine("ERR_SENSOR_NOT_READY");
       return;
     }
@@ -841,15 +870,8 @@ void setup() {
   setupBle();
   applyTempConfig();
 
-  Wire.begin();
-  delay(50);
-
-  if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
-    sensorOk = false;
+  if (!initMax3010x()) {
     emitLine("ERROR_SENSOR");
-  } else {
-    sensorOk = true;
-    applySensorConfig();
   }
 
   emitLine("READY");

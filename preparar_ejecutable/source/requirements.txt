@@ -1,7 +1,0 @@
-# Runtime dependencies for mtestv2
-numpy
-pyserial
-PyQt6
-pyqtgraph
-sounddevice
-bleak

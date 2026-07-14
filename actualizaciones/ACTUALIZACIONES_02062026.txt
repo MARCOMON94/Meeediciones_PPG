@@ -198,21 +198,6 @@ Esta actualizacion mejora la revision de resultados guardados. Se centra en dos 
 - La pantalla respeta el tema visual del ordenador.
 - Solo se fuerza texto oscuro en las filas coloreadas por puntuacion, para que los fondos verde/rojo claro sigan siendo legibles aunque Windows este en modo oscuro.
 
-15. Preparacion de ejecutable portable
-- Se anade la carpeta `preparar_ejecutable/` como referencia para crear un ejecutable Windows portable.
-- Incluye:
-  - `BUILD_EXE.cmd`
-  - copia adaptada del proyecto en `preparar_ejecutable/source/`
-  - configuracion PyInstaller en `mtestv2.spec`
-- El ejecutable portable no usa Git ni actualizaciones automaticas.
-- En la version empaquetada, los resultados se guardan en:
-  - `%USERPROFILE%\Documents\mtestv2\resultados`
-- Los artefactos pesados quedan fuera de Git:
-  - entorno de build
-  - carpetas `build` y `dist`
-  - `.exe`
-  - `.zip`
-
 16. Ajuste del modo Configuraciones y analizador
 - En `Configuraciones`, se limpia el buffer serie justo antes de iniciar cada configuracion.
 - La captura de cada configuracion empieza despues de enviar `START_CONTINUOUS`, evitando que una linea vieja pueda entrar como primera muestra del segmento.
