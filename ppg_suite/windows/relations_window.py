@@ -4,6 +4,7 @@ import csv
 import html
 import json
 import math
+import stat
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -36,7 +37,10 @@ MODE_LABELS = {
     "experimento_3m": "Experimento 3M",
 }
 
+SELECTION_HEADER = "Seleccionar"
+
 HEADER_TOOLTIPS = {
+    SELECTION_HEADER: "Seleccionar sesion, toma/raw o archivo para preparar correo o revisar su eliminacion.",
     "Sesion": "Archivo o grupo de tomas al que pertenece la medicion.",
     "Fecha": "Fecha registrada para la sesion o toma.",
     "Inicio": "Hora inicial registrada para la sesion.",
@@ -249,6 +253,15 @@ class SessionGroup:
         return self.path.name if self.path else self.key
 
 
+@dataclass
+class SelectionRecord:
+    kind: str
+    key: str
+    path: Path | None = None
+    session_key: str = ""
+    capture_key: str = ""
+
+
 class DictTableModel(QtCore.QAbstractTableModel):
     def __init__(self, headers: list[str], rows: list[dict[str, str]] | None = None):
         super().__init__()
@@ -267,11 +280,11 @@ class DictTableModel(QtCore.QAbstractTableModel):
             return None
         row = self.rows[index.row()]
         key = self.headers[index.column()]
-        if key == "Correo" and role == QtCore.Qt.ItemDataRole.CheckStateRole:
-            return QtCore.Qt.CheckState.Checked if row.get("_mail_checked") == "1" else QtCore.Qt.CheckState.Unchecked
-        if key == "Correo" and role == QtCore.Qt.ItemDataRole.ToolTipRole:
-            return row.get("_mail_tooltip", "Marcar archivo para preparar correo")
-        if key == "Correo" and role == QtCore.Qt.ItemDataRole.DisplayRole:
+        if key == SELECTION_HEADER and role == QtCore.Qt.ItemDataRole.CheckStateRole:
+            return QtCore.Qt.CheckState.Checked if row.get("_selection_checked") == "1" else QtCore.Qt.CheckState.Unchecked
+        if key == SELECTION_HEADER and role == QtCore.Qt.ItemDataRole.ToolTipRole:
+            return row.get("_selection_tooltip", "Seleccionar para preparar correo o revisar eliminacion")
+        if key == SELECTION_HEADER and role == QtCore.Qt.ItemDataRole.DisplayRole:
             return ""
         if role in (QtCore.Qt.ItemDataRole.DisplayRole, QtCore.Qt.ItemDataRole.ToolTipRole):
             return row.get(key, "")
@@ -294,9 +307,9 @@ class DictTableModel(QtCore.QAbstractTableModel):
         if not index.isValid():
             return base
         key = self.headers[index.column()]
-        if key == "Correo":
+        if key == SELECTION_HEADER:
             row = self.rows[index.row()] if 0 <= index.row() < len(self.rows) else {}
-            if not row.get("_mail_key"):
+            if not row.get("_selection_key"):
                 return base | QtCore.Qt.ItemFlag.ItemIsSelectable
             return base | QtCore.Qt.ItemFlag.ItemIsUserCheckable | QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable
         return base
@@ -305,14 +318,14 @@ class DictTableModel(QtCore.QAbstractTableModel):
         if not index.isValid() or not (0 <= index.row() < len(self.rows)):
             return False
         key = self.headers[index.column()]
-        if key != "Correo" or role != QtCore.Qt.ItemDataRole.CheckStateRole:
+        if key != SELECTION_HEADER or role != QtCore.Qt.ItemDataRole.CheckStateRole:
             return False
         checked_value = getattr(QtCore.Qt.CheckState.Checked, "value", 2)
         checked = value == QtCore.Qt.CheckState.Checked or value == checked_value
         row = self.rows[index.row()]
-        if not row.get("_mail_key"):
+        if not row.get("_selection_key"):
             return False
-        row["_mail_checked"] = "1" if checked else "0"
+        row["_selection_checked"] = "1" if checked else "0"
         if self.check_changed_callback:
             self.check_changed_callback(row, checked)
         self.dataChanged.emit(index, index, [QtCore.Qt.ItemDataRole.CheckStateRole])
@@ -356,20 +369,20 @@ class DictTableModel(QtCore.QAbstractTableModel):
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
-    session_headers = ["Correo", "Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
+    session_headers = [SELECTION_HEADER, "Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_two_temp_headers = ["Temp RT final", "Temp LT final"]
     capture_cow_temp_headers = ["Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final"]
     capture_two_manual_temp_headers = ["Temp manual RT", "Temp manual LT"]
     capture_cow_manual_temp_headers = ["Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT"]
     capture_headers = [
-        "Correo", "Animal", "Especie", "Modo", "Sensor", "Termometros",
+        SELECTION_HEADER, "Animal", "Especie", "Modo", "Sensor", "Termometros",
         "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
         "BPM medio", "Oxigeno medio", "Calidad", "Contacto", "Estado",
         "Pulso ref.", "Dif. BPM-ref", "Medicion", "Configuracion",
         "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
         "Hora", "Duracion", "Hz", "Muestras", "Raw",
     ]
-    files_headers = ["Correo", "tipo", "archivo", "filas", "ruta"]
+    files_headers = [SELECTION_HEADER, "tipo", "archivo", "filas", "ruta"]
     temporal_two_temp_headers = ["Temp RT max tramo", "Temp LT max tramo"]
     temporal_cow_temp_headers = ["Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo"]
     temporal_headers = ["Tramo", "Inicio s", "Fin s", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Muestras tramo"]
@@ -385,7 +398,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_capture: CaptureRecord | None = None
         self.temporal_source_rows: list[dict[str, str]] = []
         self.temporal_rel_t = np.asarray([], dtype=float)
-        self.mail_paths: dict[str, Path] = {}
+        self.selected_items: dict[str, SelectionRecord] = {}
         self.compare_items: dict[str, CaptureRecord] = {}
         self._build_ui()
         self.update_mail_status()
@@ -471,7 +484,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         sessions_layout.addWidget(self.sessions_label)
         self.sessions_model = DictTableModel(self.session_headers)
-        self.sessions_model.check_changed_callback = self.on_mail_checked
+        self.sessions_model.check_changed_callback = self.on_selection_checked
         self.sessions_table = QtWidgets.QTableView()
         self.sessions_table.setModel(self.sessions_model)
         self.sessions_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -490,7 +503,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         captures_layout.addWidget(self.captures_label)
         self.captures_model = DictTableModel(self.capture_headers)
-        self.captures_model.check_changed_callback = self.on_mail_checked
+        self.captures_model.check_changed_callback = self.on_selection_checked
         self.captures_table = QtWidgets.QTableView()
         self.captures_table.setModel(self.captures_model)
         self.captures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -574,7 +587,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.detail_tabs.addTab(self.params, "Parametros dispositivo")
 
         self.files_model = DictTableModel(self.files_headers)
-        self.files_model.check_changed_callback = self.on_mail_checked
+        self.files_model.check_changed_callback = self.on_selection_checked
         files_page = QtWidgets.QWidget()
         files_layout = QtWidgets.QVBoxLayout(files_page)
         files_buttons = QtWidgets.QHBoxLayout()
@@ -977,13 +990,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         qualities = [_as_float(cap.value("calidad")) for cap in caps]
         qualities = [q for q in qualities if np.isfinite(q)]
         animals = {cap.value("id").strip() for cap in caps if cap.value("id").strip()}
-        mail_key = self.mail_key(session.path)
+        selection_key = self.selection_key("session", session.key if session.captures else session.path)
         return {
-            "Correo": "",
-            "_mail_key": mail_key,
-            "_mail_path": str(session.path) if session.path else "",
-            "_mail_checked": "1" if mail_key and mail_key in self.mail_paths else "0",
-            "_mail_tooltip": "Marcar CSV de sesion para incluirlo en el ZIP" if session.path else "Esta sesion no tiene CSV localizado",
+            SELECTION_HEADER: "",
+            "_selection_key": selection_key,
+            "_selection_kind": "session",
+            "_selection_path": str(session.path) if session.path else "",
+            "_selection_session_key": session.key,
+            "_selection_capture_key": "",
+            "_selection_checked": self.selection_checked(selection_key),
+            "_selection_tooltip": "Seleccionar sesion para correo o revisar raws asociados",
             "Sesion": session.name,
             "Fecha": min(dates) if dates else "",
             "Inicio": min(hours) if hours else "",
@@ -1008,26 +1024,51 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         except OSError:
             return str(path)
 
-    def on_mail_checked(self, row: dict[str, str], checked: bool):
-        key = row.get("_mail_key", "")
-        path_text = row.get("_mail_path", "")
-        if not key or not path_text:
+    def selection_key(self, kind: str, value: str | Path | None) -> str:
+        if value in (None, ""):
+            return ""
+        text = str(value)
+        if kind == "file":
+            text = self.mail_key(Path(text))
+        return f"{kind}:{text}"
+
+    def selection_checked(self, key: str) -> str:
+        return "1" if key and key in self.selected_items else "0"
+
+    def selection_record_from_row(self, row: dict[str, str]) -> SelectionRecord | None:
+        key = row.get("_selection_key", "")
+        kind = row.get("_selection_kind", "")
+        if not key or not kind:
+            return None
+        path_text = row.get("_selection_path", "")
+        return SelectionRecord(
+            kind=kind,
+            key=key,
+            path=Path(path_text) if path_text else None,
+            session_key=row.get("_selection_session_key", ""),
+            capture_key=row.get("_selection_capture_key", ""),
+        )
+
+    def on_selection_checked(self, row: dict[str, str], checked: bool):
+        record = self.selection_record_from_row(row)
+        if record is None:
             return
-        path = Path(path_text)
         if checked:
-            self.mail_paths[key] = path
+            self.selected_items[record.key] = record
         else:
-            self.mail_paths.pop(key, None)
+            self.selected_items.pop(record.key, None)
         self.update_mail_status()
 
     def update_mail_status(self):
-        count = len(self.mail_paths)
-        self.mail_status.setText(f"{count} archivo{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
+        count = len(self.selected_items)
+        mail_status = self.__dict__.get("mail_status")
+        if mail_status is not None:
+            mail_status.setText(f"{count} elemento{'s' if count != 1 else ''} seleccionado{'s' if count != 1 else ''}")
 
     def clear_mail_selection(self):
-        if not self.mail_paths:
+        if not self.selected_items:
             return
-        self.mail_paths.clear()
+        self.selected_items.clear()
         self.update_mail_status()
         self.apply_filters()
         if self.current_session is not None:
@@ -1040,9 +1081,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         return desktop if desktop.exists() else Path.home()
 
     def prepare_mail_zip(self):
-        paths = [path for path in self.mail_paths.values() if path.exists()]
+        paths = self.selected_paths_for_mail()
         if not paths:
-            QtWidgets.QMessageBox.information(self, "Preparar correo", "Marca primero uno o varios archivos, raws o sesiones.")
+            QtWidgets.QMessageBox.information(self, "Preparar correo", "Selecciona primero uno o varios archivos, raws o sesiones.")
             return
         desktop = self.desktop_dir()
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1065,6 +1106,22 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Preparar correo",
             f"Se ha creado un ZIP en el Escritorio con {len(paths)} archivo(s):\n\n{zip_path}\n\nLa ruta queda copiada al portapapeles.",
         )
+
+    def selected_paths_for_mail(self) -> list[Path]:
+        paths: list[Path] = []
+        for record in self.selected_items.values():
+            path: Path | None = None
+            if record.kind == "session":
+                session = self.session_by_selection(record)
+                path = session.path if session else record.path
+            elif record.kind == "capture":
+                cap = self.capture_by_selection(record)
+                path = self.capture_raw_path(cap) if cap else record.path
+            elif record.kind == "file":
+                path = record.path
+            if path and path.exists() and path not in paths:
+                paths.append(path)
+        return paths
 
     def select_session(self):
         indexes = self.sessions_table.selectionModel().selectedRows()
@@ -1107,7 +1164,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         quality = _as_float(cap.value("calidad"))
         bpm = _as_float(cap.value("bpm"))
         raw_path = self.capture_raw_path(cap)
-        raw_key = self.mail_key(raw_path)
+        related_paths = [path for path in cap.files.values() if path.exists()]
+        if raw_path and raw_path.exists() and raw_path not in related_paths:
+            related_paths.insert(0, raw_path)
+        capture_key = self._capture_delete_key(cap)
+        selection_key = self.selection_key("capture", capture_key) if related_paths else ""
+        selection_path = raw_path or (related_paths[0] if related_paths else None)
         ref_avg, _ref_count = _mean_ref_pulse(
             cap.value("pulso_previo"),
             cap.value("pulso_final_pulsio"),
@@ -1121,11 +1183,14 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         else:
             state = "Dudosa" if cap.value("bpm") else ""
         return {
-            "Correo": "",
-            "_mail_key": raw_key,
-            "_mail_path": str(raw_path) if raw_path else "",
-            "_mail_checked": "1" if raw_key and raw_key in self.mail_paths else "0",
-            "_mail_tooltip": "Marcar raw para incluirlo en el ZIP de correo" if raw_path else "Esta toma no tiene raw localizado",
+            SELECTION_HEADER: "",
+            "_selection_key": selection_key,
+            "_selection_kind": "capture",
+            "_selection_path": str(selection_path) if selection_path else "",
+            "_selection_session_key": cap.session_key,
+            "_selection_capture_key": capture_key,
+            "_selection_checked": self.selection_checked(selection_key),
+            "_selection_tooltip": "Seleccionar toma/raw para correo o revisar archivos relacionados" if selection_key else "Esta toma no tiene archivos localizados",
             "Hora": cap.value("hora"),
             "Animal": cap.value("id"),
             "Especie": animal_label(cap.value("animal_type")) if cap.value("animal_type") else "",
@@ -1294,13 +1359,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.params.setHtml(self._params_html(cap))
         file_rows = []
         for kind, path in sorted(cap.files.items()):
-            mail_key = self.mail_key(path)
+            selection_key = self.selection_key("file", path)
             file_rows.append({
-                "Correo": "",
-                "_mail_key": mail_key,
-                "_mail_path": str(path),
-                "_mail_checked": "1" if mail_key and mail_key in self.mail_paths else "0",
-                "_mail_tooltip": "Marcar archivo para incluirlo en el ZIP de correo",
+                SELECTION_HEADER: "",
+                "_selection_key": selection_key,
+                "_selection_kind": "file",
+                "_selection_path": str(path),
+                "_selection_session_key": cap.session_key,
+                "_selection_capture_key": self._capture_delete_key(cap),
+                "_selection_checked": self.selection_checked(selection_key),
+                "_selection_tooltip": "Seleccionar archivo para correo o revisar eliminacion",
                 "tipo": kind,
                 "archivo": path.name,
                 "filas": str(len(_read_csv(path))) if path.suffix.lower() == ".csv" else "",
@@ -1379,14 +1447,60 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         QtWidgets.QApplication.clipboard().setText("\n".join(str(path) for path in paths))
         QtWidgets.QMessageBox.information(self, "Archivos", f"Copiadas {len(paths)} ruta(s) al portapapeles.")
 
+    def session_by_selection(self, record: SelectionRecord) -> SessionGroup | None:
+        for session in self.sessions:
+            if session.key == record.session_key or session.key == record.key.removeprefix("session:"):
+                return session
+            if record.path and session.path and self.mail_key(session.path) == self.mail_key(record.path):
+                return session
+        return None
+
+    def capture_by_key(self, key: str) -> CaptureRecord | None:
+        for session in self.sessions:
+            for cap in session.captures:
+                if self._capture_delete_key(cap) == key:
+                    return cap
+        return None
+
+    def capture_by_selection(self, record: SelectionRecord) -> CaptureRecord | None:
+        if record.capture_key:
+            cap = self.capture_by_key(record.capture_key)
+            if cap is not None:
+                return cap
+        raw_key = record.key.removeprefix("capture:")
+        cap = self.capture_by_key(raw_key)
+        if cap is not None:
+            return cap
+        return self.capture_for_path(record.path)
+
+    def capture_for_path(self, path: Path | None) -> CaptureRecord | None:
+        if path is None:
+            return None
+        wanted = self.mail_key(path)
+        if not wanted:
+            return None
+        for session in self.sessions:
+            for cap in session.captures:
+                raw = self.capture_raw_path(cap)
+                if raw and self.mail_key(raw) == wanted:
+                    return cap
+                for related in cap.files.values():
+                    if self.mail_key(related) == wanted:
+                        return cap
+        return None
+
     def delete_checked_items(self):
         capture_choices, standalone_paths = self._checked_delete_choices()
         if not capture_choices and not standalone_paths:
-            QtWidgets.QMessageBox.information(self, "Eliminar", "Marca primero una sesion, toma/raw o archivo con la casilla Correo.")
+            QtWidgets.QMessageBox.information(self, "Eliminar", "Selecciona primero una sesion, toma/raw o archivo.")
             return
         selected_captures, selected_paths = self._pick_delete_targets(capture_choices, standalone_paths)
         if not selected_captures and not selected_paths:
             return
+        paths_by_capture = {
+            self._capture_delete_key(cap): self._delete_paths_for_capture(cap)
+            for cap in selected_captures
+        }
         paths = self._delete_paths_for_targets(selected_captures, selected_paths)
         if not paths:
             QtWidgets.QMessageBox.information(self, "Eliminar", "No hay archivos existentes asociados a la seleccion.")
@@ -1408,17 +1522,24 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if msg.clickedButton() != delete_btn:
             return
         deleted = 0
-        errors: list[str] = []
+        failed_paths: dict[Path, str] = {}
         for path in paths:
-            try:
-                path.unlink()
+            ok, error = self._unlink_selected_path(path)
+            if ok:
                 deleted += 1
-            except OSError as exc:
-                errors.append(f"{path}: {exc}")
-        self._remove_capture_rows_from_sessions(selected_captures)
-        self.mail_paths.clear()
+            else:
+                failed_paths[path] = error
+        successful_captures = [
+            cap for cap in selected_captures
+            if paths_by_capture.get(self._capture_delete_key(cap))
+            and all(path not in failed_paths for path in paths_by_capture[self._capture_delete_key(cap)])
+        ]
+        session_errors, failed_sessions = self._remove_capture_rows_from_sessions(successful_captures)
+        self._keep_failed_delete_selection(selected_captures, selected_paths, failed_paths, failed_sessions)
         self.reload_data()
-        if errors:
+        if failed_paths or session_errors:
+            errors = [f"{path}: {reason}" for path, reason in failed_paths.items()]
+            errors.extend(session_errors)
             QtWidgets.QMessageBox.warning(
                 self,
                 "Eliminar",
@@ -1430,35 +1551,24 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def _checked_delete_choices(self) -> tuple[dict[str, tuple[CaptureRecord, bool]], list[Path]]:
         captures: dict[str, tuple[CaptureRecord, bool]] = {}
         standalone_paths: list[Path] = []
-        for row in self.sessions_model.rows:
-            if row.get("_mail_checked") != "1":
-                continue
-            try:
-                session_index = int(row.get("_session_index", "-1"))
-            except ValueError:
-                session_index = -1
-            if 0 <= session_index < len(self.filtered_sessions):
-                for cap in self.filtered_sessions[session_index].captures:
-                    captures.setdefault(self._capture_delete_key(cap), (cap, False))
-        if self.current_session is not None:
-            for row in self.captures_model.rows:
-                if row.get("_mail_checked") != "1":
-                    continue
-                try:
-                    capture_index = int(row.get("_capture_index", "-1"))
-                except ValueError:
-                    capture_index = -1
-                if 0 <= capture_index < len(self.current_session.captures):
-                    cap = self.current_session.captures[capture_index]
+        for record in self.selected_items.values():
+            if record.kind == "session":
+                session = self.session_by_selection(record)
+                if session is not None:
+                    for cap in session.captures:
+                        captures.setdefault(self._capture_delete_key(cap), (cap, False))
+            elif record.kind == "capture":
+                cap = self.capture_by_selection(record)
+                if cap is not None:
                     captures[self._capture_delete_key(cap)] = (cap, True)
-        for row in self.files_model.rows:
-            if row.get("_mail_checked") != "1":
-                continue
-            path_text = row.get("_mail_path") or row.get("ruta", "")
-            if path_text:
-                path = Path(path_text)
-                if path.exists() and path not in standalone_paths:
-                    standalone_paths.append(path)
+                elif record.path and record.path.exists() and record.path not in standalone_paths:
+                    standalone_paths.append(record.path)
+            elif record.kind == "file":
+                cap = self.capture_for_path(record.path)
+                if cap is not None:
+                    captures[self._capture_delete_key(cap)] = (cap, True)
+                elif record.path and record.path.exists() and record.path not in standalone_paths:
+                    standalone_paths.append(record.path)
         return captures, standalone_paths
 
     def _pick_delete_targets(
@@ -1572,14 +1682,55 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 paths.append(path)
         return paths
 
+    def _unlink_selected_path(self, path: Path) -> tuple[bool, str]:
+        try:
+            try:
+                path.chmod(path.stat().st_mode | stat.S_IWRITE)
+            except OSError:
+                pass
+            path.unlink()
+            return True, ""
+        except PermissionError as exc:
+            return False, f"permiso denegado o archivo en uso ({exc})"
+        except OSError as exc:
+            return False, str(exc)
+
+    def _keep_failed_delete_selection(
+        self,
+        captures: list[CaptureRecord],
+        standalone_paths: list[Path],
+        failed_paths: dict[Path, str],
+        failed_sessions: set[Path],
+    ):
+        self.selected_items.clear()
+        for cap in captures:
+            paths = self._delete_paths_for_capture(cap)
+            session_path = cap.files.get("session")
+            if any(path in failed_paths for path in paths) or (session_path and session_path in failed_sessions):
+                key = self.selection_key("capture", self._capture_delete_key(cap))
+                self.selected_items[key] = SelectionRecord(
+                    kind="capture",
+                    key=key,
+                    path=self.capture_raw_path(cap),
+                    session_key=cap.session_key,
+                    capture_key=self._capture_delete_key(cap),
+                )
+        for path in standalone_paths:
+            if path in failed_paths:
+                key = self.selection_key("file", path)
+                self.selected_items[key] = SelectionRecord(kind="file", key=key, path=path)
+        self.update_mail_status()
+
     def _session_update_notes(self, captures: list[CaptureRecord]) -> list[str]:
         sessions = sorted({cap.files["session"] for cap in captures if cap.files.get("session")})
         if not sessions:
             return []
         return [f"Actualizar CSV de sesion sin borrar el archivo: {path}" for path in sessions]
 
-    def _remove_capture_rows_from_sessions(self, captures: list[CaptureRecord]):
+    def _remove_capture_rows_from_sessions(self, captures: list[CaptureRecord]) -> tuple[list[str], set[Path]]:
         by_session: dict[Path, set[str]] = {}
+        errors: list[str] = []
+        failed_sessions: set[Path] = set()
         for cap in captures:
             session_path = cap.files.get("session")
             if not session_path or not session_path.exists():
@@ -1605,8 +1756,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
                     writer.writeheader()
                     writer.writerows(kept)
-            except OSError:
+            except OSError as exc:
+                failed_sessions.add(session_path)
+                errors.append(f"{session_path}: no se pudo actualizar la sesion ({exc})")
                 continue
+        return errors, failed_sessions
 
     def show_compare_tab(self):
         for idx in range(self.detail_tabs.count()):
