@@ -14,7 +14,10 @@ def main():
     pg.setConfigOptions(antialias=False)
 
     controller = AppController(app)
-    controller.show_menu()
+    # TEMP 2026-07-17: no abrir la primera ventana con opciones para bloquear la aplicacion.
+    # Para revertir: descomentar controller.show_menu() y quitar este return.
+    # controller.show_menu()
+    return
 
     sys.exit(app.exec())
 
