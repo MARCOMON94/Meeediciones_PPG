@@ -15,10 +15,18 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
-from ..animal_config import animal_label, display_mapping, normalize_animal_type
+from ..animal_config import (
+    POSITION_SUMMARY_PREFIXES,
+    TEMP_CHANNELS,
+    animal_label,
+    display_mapping,
+    normalize_animal_type,
+    normalize_position,
+    parse_temp_mapping,
+)
 from ..models import AnalysisConfig, SensorConfig
 from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
-from ..processing import score_and_merge_metrics
+from ..processing import estimate_hz, processed_ppg, score_and_merge_metrics, stable_bpm_segment, uniform_resample
 from ..utils import fmt
 
 
@@ -375,10 +383,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     capture_two_manual_temp_headers = ["Temp manual RT", "Temp manual LT"]
     capture_cow_manual_temp_headers = ["Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT"]
     capture_headers = [
-        SELECTION_HEADER, "Animal", "Especie", "Modo", "Sensor", "Termometros",
+        SELECTION_HEADER, "Animal", "Especie",
         "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
-        "BPM medio", "Oxigeno medio", "Calidad", "Contacto", "Estado",
-        "Pulso ref.", "Dif. BPM-ref", "Medicion", "Configuracion",
+        "Pulso ref.", "BPM medio", "Pulso final pulsio", "Pulso final fonendo",
+        "Modo", "Sensor", "Termometros",
+        "Oxigeno medio", "Calidad", "Contacto", "Estado",
+        "Dif. BPM-ref", "Medicion", "Configuracion",
         "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
         "Hora", "Duracion", "Hz", "Muestras", "Raw",
     ]
@@ -524,6 +534,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.summary.setReadOnly(True)
         self.detail_tabs.addTab(self.summary, "Resumen")
 
+        stable_page = QtWidgets.QWidget()
+        stable_layout = QtWidgets.QVBoxLayout(stable_page)
+        self.stable_info = QtWidgets.QTextEdit()
+        self.stable_info.setReadOnly(True)
+        self.stable_info.setMaximumHeight(120)
+        stable_layout.addWidget(self.stable_info)
+        self.plot_stable = pg.PlotWidget(title="Segmento BPM estable")
+        self.plot_stable.setBackground("w")
+        self.plot_stable.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_stable.setLabel("bottom", "Tiempo relativo", units="s")
+        stable_layout.addWidget(self.plot_stable, stretch=1)
+        self.detail_tabs.addTab(stable_page, "Estable")
+
         graph_page = QtWidgets.QWidget()
         graph_layout = QtWidgets.QVBoxLayout(graph_page)
         graph_controls = QtWidgets.QHBoxLayout()
@@ -544,6 +567,20 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.plot_capture.showGrid(x=True, y=True, alpha=0.25)
         graph_layout.addWidget(self.plot_capture, stretch=1)
         self.detail_tabs.addTab(graph_page, "Graficas")
+
+        comparison_graph_page = QtWidgets.QWidget()
+        comparison_graph_layout = QtWidgets.QVBoxLayout(comparison_graph_page)
+        self.comparison_graph_info = QtWidgets.QTextEdit()
+        self.comparison_graph_info.setReadOnly(True)
+        self.comparison_graph_info.setMaximumHeight(115)
+        comparison_graph_layout.addWidget(self.comparison_graph_info)
+        self.plot_reference_compare = pg.PlotWidget(title="BPM calculado vs referencia manual")
+        self.plot_reference_compare.setBackground("w")
+        self.plot_reference_compare.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_reference_compare.setLabel("bottom", "Frecuencia", units="BPM")
+        self.plot_reference_compare.setLabel("left", "Magnitud normalizada")
+        comparison_graph_layout.addWidget(self.plot_reference_compare, stretch=1)
+        self.detail_tabs.addTab(comparison_graph_page, "Graf. comp")
 
         temporal_page = QtWidgets.QWidget()
         temporal_layout = QtWidgets.QHBoxLayout(temporal_page)
@@ -739,6 +776,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "bpm_peak": metrics.get("bpm_peak"),
             "bpm_fft": metrics.get("bpm_fft"),
             "bpm_autocorr": metrics.get("bpm_autocorr"),
+            "bpm_estable_5s": metrics.get("bpm_estable_5s"),
+            "bpm_estable_inicio_s": metrics.get("bpm_estable_inicio_s"),
+            "bpm_estable_fin_s": metrics.get("bpm_estable_fin_s"),
+            "bpm_estable_calidad": metrics.get("bpm_estable_calidad"),
+            "bpm_estable_muestras": metrics.get("bpm_estable_muestras"),
             "calidad": metrics.get("quality"),
             "calidad_label": metrics.get("quality_label"),
             "spo2_pct": metrics.get("spo2"),
@@ -1160,6 +1202,30 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         else:
             self.set_capture(None)
 
+    def _position_temp_final(self, cap: CaptureRecord, position: str) -> float:
+        assignments = parse_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type"))
+        for channel in TEMP_CHANNELS:
+            if assignments.get(channel) != position:
+                continue
+            value = _as_float(cap.value(f"temp_{channel.lower()}_c_final_max_5s"))
+            if np.isfinite(value):
+                return value
+        prefix = POSITION_SUMMARY_PREFIXES.get(position, "")
+        if prefix:
+            value = _as_float(cap.value(f"{prefix}_c_final_max_5s"))
+            if np.isfinite(value):
+                return value
+        measured_position = normalize_position(cap.value("ubre"), cap.value("animal_type"))
+        if measured_position == position:
+            value = _as_float(cap.value("temp_c_final_max_5s"))
+            if np.isfinite(value):
+                return value
+        if position == "RT":
+            return _as_float(_cap_first(cap, "temp_a0_c_final_max_5s", "temp_c_final_max_5s"))
+        if position == "LT":
+            return _as_float(cap.value("temp_a1_c_final_max_5s"))
+        return math.nan
+
     def _capture_row(self, cap: CaptureRecord) -> dict[str, str]:
         quality = _as_float(cap.value("calidad"))
         bpm = _as_float(cap.value("bpm"))
@@ -1213,16 +1279,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
             "Temp final": fmt(_as_float(cap.value("temp_c_final_max_5s")), 1, ""),
             "Temp ult.": fmt(_as_float(cap.value("temp_c_ultima")), 1, ""),
-            "Temp RT final": fmt(_as_float(_cap_first(cap, "temp_rt_c_final_max_5s", "temp_a0_c_final_max_5s")), 1, ""),
+            "Temp RT final": fmt(self._position_temp_final(cap, "RT"), 1, ""),
             "Temp RT ult.": fmt(_as_float(_cap_first(cap, "temp_rt_c_ultima", "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
             "Temp RT raw": fmt(_as_float(_cap_first(cap, "temp_rt_raw_ultima", "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
-            "Temp LT final": fmt(_as_float(_cap_first(cap, "temp_lt_c_final_max_5s", "temp_a1_c_final_max_5s")), 1, ""),
+            "Temp LT final": fmt(self._position_temp_final(cap, "LT"), 1, ""),
             "Temp LT ult.": fmt(_as_float(_cap_first(cap, "temp_lt_c_ultima", "temp_a1_c_ultima")), 1, ""),
             "Temp LT raw": fmt(_as_float(_cap_first(cap, "temp_lt_raw_ultima", "temp_a1_raw_ultima")), 0, ""),
-            "Temp FLT final": fmt(_as_float(cap.value("temp_flt_c_final_max_5s")), 1, ""),
-            "Temp FRT final": fmt(_as_float(cap.value("temp_frt_c_final_max_5s")), 1, ""),
-            "Temp RLT final": fmt(_as_float(cap.value("temp_rlt_c_final_max_5s")), 1, ""),
-            "Temp RRT final": fmt(_as_float(cap.value("temp_rrt_c_final_max_5s")), 1, ""),
+            "Temp FLT final": fmt(self._position_temp_final(cap, "FLT"), 1, ""),
+            "Temp FRT final": fmt(self._position_temp_final(cap, "FRT"), 1, ""),
+            "Temp RLT final": fmt(self._position_temp_final(cap, "RLT"), 1, ""),
+            "Temp RRT final": fmt(self._position_temp_final(cap, "RRT"), 1, ""),
             "Temp A0 final": fmt(_as_float(_cap_first(cap, "temp_a0_c_final_max_5s", "temp_c_final_max_5s")), 1, ""),
             "Temp A0 ult.": fmt(_as_float(_cap_first(cap, "temp_a0_c_ultima", "temp_c_ultima")), 1, ""),
             "Temp A0 raw": fmt(_as_float(_cap_first(cap, "temp_a0_raw_ultima", "temp_raw_ultima")), 0, ""),
@@ -1350,6 +1416,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.params.clear()
             self.files_model.set_rows(self.files_headers, [])
             self.plot_capture.clear()
+            self.stable_info.clear()
+            self.plot_stable.clear()
+            self.comparison_graph_info.clear()
+            self.plot_reference_compare.clear()
             self.temporal_model.set_rows(self.temporal_headers, [])
             self.temporal_source_rows = []
             self.temporal_rel_t = np.asarray([], dtype=float)
@@ -1382,6 +1452,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         block_rows = _read_csv(cap.files["blocks"], limit=5000) if "blocks" in cap.files else []
         self.files_table.resizeColumnsToContents()
         self.update_capture_plot(raw_rows, proc_rows, block_rows)
+        self.update_stable_tab(cap, raw_rows_full, proc_rows_full)
+        self.update_reference_compare_tab(cap, raw_rows_full, proc_rows_full)
         self.update_temporalization(cap, raw_rows_full, proc_rows_full, block_rows)
 
     def open_path(self, path: Path | None):
@@ -2034,6 +2106,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Temp manual FLT / FRT / RLT / RRT", f"{cap.value('temperatura_manual_inicio_flt_c') or '-'} / {cap.value('temperatura_manual_inicio_frt_c') or '-'} / {cap.value('temperatura_manual_inicio_rlt_c') or '-'} / {cap.value('temperatura_manual_inicio_rrt_c') or '-'}"),
             ("Diferencia BPM medio - ref.", f"{fmt(diff_ref, 1, '-')} BPM"),
             ("BPM medio", fmt(bpm, 1, "-")),
+            ("BPM estable 5 s", f"{fmt(_as_float(cap.value('bpm_estable_5s')), 1, '-')} BPM | {fmt(_as_float(cap.value('bpm_estable_inicio_s')), 2, '-')}-{fmt(_as_float(cap.value('bpm_estable_fin_s')), 2, '-')} s"),
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
             ("Oxigeno medio", f"{fmt(spo2, 1, '-')} %"),
             ("Ratio R", fmt(_as_float(cap.value("ratio_r")), 5, "-")),
@@ -2043,12 +2116,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
             ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
             ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
-            ("Temperatura RT final", f"{fmt(_as_float(_cap_first(cap, 'temp_rt_c_final_max_5s', 'temp_a0_c_final_max_5s')), 2, '-')} C"),
-            ("Temperatura LT final", f"{fmt(_as_float(_cap_first(cap, 'temp_lt_c_final_max_5s', 'temp_a1_c_final_max_5s')), 2, '-')} C"),
-            ("Temperatura FLT final", f"{fmt(_as_float(cap.value('temp_flt_c_final_max_5s')), 2, '-')} C"),
-            ("Temperatura FRT final", f"{fmt(_as_float(cap.value('temp_frt_c_final_max_5s')), 2, '-')} C"),
-            ("Temperatura RLT final", f"{fmt(_as_float(cap.value('temp_rlt_c_final_max_5s')), 2, '-')} C"),
-            ("Temperatura RRT final", f"{fmt(_as_float(cap.value('temp_rrt_c_final_max_5s')), 2, '-')} C"),
+            ("Temperatura RT / LT final", f"{fmt(self._position_temp_final(cap, 'RT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'LT'), 2, '-')} C"),
+            ("Temperatura FLT / FRT / RLT / RRT final", f"{fmt(self._position_temp_final(cap, 'FLT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'FRT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'RLT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'RRT'), 2, '-')} C"),
             ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
@@ -2102,6 +2171,164 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         <h3>Analisis usado al guardar resumen</h3>
         <table cellspacing='8'>{analysis_rows}</table>
         """
+
+    def _signal_arrays_from_rows(self, rows: list[dict[str, str]]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if not rows:
+            return np.asarray([], dtype=float), np.asarray([], dtype=float), np.asarray([], dtype=float)
+        t = np.asarray([_as_float(row.get("tiempo_s", "")) for row in rows], dtype=float)
+        red = np.asarray([_as_float(row.get("red_raw", "")) for row in rows], dtype=float)
+        ir = np.asarray([_as_float(row.get("ir_raw", "")) for row in rows], dtype=float)
+        n = min(t.size, red.size, ir.size)
+        t, red, ir = t[:n], red[:n], ir[:n]
+        mask = np.isfinite(t) & np.isfinite(ir)
+        if not np.any(mask):
+            return np.asarray([], dtype=float), np.asarray([], dtype=float), np.asarray([], dtype=float)
+        t, red, ir = t[mask], red[mask], ir[mask]
+        return t - float(t[0]), red, ir
+
+    def _stored_stable_values(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> dict[str, float | int]:
+        sources: list[dict[str, str]] = [cap.row]
+        if rows:
+            sources.append(rows[0])
+        for source in sources:
+            bpm = _as_float(source.get("bpm_estable_5s", ""))
+            start = _as_float(source.get("bpm_estable_inicio_s", ""))
+            end = _as_float(source.get("bpm_estable_fin_s", ""))
+            samples_value = _as_float(source.get("bpm_estable_muestras", ""))
+            if np.isfinite(bpm) and np.isfinite(start) and np.isfinite(end):
+                return {
+                    "bpm": bpm,
+                    "start": start,
+                    "end": end,
+                    "quality": _as_float(source.get("bpm_estable_calidad", "")),
+                    "samples": int(samples_value) if np.isfinite(samples_value) else 0,
+                }
+        return {"bpm": math.nan, "start": math.nan, "end": math.nan, "quality": math.nan, "samples": 0}
+
+    def _stable_values_for_rows(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> dict[str, float | int]:
+        stored = self._stored_stable_values(cap, rows)
+        if np.isfinite(float(stored["bpm"])):
+            return stored
+        t, red, ir = self._signal_arrays_from_rows(rows)
+        if not t.size:
+            return stored
+        stable = stable_bpm_segment(t, red, ir, self._sensor_config_from_capture(cap), self._analysis_config_from_capture(cap), window_s=5.0)
+        return {
+            "bpm": stable.bpm_estable_5s,
+            "start": stable.bpm_estable_inicio_s,
+            "end": stable.bpm_estable_fin_s,
+            "quality": stable.bpm_estable_calidad,
+            "samples": stable.bpm_estable_muestras,
+        }
+
+    def _normalized_for_display(self, values: np.ndarray) -> np.ndarray:
+        out = np.asarray(values, dtype=float).copy()
+        finite = out[np.isfinite(out)]
+        if not finite.size:
+            return np.full(out.shape, math.nan)
+        sd = float(np.std(finite))
+        if sd <= 1e-9:
+            sd = 1.0
+        return (out - float(np.mean(finite))) / sd
+
+    def update_stable_tab(self, cap: CaptureRecord, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]]):
+        self.plot_stable.clear()
+        rows = proc_rows or raw_rows
+        stable = self._stable_values_for_rows(cap, rows)
+        bpm = float(stable["bpm"])
+        start = float(stable["start"])
+        end = float(stable["end"])
+        quality = float(stable["quality"])
+        samples = int(stable["samples"] or 0)
+        if not np.isfinite(bpm):
+            self.stable_info.setHtml("<p>No hay un segmento estable de 5 s con BPM fiable para esta toma.</p>")
+            self.plot_stable.setTitle("Segmento BPM estable")
+            return
+        self.stable_info.setHtml(
+            "<table cellspacing='8'>"
+            f"<tr><td><b>BPM estable</b></td><td>{fmt(bpm, 1, '-')} BPM</td></tr>"
+            f"<tr><td><b>Ventana</b></td><td>{fmt(start, 2, '-')} - {fmt(end, 2, '-')} s</td></tr>"
+            f"<tr><td><b>Calidad</b></td><td>{fmt(quality, 1, '-')} / 100</td></tr>"
+            f"<tr><td><b>Muestras</b></td><td>{samples}</td></tr>"
+            "</table>"
+        )
+        t, red, ir = self._signal_arrays_from_rows(rows)
+        if not t.size or not np.isfinite(start) or not np.isfinite(end):
+            return
+        mask = np.isfinite(t) & (t >= start) & (t <= end)
+        if not np.any(mask):
+            return
+        x = t[mask]
+        self.plot_stable.plot(x, self._normalized_for_display(ir[mask]), pen=pg.mkPen((0, 80, 220), width=2), name="IR")
+        self.plot_stable.plot(x, self._normalized_for_display(red[mask]), pen=pg.mkPen((220, 40, 35), width=1), name="RED")
+        self.plot_stable.setTitle(f"Segmento estable | {fmt(bpm, 1, '-')} BPM | {fmt(start, 1, '-')}-{fmt(end, 1, '-')} s")
+        self.plot_stable.setLabel("bottom", "Tiempo relativo", units="s")
+        self.plot_stable.setLabel("left", "Senal normalizada")
+
+    def _fft_spectrum_for_rows(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> tuple[np.ndarray, np.ndarray, float]:
+        t, _red, ir = self._signal_arrays_from_rows(rows)
+        if t.size < 40:
+            return np.asarray([], dtype=float), np.asarray([], dtype=float), math.nan
+        cfg = self._analysis_config_from_capture(cap)
+        hz = estimate_hz(t)
+        sig = processed_ppg(ir, hz, cfg)
+        _tt, yy, hz_u = uniform_resample(t, sig, hz)
+        if yy.size < max(128, int(4 * hz_u)):
+            return np.asarray([], dtype=float), np.asarray([], dtype=float), math.nan
+        yy = yy - float(np.mean(yy))
+        if float(np.std(yy)) <= 1e-9:
+            return np.asarray([], dtype=float), np.asarray([], dtype=float), math.nan
+        spectrum = np.abs(np.fft.rfft(yy * np.hanning(yy.size)))
+        freqs_bpm = np.fft.rfftfreq(yy.size, d=1.0 / hz_u) * 60.0
+        band = (freqs_bpm >= cfg.bpm_min) & (freqs_bpm <= cfg.bpm_max)
+        bpm_fft = math.nan
+        if np.any(band):
+            local = spectrum[band]
+            local_freqs = freqs_bpm[band]
+            if local.size and float(np.max(local)) > 0:
+                bpm_fft = float(local_freqs[int(np.argmax(local))])
+        return freqs_bpm, spectrum, bpm_fft
+
+    def update_reference_compare_tab(self, cap: CaptureRecord, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]]):
+        self.plot_reference_compare.clear()
+        rows = proc_rows or raw_rows
+        ref_avg, ref_count = _mean_ref_pulse(
+            cap.value("pulso_previo"),
+            cap.value("pulso_final_pulsio"),
+            cap.value("pulso_final_fonendo"),
+        )
+        bpm_calc = _as_float(cap.value("bpm"))
+        freqs_bpm, spectrum, bpm_fft = self._fft_spectrum_for_rows(cap, rows)
+        if not np.isfinite(bpm_calc):
+            bpm_calc = _as_float(cap.value("bpm_fft"))
+        if not np.isfinite(bpm_calc):
+            bpm_calc = bpm_fft
+        diff = abs(bpm_calc - ref_avg) if np.isfinite(bpm_calc) and np.isfinite(ref_avg) else math.nan
+        self.comparison_graph_info.setHtml(
+            "<table cellspacing='8'>"
+            f"<tr><td><b>BPM recogido</b></td><td>{fmt(bpm_calc, 1, '-')} BPM</td></tr>"
+            f"<tr><td><b>BPM ref.</b></td><td>{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s))</td></tr>"
+            f"<tr><td><b>Diferencia</b></td><td>{fmt(diff, 1, '-')} BPM</td></tr>"
+            "</table>"
+        )
+        if not freqs_bpm.size or not spectrum.size:
+            self.plot_reference_compare.setTitle("BPM calculado vs referencia manual")
+            return
+        mask = (freqs_bpm >= 20) & (freqs_bpm <= 240)
+        x = freqs_bpm[mask]
+        y = spectrum[mask]
+        if y.size and float(np.max(y)) > 0:
+            y = y / float(np.max(y))
+        self.plot_reference_compare.plot(x, y, pen=pg.mkPen((0, 80, 220), width=2), name="Espectro IR")
+        if np.isfinite(bpm_calc):
+            self.plot_reference_compare.addItem(pg.InfiniteLine(pos=bpm_calc, angle=90, pen=pg.mkPen((220, 40, 35), width=2)))
+        if np.isfinite(ref_avg):
+            self.plot_reference_compare.addItem(pg.InfiniteLine(pos=ref_avg, angle=90, pen=pg.mkPen((20, 140, 70), width=2, style=QtCore.Qt.PenStyle.DashLine)))
+        self.plot_reference_compare.setTitle(
+            f"BPM recogido {fmt(bpm_calc, 1, '-')} | ref {fmt(ref_avg, 1, '-')} | dif {fmt(diff, 1, '-')} BPM"
+        )
+        self.plot_reference_compare.setLabel("bottom", "Frecuencia", units="BPM")
+        self.plot_reference_compare.setLabel("left", "Magnitud normalizada")
 
     def update_capture_plot(self, raw_rows: list[dict[str, str]], proc_rows: list[dict[str, str]], block_rows: list[dict[str, str]]):
         self.plot_capture.clear()

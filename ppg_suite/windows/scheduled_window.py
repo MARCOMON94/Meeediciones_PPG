@@ -10,9 +10,9 @@ from datetime import datetime
 import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from ..animal_config import POSITION_SUMMARY_PREFIXES, TEMP_CHANNELS, animal_label, parse_temp_mapping
+from ..animal_config import POSITION_SUMMARY_PREFIXES, TEMP_CHANNELS, animal_label, parse_temp_mapping, position_values_from_channels
 from ..models import SensorConfig
-from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
+from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message, stable_bpm_segment
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR
@@ -524,11 +524,15 @@ class ScheduledConfigWindow(PPGSuite):
             for channel in TEMP_CHANNELS
         }
         assignments = parse_temp_mapping(self.state.temp_mapping, self.state.animal_type)
-        position_summaries = {
-            position: channel_summaries.get(channel)
-            for channel, position in assignments.items()
-            if channel in channel_summaries
-        }
+        position_summaries = {}
+        for channel in TEMP_CHANNELS:
+            position = assignments.get(channel)
+            if not position:
+                continue
+            summary = channel_summaries.get(channel)
+            if summary is None:
+                continue
+            position_summaries.setdefault(position, summary)
         out = {
             "temp_samples": primary["samples"],
             "temp_raw_samples": primary["raw_samples"],
@@ -666,10 +670,14 @@ class ScheduledConfigWindow(PPGSuite):
         session_id = base_name
         analysis_cfg = self.analysis_widget.get_config()
         metrics = score_and_merge_metrics(t, red, ir, step.config, analysis_cfg)
+        stable = stable_bpm_segment(t, red, ir, step.config, analysis_cfg, window_s=5.0)
+        metrics.bpm_estable_5s = stable.bpm_estable_5s
+        metrics.bpm_estable_inicio_s = stable.bpm_estable_inicio_s
+        metrics.bpm_estable_fin_s = stable.bpm_estable_fin_s
+        metrics.bpm_estable_calidad = stable.bpm_estable_calidad
+        metrics.bpm_estable_muestras = stable.bpm_estable_muestras
         blocks = block_bpm(t, ir, step.config, analysis_cfg, block_s=10)
         temp = self.temp_summary_for_arrays(t, temp_c, temp_raw, channel_arrays)
-        assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
-
         def row_temperature_values(i: int) -> tuple[dict[str, tuple[float, float]], dict[str, tuple[float, float]]]:
             channel_values: dict[str, tuple[float, float]] = {}
             for channel in TEMP_CHANNELS:
@@ -678,10 +686,7 @@ class ScheduledConfigWindow(PPGSuite):
                     values[i] if i < values.size else math.nan,
                     raw_values[i] if i < raw_values.size else math.nan,
                 )
-            position_values = {
-                position: channel_values.get(channel, (math.nan, math.nan))
-                for channel, position in assignments.items()
-            }
+            position_values = position_values_from_channels(channel_values, st.temp_mapping, st.animal_type)
             return channel_values, position_values
 
         raw_file = RAW_DIR / f"raw_{base_name}.csv"
@@ -695,6 +700,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
                 "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
                 "pulso_final_pulsio", "pulso_final_fonendo",
+                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
                 "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales",
             ])
             for i in range(t.size):
@@ -719,6 +725,8 @@ class ScheduledConfigWindow(PPGSuite):
                     segment.temp_manual_initial_by_position.get("FRT", ""), segment.temp_manual_initial_by_position.get("FLT", ""),
                     segment.temp_manual_initial_by_position.get("RRT", ""), segment.temp_manual_initial_by_position.get("RLT", ""),
                     segment.pulse_final_pulsio, segment.pulse_final_fonendo,
+                    fmt(metrics.bpm_estable_5s, 2, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
+                    fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""),
                     self.last_config_ack, datetime.now().isoformat(timespec="milliseconds"),
                     st.measurement_condition, segment.final_annotations,
                 ])
@@ -743,6 +751,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
+                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -761,6 +770,8 @@ class ScheduledConfigWindow(PPGSuite):
                     fmt(position_values.get("RRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RRT", (math.nan, math.nan))[1], 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     "", "", "", "",
+                    fmt(metrics.bpm_estable_5s, 2, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
+                    fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""),
                 ])
 
         blocks_file = REPORT_DIR / f"bpm_blocks_10s_{base_name}.csv"
@@ -829,7 +840,10 @@ class ScheduledConfigWindow(PPGSuite):
             self.capture_mode_name(), st.measurement_condition, st.animal_type, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, step.label, reason, fmt(self.scheduled_step_duration_s, 1, ""),
             int(t.size), fmt(metrics.duration_s, 3, ""), fmt(metrics.hz, 2, ""), fmt(metrics.bpm, 1, ""),
             fmt(metrics.bpm_peak, 1, ""), fmt(metrics.bpm_fft, 1, ""), fmt(metrics.bpm_autocorr, 1, ""),
-            fmt(metrics.quality, 1, ""), metrics.quality_label, fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
+            fmt(metrics.quality, 1, ""), metrics.quality_label,
+            fmt(metrics.bpm_estable_5s, 1, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
+            fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""),
+            fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
             fmt(metrics.resp_rate_rpm, 1, ""), fmt(metrics.resp_quality, 0, ""), metrics.resp_reason,
             fmt(temp["temp_c_final_max_5s"], 2, ""), fmt(temp["temp_c_final_time_s"], 3, ""), fmt(temp["temp_c_final_raw_at_max"], 0, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),
             fmt(temp["temp_rt_c_final_max_5s"], 2, ""), fmt(temp["temp_rt_c_final_time_s"], 3, ""), fmt(temp["temp_rt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rt_c_last"], 2, ""), fmt(temp["temp_rt_c_mean"], 2, ""), fmt(temp["temp_rt_raw_last"], 0, ""),

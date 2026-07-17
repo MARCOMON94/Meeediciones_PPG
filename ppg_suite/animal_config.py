@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Iterable
 
 
@@ -97,6 +98,7 @@ def inverted_mapping_for_animal(animal_type: str) -> str:
 
 def parse_temp_mapping(mapping: str, animal_type: str = "") -> dict[str, str]:
     animal = normalize_animal_type(animal_type)
+    active_channels = set(active_temp_channels_for_animal(animal))
     text = (mapping or "").strip().upper()
     if not text:
         text = default_mapping_for_animal(animal)
@@ -106,7 +108,7 @@ def parse_temp_mapping(mapping: str, animal_type: str = "") -> dict[str, str]:
     for idx in range(0, len(tokens) - 1, 2):
         channel = tokens[idx]
         position = tokens[idx + 1]
-        if channel in TEMP_CHANNELS:
+        if channel in active_channels:
             parsed[channel] = normalize_position(position, animal)
 
     if not parsed:
@@ -121,8 +123,11 @@ def parse_temp_mapping(mapping: str, animal_type: str = "") -> dict[str, str]:
 
 def mapping_from_assignments(assignments: dict[str, str], animal_type: str = "") -> str:
     positions = set(positions_for_animal(animal_type))
+    active_channels = set(active_temp_channels_for_animal(animal_type))
     chunks: list[str] = []
     for channel in TEMP_CHANNELS:
+        if channel not in active_channels:
+            continue
         position = normalize_position(assignments.get(channel, ""), animal_type)
         if position in positions:
             chunks.extend([channel, position])
@@ -151,6 +156,23 @@ def display_mapping(mapping: str, animal_type: str = "") -> str:
         if position:
             parts.append(f"{channel} {POSITION_LABELS.get(position, position)}")
     return " / ".join(parts)
+
+
+def position_values_from_channels(
+    channel_values: dict[str, tuple[float, float]],
+    mapping: str,
+    animal_type: str = "",
+) -> dict[str, tuple[float, float]]:
+    assignments = parse_temp_mapping(mapping, animal_type)
+    positions = set(positions_for_animal(animal_type))
+    out: dict[str, tuple[float, float]] = {}
+    for channel in TEMP_CHANNELS:
+        position = assignments.get(channel)
+        if position not in positions:
+            continue
+        candidate = channel_values.get(channel, (math.nan, math.nan))
+        out.setdefault(position, candidate)
+    return out
 
 
 def channel_field_prefix(channel: str) -> str:

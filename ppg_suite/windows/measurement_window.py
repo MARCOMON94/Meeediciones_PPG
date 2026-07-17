@@ -39,6 +39,7 @@ from ..animal_config import (
     normalize_animal_type,
     normalize_position,
     parse_temp_mapping,
+    position_values_from_channels,
     primary_channel_for,
     positions_for_animal,
 )
@@ -47,7 +48,7 @@ from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
 from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR, log
 from ..processing import (
     block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, find_local_peaks,
-    processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, uniform_resample,
+    processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, stable_bpm_segment, uniform_resample,
 )
 from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
@@ -1291,11 +1292,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             }
             st.temp_primary_channel = temp_primary_channel_for(st.udder_side, st.temp_mapping, st.animal_type)
             temp_c, temp_raw = channel_values.get(st.temp_primary_channel, channel_values["A0"])
-            assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
-            position_values = {
-                position: channel_values.get(channel, (math.nan, math.nan))
-                for channel, position in assignments.items()
-            }
+            position_values = position_values_from_channels(channel_values, st.temp_mapping, st.animal_type)
             temp_rt_c, temp_rt_raw = position_values.get("RT", (math.nan, math.nan))
             temp_lt_c, temp_lt_raw = position_values.get("LT", (math.nan, math.nan))
             temp_flt_c, temp_flt_raw = position_values.get("FLT", (math.nan, math.nan))
@@ -1390,6 +1387,11 @@ class PPGSuite(QtWidgets.QMainWindow):
                     st.temp_manual_initial_by_position.get("RLT", ""),
                     st.pulse_final_pulsio,
                     st.pulse_final_fonendo,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
                     self.last_config_ack,
                     datetime.now().isoformat(timespec="milliseconds"),
                     st.measurement_condition,
@@ -1447,6 +1449,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
             "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
             "pulso_final_pulsio", "pulso_final_fonendo",
+            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
             "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales"
         ])
         st.raw_handle.flush()
@@ -1760,10 +1763,15 @@ class PPGSuite(QtWidgets.QMainWindow):
             for channel, (values, raw) in channel_arrays.items()
         }
         assignments = parse_temp_mapping(self.state.temp_mapping, self.state.animal_type)
-        position_summaries = {
-            position: channel_summaries.get(channel, temperature_channel_summary(t, np.asarray([], dtype=float), np.asarray([], dtype=float), settle_s=0.0, window_s=window_s))
-            for channel, position in assignments.items()
-        }
+        position_summaries = {}
+        for channel in TEMP_CHANNELS:
+            position = assignments.get(channel)
+            if not position:
+                continue
+            summary = channel_summaries.get(channel)
+            if summary is None:
+                continue
+            position_summaries.setdefault(position, summary)
         out = {
             "temp_samples": primary["samples"],
             "temp_raw_samples": primary["raw_samples"],
@@ -1845,6 +1853,12 @@ class PPGSuite(QtWidgets.QMainWindow):
         t, red, ir = self.arrays()
         if t.size >= 20:
             st.metrics = score_and_merge_metrics(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config())
+            stable = stable_bpm_segment(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), window_s=5.0)
+            st.metrics.bpm_estable_5s = stable.bpm_estable_5s
+            st.metrics.bpm_estable_inicio_s = stable.bpm_estable_inicio_s
+            st.metrics.bpm_estable_fin_s = stable.bpm_estable_fin_s
+            st.metrics.bpm_estable_calidad = stable.bpm_estable_calidad
+            st.metrics.bpm_estable_muestras = stable.bpm_estable_muestras
             st.bpm_blocks = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=2)
             st.bpm_blocks_10s = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=10)
         self.ask_final_reference(include_pulse=st.mode in ("normal", "long", "experimento_vacio"))
@@ -1895,6 +1909,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
             "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
             "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales",
+            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
         ):
             if field not in fieldnames:
                 fieldnames.append(field)
@@ -1911,6 +1926,11 @@ class PPGSuite(QtWidgets.QMainWindow):
             row["pulso_final_fonendo"] = st.pulse_final_fonendo
             row["anotaciones_inicio"] = st.measurement_condition
             row["anotaciones_finales"] = st.final_annotations
+            row["bpm_estable_5s"] = fmt(st.metrics.bpm_estable_5s, 2, "")
+            row["bpm_estable_inicio_s"] = fmt(st.metrics.bpm_estable_inicio_s, 3, "")
+            row["bpm_estable_fin_s"] = fmt(st.metrics.bpm_estable_fin_s, 3, "")
+            row["bpm_estable_calidad"] = fmt(st.metrics.bpm_estable_calidad, 1, "")
+            row["bpm_estable_muestras"] = str(st.metrics.bpm_estable_muestras or "")
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";", extrasaction="ignore")
@@ -1931,7 +1951,6 @@ class PPGSuite(QtWidgets.QMainWindow):
         t, red, ir = self.arrays()
         temp_c, temp_raw = self.temp_arrays()
         channel_arrays = self.temp_channel_arrays()
-        assignments = parse_temp_mapping(st.temp_mapping, st.animal_type)
         if t.size < 2 or not st.base_name:
             return
         cfg = self.analysis_widget.get_config()
@@ -1969,7 +1988,8 @@ class PPGSuite(QtWidgets.QMainWindow):
                 "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
                 "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
-                "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s"
+                "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
+                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -1981,10 +2001,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                         values[i] if i < values.size else math.nan,
                         raw[i] if i < raw.size else math.nan,
                     )
-                position_values = {
-                    position: channel_values.get(channel, (math.nan, math.nan))
-                    for channel, position in assignments.items()
-                }
+                position_values = position_values_from_channels(channel_values, st.temp_mapping, st.animal_type)
                 w.writerow([
                     st.session_id or st.base_name, st.crotal_id, st.base_name, st.mode, st.animal_type, st.measurement_condition, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, st.config_label, i + 1, f"{t[i]:.6f}",
                     f"{red[i]:.0f}", f"{ir[i]:.0f}", fmt(tc, 2, ""), fmt(tr, 0, ""),
@@ -1997,7 +2014,9 @@ class PPGSuite(QtWidgets.QMainWindow):
                     fmt(position_values.get("RLT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RLT", (math.nan, math.nan))[1], 0, ""),
                     fmt(position_values.get("RRT", (math.nan, math.nan))[0], 2, ""), fmt(position_values.get("RRT", (math.nan, math.nan))[1], 0, ""),
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
-                    fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, "")
+                    fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, ""),
+                    fmt(st.metrics.bpm_estable_5s, 2, ""), fmt(st.metrics.bpm_estable_inicio_s, 3, ""), fmt(st.metrics.bpm_estable_fin_s, 3, ""),
+                    fmt(st.metrics.bpm_estable_calidad, 1, ""), str(st.metrics.bpm_estable_muestras or ""),
                 ])
 
     def save_blocks_file(self):
@@ -2092,6 +2111,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "animal_type", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label",
             "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real",
             "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label",
+            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
             "spo2_pct", "ratio_r", "resp_min_exp", "resp_calidad_exp", "resp_razon_exp",
             "temp_c_final_max_5s", "temp_c_final_time_s", "temp_c_final_raw_at_max", "temp_c_ultima", "temp_c_media", "temp_raw_ultima",
             "temp_rt_c_final_max_5s", "temp_rt_c_final_time_s", "temp_rt_c_final_raw_at_max", "temp_rt_c_ultima", "temp_rt_c_media", "temp_rt_raw_ultima",
@@ -2120,7 +2140,10 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.mode, st.measurement_condition, st.animal_type, st.udder_side, st.temp_mapping, st.temp_primary_channel, st.vacuum_condition, st.config_label,
             reason, fmt(st.requested_duration_s, 1, ""), len(st.t), fmt(m.duration_s, 3, ""), fmt(m.hz, 2, ""),
             fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""),
-            fmt(m.quality, 1, ""), m.quality_label, fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""),
+            fmt(m.quality, 1, ""), m.quality_label,
+            fmt(m.bpm_estable_5s, 1, ""), fmt(m.bpm_estable_inicio_s, 3, ""), fmt(m.bpm_estable_fin_s, 3, ""),
+            fmt(m.bpm_estable_calidad, 1, ""), str(m.bpm_estable_muestras or ""),
+            fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""),
             fmt(m.resp_rate_rpm, 1, ""), fmt(m.resp_quality, 0, ""), m.resp_reason,
             fmt(temp["temp_c_final_max_5s"], 2, ""), fmt(temp["temp_c_final_time_s"], 3, ""), fmt(temp["temp_c_final_raw_at_max"], 0, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),
             fmt(temp["temp_rt_c_final_max_5s"], 2, ""), fmt(temp["temp_rt_c_final_time_s"], 3, ""), fmt(temp["temp_rt_c_final_raw_at_max"], 0, ""), fmt(temp["temp_rt_c_last"], 2, ""), fmt(temp["temp_rt_c_mean"], 2, ""), fmt(temp["temp_rt_raw_last"], 0, ""),

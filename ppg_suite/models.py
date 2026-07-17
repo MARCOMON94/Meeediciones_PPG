@@ -59,6 +59,11 @@ class Metrics:
     bpm_peak: float = math.nan
     bpm_fft: float = math.nan
     bpm_autocorr: float = math.nan
+    bpm_estable_5s: float = math.nan
+    bpm_estable_inicio_s: float = math.nan
+    bpm_estable_fin_s: float = math.nan
+    bpm_estable_calidad: float = math.nan
+    bpm_estable_muestras: int = 0
     spo2: float = math.nan
     ratio_r: float = math.nan
     resp_rate_rpm: float = math.nan

@@ -562,3 +562,94 @@ def block_bpm(t: np.ndarray, ir: np.ndarray, sensor_cfg: SensorConfig, cfg: Anal
         out.append(met.bpm if met.quality >= 35 else math.nan)
     return out
 
+
+def stable_bpm_segment(
+    t: np.ndarray,
+    red: np.ndarray,
+    ir: np.ndarray,
+    sensor_cfg: SensorConfig,
+    cfg: AnalysisConfig,
+    window_s: float = 5.0,
+) -> Metrics:
+    out = Metrics()
+    n = min(t.size, red.size, ir.size)
+    if n < 80:
+        return out
+    t = np.asarray(t[:n], dtype=float)
+    red = np.asarray(red[:n], dtype=float)
+    ir = np.asarray(ir[:n], dtype=float)
+    valid = np.isfinite(t) & np.isfinite(ir)
+    if int(np.sum(valid)) < 80:
+        return out
+    t = t[valid]
+    red = red[valid]
+    ir = ir[valid]
+    t = t - float(t[0])
+    duration = float(t[-1] - t[0]) if t.size > 1 else math.nan
+    if not np.isfinite(duration) or duration < window_s:
+        return out
+    hz = estimate_hz(t)
+    min_samples = 80
+    if np.isfinite(hz) and hz > 0:
+        min_samples = max(min_samples, int(round(hz * window_s * 0.45)))
+    best: tuple[float, float, float, Metrics, int] | None = None
+    step_s = 0.5
+    start = 0.0
+    max_start = max(0.0, duration - window_s)
+    while start <= max_start + 1e-9:
+        end = start + window_s
+        mask = (t >= start) & (t <= end)
+        samples = int(np.sum(mask))
+        if samples >= min_samples:
+            local_t = t[mask] - float(t[mask][0])
+            local_ir = ir[mask]
+            bpm_peak, q_peak, _r_peak, _polarity, _peaks, _peak_t = estimate_bpm_peaks(local_t, local_ir, cfg)
+            bpm_fft, q_fft, _r_fft = estimate_bpm_fft(local_t, local_ir, cfg)
+            bpm_acorr, q_acorr, _r_acorr = estimate_bpm_autocorr(local_t, local_ir, cfg)
+            candidates = [
+                (float(value), float(quality))
+                for value, quality in ((bpm_peak, q_peak), (bpm_fft, q_fft), (bpm_acorr, q_acorr))
+                if np.isfinite(value) and cfg.bpm_min <= value <= cfg.bpm_max and quality > 10.0
+            ]
+            if not candidates:
+                start += step_s
+                continue
+            values = [value for value, _quality in candidates]
+            qualities = [quality for _value, quality in candidates]
+            spread = (max(values) - min(values)) if len(values) >= 2 else 18.0
+            if len(candidates) >= 2 and spread <= 18.0:
+                weights = np.asarray(qualities, dtype=float)
+                bpm = float(np.average(np.asarray(values, dtype=float), weights=weights))
+                quality = float(np.clip(np.mean(weights) + max(0.0, 20.0 - spread), 0.0, 100.0))
+            else:
+                best_idx = int(np.argmax(qualities))
+                bpm = values[best_idx]
+                quality = float(np.clip(qualities[best_idx] * 0.55, 0.0, 60.0))
+            if quality < 30.0:
+                start += step_s
+                continue
+            met = Metrics(
+                n=samples,
+                hz=estimate_hz(local_t),
+                duration_s=float(local_t[-1] - local_t[0]) if local_t.size > 1 else math.nan,
+                bpm=bpm,
+                bpm_peak=bpm_peak,
+                bpm_fft=bpm_fft,
+                bpm_autocorr=bpm_acorr,
+                quality=quality,
+                quality_label="estable",
+            )
+            score = float(quality - min(45.0, spread * 2.0) + min(10.0, samples / max(1, min_samples)))
+            if best is None or score > best[0]:
+                best = (score, float(start), float(end), met, samples)
+        start += step_s
+    if best is None:
+        return out
+    _score, start, end, met, samples = best
+    out.bpm_estable_5s = float(met.bpm)
+    out.bpm_estable_inicio_s = start
+    out.bpm_estable_fin_s = end
+    out.bpm_estable_calidad = float(met.quality)
+    out.bpm_estable_muestras = int(samples)
+    return out
+
