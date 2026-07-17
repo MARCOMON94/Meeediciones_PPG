@@ -26,23 +26,27 @@ class ModeSelectDialog(QtWidgets.QDialog):
         layout.setSpacing(12)
 
         hero = QtWidgets.QHBoxLayout()
-        hero.setSpacing(14)
+        hero.setSpacing(18)
+        hero.setContentsMargins(4, 0, 4, 4)
         self.hero_image = QtWidgets.QLabel()
-        self.hero_image.setFixedSize(118, 108)
+        self.hero_image.setFixedSize(130, 116)
         self.hero_image.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        hero_pix = self.asset_pixmap("rumiando-sheep-tech-app-colors.png", QtCore.QSize(118, 108))
+        hero_pix = self.asset_pixmap("rumiando-sheep-tech-app-colors.png", QtCore.QSize(130, 116))
         if hero_pix.isNull():
             self.hero_image.hide()
         else:
             self.hero_image.setPixmap(hero_pix)
             hero.addWidget(self.hero_image)
         hero_text = QtWidgets.QVBoxLayout()
+        hero_text.setContentsMargins(0, 8, 0, 0)
+        hero_text.setSpacing(8)
         title = QtWidgets.QLabel("Medicion PPG")
         title.setObjectName("title")
-        title.setFont(QtGui.QFont("Arial", 17, QtGui.QFont.Weight.Bold))
+        title.setFont(QtGui.QFont("Arial", 22, QtGui.QFont.Weight.Bold))
         hero_text.addWidget(title)
 
         subtitle = QtWidgets.QLabel("Medicion de campo: toma rapida con la interfaz minima y los datos esenciales.")
+        subtitle.setObjectName("subtitle")
         subtitle.setWordWrap(True)
         hero_text.addWidget(subtitle)
         hero_text.addStretch(1)
@@ -52,7 +56,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_real = QtWidgets.QPushButton("Medicion de campo")
         self.btn_real.setObjectName("primaryMode")
         self.btn_real.setMinimumHeight(104)
-        self.btn_real.setFont(QtGui.QFont("Arial", 15, QtGui.QFont.Weight.Bold))
+        self.btn_real.setFont(QtGui.QFont("Arial", 16, QtGui.QFont.Weight.Bold))
         layout.addWidget(self.btn_real)
 
         self.btn_test = QtWidgets.QPushButton("Test de campo")
@@ -163,6 +167,10 @@ class ModeSelectDialog(QtWidgets.QDialog):
                 color: #003f2a;
                 letter-spacing: 0px;
             }
+            QLabel#subtitle {
+                color: #214d37;
+                font-size: 10pt;
+            }
             QLabel#infoText {
                 background: #ffffff;
                 border: 1px solid #d7e7d8;
@@ -191,7 +199,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
                 border: 2px solid #3f6f4b;
                 color: #1f4f35;
                 font-weight: 700;
-                padding: 14px 10px;
+                padding: 14px 28px;
                 text-align: center;
             }
             QPushButton#otherToggle {
