@@ -18,12 +18,12 @@ class ModeSelectDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowTitle("Seleccionar modo de trabajo")
         self.selected_mode: AppMode = "real"
-        self.setMinimumWidth(720)
+        self.setMinimumSize(760, 680)
         self.apply_rumiando_style()
 
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(10)
+        layout.setContentsMargins(22, 20, 22, 16)
+        layout.setSpacing(12)
 
         hero = QtWidgets.QHBoxLayout()
         hero.setSpacing(14)
@@ -38,7 +38,8 @@ class ModeSelectDialog(QtWidgets.QDialog):
             hero.addWidget(self.hero_image)
         hero_text = QtWidgets.QVBoxLayout()
         title = QtWidgets.QLabel("Medicion PPG")
-        title.setFont(QtGui.QFont("Arial", 15, QtGui.QFont.Weight.Bold))
+        title.setObjectName("title")
+        title.setFont(QtGui.QFont("Arial", 17, QtGui.QFont.Weight.Bold))
         hero_text.addWidget(title)
 
         subtitle = QtWidgets.QLabel("Medicion de campo: toma rapida con la interfaz minima y los datos esenciales.")
@@ -50,8 +51,8 @@ class ModeSelectDialog(QtWidgets.QDialog):
 
         self.btn_real = QtWidgets.QPushButton("Medicion de campo")
         self.btn_real.setObjectName("primaryMode")
-        self.btn_real.setMinimumHeight(82)
-        self.btn_real.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Weight.Bold))
+        self.btn_real.setMinimumHeight(104)
+        self.btn_real.setFont(QtGui.QFont("Arial", 15, QtGui.QFont.Weight.Bold))
         layout.addWidget(self.btn_real)
 
         self.btn_test = QtWidgets.QPushButton("Test de campo")
@@ -64,30 +65,47 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_animals = QtWidgets.QPushButton("Animales")
         self.btn_fourier = QtWidgets.QPushButton("Analisis experimental de Fourier")
 
-        for button in [self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_configurations, self.btn_3m, self.btn_vacuum, self.btn_relations, self.btn_animals, self.btn_fourier]:
-            button.setMinimumHeight(38)
-            button.setIconSize(QtCore.QSize(24, 24))
-        self.btn_real.setIconSize(QtCore.QSize(34, 34))
+        secondary_buttons = [
+            self.btn_relations, self.btn_animals, self.btn_fourier, self.btn_configurations,
+            self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_3m, self.btn_vacuum,
+        ]
+        for button in secondary_buttons:
+            button.setMinimumHeight(58)
+            button.setFont(QtGui.QFont("Arial", 11, QtGui.QFont.Weight.DemiBold))
+            button.setIconSize(QtCore.QSize(36, 36))
+        self.btn_real.setIconSize(QtCore.QSize(58, 58))
         self.apply_button_icons()
 
-        layout.addWidget(self.btn_relations)
-        layout.addWidget(self.btn_animals)
-        layout.addWidget(self.btn_fourier)
-        layout.addWidget(self.btn_configurations)
+        main_buttons = QtWidgets.QGridLayout()
+        main_buttons.setHorizontalSpacing(12)
+        main_buttons.setVerticalSpacing(10)
+        main_buttons.addWidget(self.btn_relations, 0, 0)
+        main_buttons.addWidget(self.btn_animals, 0, 1)
+        main_buttons.addWidget(self.btn_fourier, 1, 0)
+        main_buttons.addWidget(self.btn_configurations, 1, 1)
+        main_buttons.setColumnStretch(0, 1)
+        main_buttons.setColumnStretch(1, 1)
+        layout.addLayout(main_buttons)
 
         self.btn_other_toggle = QtWidgets.QPushButton("Otros")
+        self.btn_other_toggle.setObjectName("otherToggle")
         self.btn_other_toggle.setCheckable(True)
-        self.btn_other_toggle.setMinimumHeight(38)
+        self.btn_other_toggle.setMinimumHeight(46)
+        self.btn_other_toggle.setFont(QtGui.QFont("Arial", 10, QtGui.QFont.Weight.DemiBold))
         layout.addWidget(self.btn_other_toggle)
 
         self.other_modes_widget = QtWidgets.QWidget()
-        other_layout = QtWidgets.QVBoxLayout(self.other_modes_widget)
+        other_layout = QtWidgets.QGridLayout(self.other_modes_widget)
         other_layout.setContentsMargins(0, 0, 0, 0)
-        other_layout.addWidget(self.btn_test)
-        other_layout.addWidget(self.btn_temp)
-        other_layout.addWidget(self.btn_reajustes)
-        other_layout.addWidget(self.btn_3m)
-        other_layout.addWidget(self.btn_vacuum)
+        other_layout.setHorizontalSpacing(12)
+        other_layout.setVerticalSpacing(10)
+        other_layout.addWidget(self.btn_test, 0, 0)
+        other_layout.addWidget(self.btn_temp, 0, 1)
+        other_layout.addWidget(self.btn_reajustes, 1, 0)
+        other_layout.addWidget(self.btn_3m, 1, 1)
+        other_layout.addWidget(self.btn_vacuum, 2, 0, 1, 2)
+        other_layout.setColumnStretch(0, 1)
+        other_layout.setColumnStretch(1, 1)
         self.other_modes_widget.setVisible(False)
         layout.addWidget(self.other_modes_widget)
 
@@ -104,7 +122,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         )
         info.setObjectName("infoText")
         info.setWordWrap(True)
-        layout.addWidget(info)
+        layout.addWidget(info, stretch=1)
 
         self.btn_updates = QtWidgets.QPushButton("Ultimas actualizaciones")
         self.btn_updates.setObjectName("updatesButton")
@@ -141,6 +159,10 @@ class ModeSelectDialog(QtWidgets.QDialog):
             QLabel {
                 color: #1f4f35;
             }
+            QLabel#title {
+                color: #003f2a;
+                letter-spacing: 0px;
+            }
             QLabel#infoText {
                 background: #ffffff;
                 border: 1px solid #d7e7d8;
@@ -151,9 +173,9 @@ class ModeSelectDialog(QtWidgets.QDialog):
             QPushButton {
                 background: #ffffff;
                 border: 1px solid #9fbea5;
-                border-radius: 6px;
+                border-radius: 8px;
                 color: #1f4f35;
-                padding: 7px 12px;
+                padding: 10px 14px;
                 text-align: left;
             }
             QPushButton:hover {
@@ -169,6 +191,11 @@ class ModeSelectDialog(QtWidgets.QDialog):
                 border: 2px solid #3f6f4b;
                 color: #1f4f35;
                 font-weight: 700;
+                padding: 14px 18px;
+            }
+            QPushButton#otherToggle {
+                background: #f7fbf5;
+                border-style: dashed;
             }
             QPushButton#updatesButton {
                 background: transparent;
@@ -202,7 +229,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
 
     def apply_button_icons(self):
         icon_map = {
-            self.btn_real: "icon-cencerro-green.png",
+            self.btn_real: "rumiando-sheep-facing-left.png",
             self.btn_relations: "icon-estadisticas-green.png",
             self.btn_animals: "icon-ganado-outline-green.png",
             self.btn_fourier: "icon-ia-green.png",
