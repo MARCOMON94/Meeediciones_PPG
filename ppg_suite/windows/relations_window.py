@@ -374,6 +374,51 @@ class DictTableModel(QtCore.QAbstractTableModel):
         self.layoutChanged.emit()
 
 
+class CollapsibleSection(QtWidgets.QWidget):
+    toggled = QtCore.pyqtSignal(bool)
+
+    def __init__(self, title: str, body: QtWidgets.QWidget, expanded: bool = True, parent=None):
+        super().__init__(parent)
+        self.body = body
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        header = QtWidgets.QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        self.toggle_button = QtWidgets.QToolButton()
+        self.toggle_button.setAutoRaise(True)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.toggle_button.setFixedSize(24, 24)
+        self.title_label = QtWidgets.QLabel(title)
+        self.title_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        header.addWidget(self.toggle_button)
+        header.addWidget(self.title_label, stretch=1)
+        layout.addLayout(header)
+        layout.addWidget(self.body)
+
+        self.toggle_button.toggled.connect(self.set_expanded)
+        self.set_expanded(expanded)
+
+    def set_title(self, title: str):
+        self.title_label.setText(title)
+
+    def is_expanded(self) -> bool:
+        return self.toggle_button.isChecked()
+
+    def set_expanded(self, expanded: bool):
+        if self.toggle_button.isChecked() != expanded:
+            self.toggle_button.blockSignals(True)
+            self.toggle_button.setChecked(expanded)
+            self.toggle_button.blockSignals(False)
+        self.toggle_button.setArrowType(
+            QtCore.Qt.ArrowType.DownArrow if expanded else QtCore.Qt.ArrowType.RightArrow
+        )
+        self.body.setVisible(expanded)
+        self.toggled.emit(expanded)
+
+
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
@@ -396,6 +441,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     temporal_two_temp_headers = ["Temp RT max tramo", "Temp LT max tramo"]
     temporal_cow_temp_headers = ["Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo"]
     temporal_headers = ["Tramo", "Inicio s", "Fin s", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Muestras tramo"]
+    capture_column_groups = [
+        ("animal", "Datos animal", ["Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Hora", "Raw"]),
+        ("quality", "Calidad", ["Calidad", "Contacto", "Estado"]),
+        ("pulse", "Pulsaciones", ["Pulso ref.", "BPM medio", "Pulso final pulsio", "Pulso final fonendo", "Dif. BPM-ref"]),
+        ("temperature", "Temperatura", [
+            "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
+            "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
+        ]),
+        ("spo2", "SpO2", ["Oxigeno medio"]),
+    ]
 
     def __init__(self):
         super().__init__()
@@ -410,6 +465,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_rel_t = np.asarray([], dtype=float)
         self.selected_items: dict[str, SelectionRecord] = {}
         self.compare_items: dict[str, CaptureRecord] = {}
+        self.capture_column_group_state = {
+            key: key == "animal" for key, _label, _headers in self.capture_column_groups
+        }
+        self.capture_column_buttons: dict[str, QtWidgets.QToolButton] = {}
         self._build_ui()
         self.update_mail_status()
         self.reload_data()
@@ -449,8 +508,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_delete.clicked.connect(self.delete_checked_items)
         self.btn_clear_mail.clicked.connect(self.clear_mail_selection)
 
-        filters = QtWidgets.QGroupBox("Buscar en sesiones")
-        fl = QtWidgets.QGridLayout(filters)
+        filters_body = QtWidgets.QWidget()
+        fl = QtWidgets.QGridLayout(filters_body)
         self.text_filter = QtWidgets.QLineEdit()
         self.text_filter.setPlaceholderText("Animal, modo, configuracion, contacto...")
         self.mode_filter = QtWidgets.QComboBox()
@@ -476,7 +535,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.quality_min, 1, 1)
         fl.addWidget(self.btn_clear, 1, 2)
         fl.addWidget(self.btn_import, 1, 3)
-        root.addWidget(filters)
+        self.filters_section = CollapsibleSection("Buscar en sesiones", filters_body, expanded=True)
+        root.addWidget(self.filters_section)
         self.text_filter.textChanged.connect(self.apply_filters)
         self.mode_filter.currentTextChanged.connect(self.apply_filters)
         self.udder_filter.currentTextChanged.connect(self.apply_filters)
@@ -488,11 +548,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         root.addWidget(main_splitter, stretch=1)
 
-        sessions_panel = QtWidgets.QWidget()
-        sessions_layout = QtWidgets.QVBoxLayout(sessions_panel)
-        self.sessions_label = QtWidgets.QLabel()
-        self.sessions_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
-        sessions_layout.addWidget(self.sessions_label)
+        sessions_body = QtWidgets.QWidget()
+        sessions_layout = QtWidgets.QVBoxLayout(sessions_body)
+        sessions_layout.setContentsMargins(0, 0, 0, 0)
         self.sessions_model = DictTableModel(self.session_headers)
         self.sessions_model.check_changed_callback = self.on_selection_checked
         self.sessions_table = QtWidgets.QTableView()
@@ -505,13 +563,31 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.sessions_table.selectionModel().selectionChanged.connect(self.select_session)
         self.sessions_table.doubleClicked.connect(self.open_selected_session_file)
         sessions_layout.addWidget(self.sessions_table)
-        main_splitter.addWidget(sessions_panel)
+        self.sessions_section = CollapsibleSection("Sesiones", sessions_body, expanded=True)
+        self.sessions_label = self.sessions_section.title_label
+        main_splitter.addWidget(self.sessions_section)
 
-        captures_panel = QtWidgets.QWidget()
-        captures_layout = QtWidgets.QVBoxLayout(captures_panel)
-        self.captures_label = QtWidgets.QLabel("Raws / tomas de la sesion seleccionada")
-        self.captures_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
-        captures_layout.addWidget(self.captures_label)
+        captures_body = QtWidgets.QWidget()
+        captures_layout = QtWidgets.QVBoxLayout(captures_body)
+        captures_layout.setContentsMargins(0, 0, 0, 0)
+        capture_columns = QtWidgets.QHBoxLayout()
+        capture_columns.addWidget(QtWidgets.QLabel("Columnas"))
+        for key, label, _headers in self.capture_column_groups:
+            button = QtWidgets.QToolButton()
+            button.setText(label)
+            button.setCheckable(True)
+            button.setChecked(self.capture_column_group_state.get(key, False))
+            button.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setArrowType(
+                QtCore.Qt.ArrowType.DownArrow
+                if self.capture_column_group_state.get(key, False)
+                else QtCore.Qt.ArrowType.RightArrow
+            )
+            button.toggled.connect(lambda checked, group_key=key: self.set_capture_column_group(group_key, checked))
+            self.capture_column_buttons[key] = button
+            capture_columns.addWidget(button)
+        capture_columns.addStretch(1)
+        captures_layout.addLayout(capture_columns)
         self.captures_model = DictTableModel(self.capture_headers)
         self.captures_model.check_changed_callback = self.on_selection_checked
         self.captures_table = QtWidgets.QTableView()
@@ -524,7 +600,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_table.selectionModel().selectionChanged.connect(self.select_capture)
         self.captures_table.doubleClicked.connect(self.open_selected_capture_file)
         captures_layout.addWidget(self.captures_table)
-        main_splitter.addWidget(captures_panel)
+        self.captures_section = CollapsibleSection("Raws / tomas de la sesion seleccionada", captures_body, expanded=True)
+        self.captures_label = self.captures_section.title_label
+        main_splitter.addWidget(self.captures_section)
 
         self.detail_tabs = QtWidgets.QTabWidget()
         main_splitter.addWidget(self.detail_tabs)
@@ -535,16 +613,20 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.detail_tabs.addTab(self.summary, "Resumen")
 
         stable_page = QtWidgets.QWidget()
-        stable_layout = QtWidgets.QVBoxLayout(stable_page)
+        stable_layout = QtWidgets.QHBoxLayout(stable_page)
         self.stable_info = QtWidgets.QTextEdit()
         self.stable_info.setReadOnly(True)
-        self.stable_info.setMaximumHeight(120)
+        self.stable_info.setMinimumWidth(230)
+        self.stable_info.setMaximumWidth(300)
         stable_layout.addWidget(self.stable_info)
         self.plot_stable = pg.PlotWidget(title="Segmento BPM estable")
         self.plot_stable.setBackground("w")
         self.plot_stable.showGrid(x=True, y=True, alpha=0.25)
-        self.plot_stable.setLabel("bottom", "Tiempo relativo", units="s")
-        stable_layout.addWidget(self.plot_stable, stretch=1)
+        self.plot_stable.setMinimumWidth(420)
+        self.plot_stable.setMaximumWidth(760)
+        self.plot_stable.setLabel("bottom", "Tiempo del tramo", units="s")
+        stable_layout.addWidget(self.plot_stable, stretch=0)
+        stable_layout.addStretch(1)
         self.detail_tabs.addTab(stable_page, "Estable")
 
         graph_page = QtWidgets.QWidget()
@@ -1165,6 +1247,55 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 paths.append(path)
         return paths
 
+    def set_capture_column_group(self, group_key: str, checked: bool):
+        if group_key not in self.capture_column_group_state:
+            return
+        self.capture_column_group_state[group_key] = checked
+        button = self.capture_column_buttons.get(group_key)
+        if button is not None:
+            button.setArrowType(
+                QtCore.Qt.ArrowType.DownArrow if checked else QtCore.Qt.ArrowType.RightArrow
+            )
+        self.refresh_capture_columns()
+
+    def visible_capture_headers(self, rows: list[dict[str, str]]) -> list[str]:
+        visible: list[str] = [SELECTION_HEADER]
+        for key, _label, group_headers in self.capture_column_groups:
+            if not self.capture_column_group_state.get(key, False):
+                continue
+            headers = list(group_headers)
+            if key == "temperature":
+                headers = self._headers_for_temperature_rows(
+                    headers,
+                    rows,
+                    self.capture_two_temp_headers + self.capture_two_manual_temp_headers,
+                    self.capture_cow_temp_headers + self.capture_cow_manual_temp_headers,
+                )
+            for header in headers:
+                if header in self.capture_headers and header not in visible:
+                    visible.append(header)
+        return visible
+
+    def refresh_capture_columns(self):
+        rows = self.captures_model.rows
+        selected_capture = self.current_capture
+        selected_row = None
+        if selected_capture is not None and self.current_session is not None:
+            for row_idx, row in enumerate(rows):
+                try:
+                    source_idx = int(row.get("_capture_index", row_idx) or row_idx)
+                except ValueError:
+                    source_idx = row_idx
+                if 0 <= source_idx < len(self.current_session.captures):
+                    cap = self.current_session.captures[source_idx]
+                    if cap is selected_capture or cap.capture_id == selected_capture.capture_id:
+                        selected_row = row_idx
+                        break
+        self.captures_model.set_rows(self.visible_capture_headers(rows), rows)
+        self.captures_table.resizeColumnsToContents()
+        if selected_row is not None:
+            self.captures_table.selectRow(selected_row)
+
     def select_session(self):
         indexes = self.sessions_table.selectionModel().selectedRows()
         if not indexes:
@@ -1180,7 +1311,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_capture = None
         if session is None:
             self.captures_label.setText("Raws / tomas de la sesion seleccionada")
-            self.captures_model.set_rows(self.capture_headers, [])
+            self.captures_model.set_rows(self.visible_capture_headers([]), [])
             self.set_capture(None)
             return
         self.captures_label.setText(f"Raws / tomas dentro de {session.name}")
@@ -1189,13 +1320,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             row = self._capture_row(cap)
             row["_capture_index"] = str(idx)
             capture_rows.append(row)
-        capture_headers = self._headers_for_temperature_rows(
-            self.capture_headers,
-            capture_rows,
-            self.capture_two_temp_headers + self.capture_two_manual_temp_headers,
-            self.capture_cow_temp_headers + self.capture_cow_manual_temp_headers,
-        )
-        self.captures_model.set_rows(capture_headers, capture_rows)
+        self.captures_model.set_rows(self.visible_capture_headers(capture_rows), capture_rows)
         self.captures_table.resizeColumnsToContents()
         if session.captures:
             _select_first_row(self.captures_table)
@@ -2258,15 +2383,29 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         mask = np.isfinite(t) & (t >= start) & (t <= end)
         if not np.any(mask):
             return
-        x = t[mask]
+        window_len = max(0.1, float(end - start))
+        x = t[mask] - start
         self.plot_stable.plot(x, self._normalized_for_display(ir[mask]), pen=pg.mkPen((0, 80, 220), width=2), name="IR")
         self.plot_stable.plot(x, self._normalized_for_display(red[mask]), pen=pg.mkPen((220, 40, 35), width=1), name="RED")
-        self.plot_stable.setTitle(f"Segmento estable | {fmt(bpm, 1, '-')} BPM | {fmt(start, 1, '-')}-{fmt(end, 1, '-')} s")
-        self.plot_stable.setLabel("bottom", "Tiempo relativo", units="s")
+        self.plot_stable.setTitle(f"Segmento estable | {fmt(bpm, 1, '-')} BPM | origen {fmt(start, 1, '-')}-{fmt(end, 1, '-')} s")
+        self.plot_stable.setLabel("bottom", "Tiempo del tramo", units="s")
         self.plot_stable.setLabel("left", "Senal normalizada")
+        self.plot_stable.setXRange(0.0, window_len, padding=0.02)
 
-    def _fft_spectrum_for_rows(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> tuple[np.ndarray, np.ndarray, float]:
+    def _fft_spectrum_for_rows(
+        self,
+        cap: CaptureRecord,
+        rows: list[dict[str, str]],
+        start_s: float | None = None,
+        end_s: float | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, float]:
         t, _red, ir = self._signal_arrays_from_rows(rows)
+        if start_s is not None and end_s is not None and np.isfinite(start_s) and np.isfinite(end_s) and end_s > start_s:
+            mask = np.isfinite(t) & (t >= float(start_s)) & (t <= float(end_s))
+            if not np.any(mask):
+                return np.asarray([], dtype=float), np.asarray([], dtype=float), math.nan
+            t = t[mask]
+            ir = ir[mask]
         if t.size < 40:
             return np.asarray([], dtype=float), np.asarray([], dtype=float), math.nan
         cfg = self._analysis_config_from_capture(cap)
@@ -2278,8 +2417,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         yy = yy - float(np.mean(yy))
         if float(np.std(yy)) <= 1e-9:
             return np.asarray([], dtype=float), np.asarray([], dtype=float), math.nan
-        spectrum = np.abs(np.fft.rfft(yy * np.hanning(yy.size)))
-        freqs_bpm = np.fft.rfftfreq(yy.size, d=1.0 / hz_u) * 60.0
+        n_fft = 2 ** int(math.ceil(math.log2(max(yy.size, 2))))
+        n_fft = max(n_fft, yy.size) * 4
+        spectrum = np.abs(np.fft.rfft(yy * np.hanning(yy.size), n=n_fft))
+        freqs_bpm = np.fft.rfftfreq(n_fft, d=1.0 / hz_u) * 60.0
         band = (freqs_bpm >= cfg.bpm_min) & (freqs_bpm <= cfg.bpm_max)
         bpm_fft = math.nan
         if np.any(band):
@@ -2297,16 +2438,28 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             cap.value("pulso_final_pulsio"),
             cap.value("pulso_final_fonendo"),
         )
-        bpm_calc = _as_float(cap.value("bpm"))
-        freqs_bpm, spectrum, bpm_fft = self._fft_spectrum_for_rows(cap, rows)
-        if not np.isfinite(bpm_calc):
-            bpm_calc = _as_float(cap.value("bpm_fft"))
-        if not np.isfinite(bpm_calc):
-            bpm_calc = bpm_fft
+        stable = self._stable_values_for_rows(cap, rows)
+        stable_bpm = float(stable["bpm"])
+        stable_start = float(stable["start"])
+        stable_end = float(stable["end"])
+        using_stable = np.isfinite(stable_bpm) and np.isfinite(stable_start) and np.isfinite(stable_end) and stable_end > stable_start
+        if using_stable:
+            freqs_bpm, spectrum, bpm_fft = self._fft_spectrum_for_rows(cap, rows, stable_start, stable_end)
+            bpm_calc = stable_bpm
+            source_label = f"Tramo estable {fmt(stable_start, 2, '-')}-{fmt(stable_end, 2, '-')} s"
+        else:
+            freqs_bpm, spectrum, bpm_fft = self._fft_spectrum_for_rows(cap, rows)
+            bpm_calc = _as_float(cap.value("bpm"))
+            if not np.isfinite(bpm_calc):
+                bpm_calc = _as_float(cap.value("bpm_fft"))
+            if not np.isfinite(bpm_calc):
+                bpm_calc = bpm_fft
+            source_label = "Toma completa (sin tramo estable disponible)"
         diff = abs(bpm_calc - ref_avg) if np.isfinite(bpm_calc) and np.isfinite(ref_avg) else math.nan
         self.comparison_graph_info.setHtml(
             "<table cellspacing='8'>"
-            f"<tr><td><b>BPM recogido</b></td><td>{fmt(bpm_calc, 1, '-')} BPM</td></tr>"
+            f"<tr><td><b>Fuente</b></td><td>{source_label}</td></tr>"
+            f"<tr><td><b>BPM marcado</b></td><td>{fmt(bpm_calc, 1, '-')} BPM</td></tr>"
             f"<tr><td><b>BPM ref.</b></td><td>{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s))</td></tr>"
             f"<tr><td><b>Diferencia</b></td><td>{fmt(diff, 1, '-')} BPM</td></tr>"
             "</table>"
@@ -2325,7 +2478,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if np.isfinite(ref_avg):
             self.plot_reference_compare.addItem(pg.InfiniteLine(pos=ref_avg, angle=90, pen=pg.mkPen((20, 140, 70), width=2, style=QtCore.Qt.PenStyle.DashLine)))
         self.plot_reference_compare.setTitle(
-            f"BPM recogido {fmt(bpm_calc, 1, '-')} | ref {fmt(ref_avg, 1, '-')} | dif {fmt(diff, 1, '-')} BPM"
+            f"{source_label} | BPM {fmt(bpm_calc, 1, '-')} | ref {fmt(ref_avg, 1, '-')} | dif {fmt(diff, 1, '-')} BPM"
         )
         self.plot_reference_compare.setLabel("bottom", "Frecuencia", units="BPM")
         self.plot_reference_compare.setLabel("left", "Magnitud normalizada")
