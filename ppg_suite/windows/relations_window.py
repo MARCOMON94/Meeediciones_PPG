@@ -69,6 +69,8 @@ HEADER_TOOLTIPS = {
     "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
     "Dif. BPM-ref": "Diferencia absoluta entre el BPM calculado por el sistema y el BPM de referencia manual.",
     "BPM medio": "Estimacion final de frecuencia cardiaca tras combinar estimadores validos y aplicar cribado.",
+    "BPM estable": "BPM del mejor segmento estable de 5 segundos.",
+    "Tramo estable": "Inicio y fin del segmento estable usado para BPM estable.",
     "BPM picos": "BPM estimado detectando picos locales en la senal PPG procesada.",
     "BPM FFT": "BPM estimado con transformada de Fourier sobre la senal IR procesada.",
     "BPM autocorr": "BPM estimado con autocorrelacion: repeticion temporal del patron de pulso.",
@@ -442,7 +444,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     capture_headers = [
         SELECTION_HEADER, "Animal", "Especie",
         "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
-        "Pulso ref.", "BPM medio", "Pulso final pulsio", "Pulso final fonendo",
+        "Pulso ref.", "BPM medio", "BPM estable", "Tramo estable", "Pulso final pulsio", "Pulso final fonendo",
         "Modo", "Sensor", "Termometros",
         "Oxigeno medio", "Calidad", "Contacto", "Estado",
         "Dif. BPM-ref", "Medicion", "Configuracion",
@@ -457,7 +459,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         ("animal", "Animal", ["Animal", "Especie"]),
         ("sample", "Muestra", ["Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Hora"]),
         ("quality", "Calidad", ["Calidad", "Contacto", "Estado"]),
-        ("pulse", "Pulsaciones", ["Pulso ref.", "BPM medio", "Pulso final pulsio", "Pulso final fonendo", "Dif. BPM-ref"]),
+        ("pulse", "Pulsaciones", ["Pulso ref.", "BPM medio", "BPM estable", "Tramo estable", "Pulso final pulsio", "Pulso final fonendo", "Dif. BPM-ref"]),
         ("temperature", "Temperatura", [
             "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
             "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
@@ -478,6 +480,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_rel_t = np.asarray([], dtype=float)
         self.selected_items: dict[str, SelectionRecord] = {}
         self.compare_items: dict[str, CaptureRecord] = {}
+        self.stable_bpm_cache: dict[str, dict[str, float | int]] = {}
         self.capture_column_group_state = {
             key: key == "animal" for key, _label, _headers in self.capture_column_groups
         }
@@ -1325,6 +1328,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
 
     def refresh_capture_columns(self):
         rows = self.captures_model.rows
+        self.ensure_stable_columns_for_rows(rows)
         selected_capture = self.current_capture
         selected_row = None
         if selected_capture is not None and self.current_session is not None:
@@ -1343,6 +1347,52 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.fit_selection_column(self.captures_table)
         if selected_row is not None:
             self.captures_table.selectRow(selected_row)
+
+    def stable_cache_key(self, cap: CaptureRecord) -> str:
+        raw_path = self.capture_raw_path(cap)
+        if raw_path:
+            return str(raw_path)
+        return cap.capture_id or cap.base_name
+
+    def stable_values_for_capture_table(self, cap: CaptureRecord) -> dict[str, float | int]:
+        cache_key = self.stable_cache_key(cap)
+        cached = self.stable_bpm_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        stored = self._stored_stable_values(cap, [])
+        if np.isfinite(float(stored["bpm"])):
+            self.stable_bpm_cache[cache_key] = stored
+            return stored
+        rows: list[dict[str, str]] = []
+        processed = cap.files.get("processed")
+        raw = self.capture_raw_path(cap)
+        if processed and processed.exists():
+            rows = _read_csv(processed)
+        elif raw and raw.exists():
+            rows = _read_csv(raw)
+        stable = self._stable_values_for_rows(cap, rows)
+        self.stable_bpm_cache[cache_key] = stable
+        return stable
+
+    def ensure_stable_columns_for_rows(self, rows: list[dict[str, str]]):
+        if not self.capture_column_group_state.get("pulse", False):
+            return
+        if self.current_session is None:
+            return
+        for row_idx, row in enumerate(rows):
+            try:
+                source_idx = int(row.get("_capture_index", row_idx) or row_idx)
+            except ValueError:
+                source_idx = row_idx
+            if not (0 <= source_idx < len(self.current_session.captures)):
+                continue
+            cap = self.current_session.captures[source_idx]
+            stable = self.stable_values_for_capture_table(cap)
+            bpm = float(stable["bpm"])
+            start = float(stable["start"])
+            end = float(stable["end"])
+            row["BPM estable"] = fmt(bpm, 1, "") if np.isfinite(bpm) else ""
+            row["Tramo estable"] = f"{fmt(start, 2, '')}-{fmt(end, 2, '')} s" if np.isfinite(start) and np.isfinite(end) else ""
 
     def select_session(self):
         indexes = self.sessions_table.selectionModel().selectedRows()
@@ -1369,6 +1419,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             row = self._capture_row(cap)
             row["_capture_index"] = str(idx)
             capture_rows.append(row)
+        self.ensure_stable_columns_for_rows(capture_rows)
         self.captures_model.set_rows(self.visible_capture_headers(capture_rows), capture_rows)
         self.captures_table.resizeColumnsToContents()
         self.fit_selection_column(self.captures_table)
@@ -1417,6 +1468,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             cap.value("pulso_final_fonendo"),
         )
         diff_ref = abs(bpm - ref_avg) if np.isfinite(bpm) and np.isfinite(ref_avg) else math.nan
+        stable_bpm = _as_float(cap.value("bpm_estable_5s"))
+        stable_start = _as_float(cap.value("bpm_estable_inicio_s"))
+        stable_end = _as_float(cap.value("bpm_estable_fin_s"))
+        stable_segment = f"{fmt(stable_start, 2, '')}-{fmt(stable_end, 2, '')} s" if np.isfinite(stable_start) and np.isfinite(stable_end) else ""
         if np.isfinite(quality) and quality >= 70:
             state = "Buena"
         elif np.isfinite(quality) and quality >= 45:
@@ -1445,6 +1500,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Pulso ref.": fmt(ref_avg, 1, ""),
             "Dif. BPM-ref": fmt(diff_ref, 1, ""),
             "BPM medio": fmt(bpm, 0, ""),
+            "BPM estable": fmt(stable_bpm, 1, ""),
+            "Tramo estable": stable_segment,
             "BPM picos": fmt(_as_float(cap.value("bpm_peak")), 0, ""),
             "BPM FFT": fmt(_as_float(cap.value("bpm_fft")), 0, ""),
             "BPM autocorr": fmt(_as_float(cap.value("bpm_autocorr")), 0, ""),
