@@ -343,6 +343,8 @@ class DictTableModel(QtCore.QAbstractTableModel):
         if orientation == QtCore.Qt.Orientation.Horizontal:
             header = self.headers[section]
             if role == QtCore.Qt.ItemDataRole.DisplayRole:
+                if header == SELECTION_HEADER:
+                    return ""
                 return header
             if role == QtCore.Qt.ItemDataRole.ToolTipRole:
                 return HEADER_TOOLTIPS.get(header, header)
@@ -395,7 +397,9 @@ class CollapsibleSection(QtWidgets.QWidget):
         self.title_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         header.addWidget(self.toggle_button)
         header.addWidget(self.title_label, stretch=1)
-        layout.addLayout(header)
+        self.header_widget = QtWidgets.QWidget()
+        self.header_widget.setLayout(header)
+        layout.addWidget(self.header_widget)
         layout.addWidget(self.body)
 
         self.toggle_button.toggled.connect(self.set_expanded)
@@ -416,6 +420,14 @@ class CollapsibleSection(QtWidgets.QWidget):
             QtCore.Qt.ArrowType.DownArrow if expanded else QtCore.Qt.ArrowType.RightArrow
         )
         self.body.setVisible(expanded)
+        if expanded:
+            self.setMaximumHeight(16777215)
+            self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
+        else:
+            header_height = self.header_widget.sizeHint().height() + self.layout().contentsMargins().top() + self.layout().contentsMargins().bottom()
+            self.setMaximumHeight(max(28, header_height))
+            self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
+        self.updateGeometry()
         self.toggled.emit(expanded)
 
 
@@ -442,7 +454,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     temporal_cow_temp_headers = ["Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo"]
     temporal_headers = ["Tramo", "Inicio s", "Fin s", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Muestras tramo"]
     capture_column_groups = [
-        ("animal", "Datos animal", ["Animal", "Especie", "Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Hora", "Raw"]),
+        ("animal", "Animal", ["Animal", "Especie"]),
+        ("sample", "Muestra", ["Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Hora"]),
         ("quality", "Calidad", ["Calidad", "Contacto", "Estado"]),
         ("pulse", "Pulsaciones", ["Pulso ref.", "BPM medio", "Pulso final pulsio", "Pulso final fonendo", "Dif. BPM-ref"]),
         ("temperature", "Temperatura", [
@@ -545,8 +558,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_clear.clicked.connect(self.clear_filters)
         self.btn_import.clicked.connect(self.pick_folder)
 
-        main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
-        root.addWidget(main_splitter, stretch=1)
+        self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+        root.addWidget(self.main_splitter, stretch=1)
 
         sessions_body = QtWidgets.QWidget()
         sessions_layout = QtWidgets.QVBoxLayout(sessions_body)
@@ -565,7 +578,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         sessions_layout.addWidget(self.sessions_table)
         self.sessions_section = CollapsibleSection("Sesiones", sessions_body, expanded=True)
         self.sessions_label = self.sessions_section.title_label
-        main_splitter.addWidget(self.sessions_section)
+        self.sessions_section.toggled.connect(self.rebalance_main_splitter)
+        self.main_splitter.addWidget(self.sessions_section)
 
         captures_body = QtWidgets.QWidget()
         captures_layout = QtWidgets.QVBoxLayout(captures_body)
@@ -588,7 +602,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             capture_columns.addWidget(button)
         capture_columns.addStretch(1)
         captures_layout.addLayout(capture_columns)
-        self.captures_model = DictTableModel(self.capture_headers)
+        self.captures_model = DictTableModel(self.visible_capture_headers([]))
         self.captures_model.check_changed_callback = self.on_selection_checked
         self.captures_table = QtWidgets.QTableView()
         self.captures_table.setModel(self.captures_model)
@@ -602,11 +616,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         captures_layout.addWidget(self.captures_table)
         self.captures_section = CollapsibleSection("Raws / tomas de la sesion seleccionada", captures_body, expanded=True)
         self.captures_label = self.captures_section.title_label
-        main_splitter.addWidget(self.captures_section)
+        self.captures_section.toggled.connect(self.rebalance_main_splitter)
+        self.main_splitter.addWidget(self.captures_section)
 
         self.detail_tabs = QtWidgets.QTabWidget()
-        main_splitter.addWidget(self.detail_tabs)
-        main_splitter.setSizes([230, 260, 360])
+        self.main_splitter.addWidget(self.detail_tabs)
+        self.main_splitter.setSizes([230, 260, 360])
+        self.filters_section.toggled.connect(self.rebalance_main_splitter)
 
         self.summary = QtWidgets.QTextEdit()
         self.summary.setReadOnly(True)
@@ -651,17 +667,21 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.detail_tabs.addTab(graph_page, "Graficas")
 
         comparison_graph_page = QtWidgets.QWidget()
-        comparison_graph_layout = QtWidgets.QVBoxLayout(comparison_graph_page)
+        comparison_graph_layout = QtWidgets.QHBoxLayout(comparison_graph_page)
         self.comparison_graph_info = QtWidgets.QTextEdit()
         self.comparison_graph_info.setReadOnly(True)
-        self.comparison_graph_info.setMaximumHeight(115)
+        self.comparison_graph_info.setMinimumWidth(230)
+        self.comparison_graph_info.setMaximumWidth(300)
         comparison_graph_layout.addWidget(self.comparison_graph_info)
         self.plot_reference_compare = pg.PlotWidget(title="BPM calculado vs referencia manual")
         self.plot_reference_compare.setBackground("w")
         self.plot_reference_compare.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_reference_compare.setMinimumWidth(420)
+        self.plot_reference_compare.setMaximumWidth(760)
         self.plot_reference_compare.setLabel("bottom", "Frecuencia", units="BPM")
         self.plot_reference_compare.setLabel("left", "Magnitud normalizada")
-        comparison_graph_layout.addWidget(self.plot_reference_compare, stretch=1)
+        comparison_graph_layout.addWidget(self.plot_reference_compare, stretch=0)
+        comparison_graph_layout.addStretch(1)
         self.detail_tabs.addTab(comparison_graph_page, "Graf. comp")
 
         temporal_page = QtWidgets.QWidget()
@@ -758,6 +778,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.compare_view_combo.currentTextChanged.connect(self.update_compare_plot)
         self.btn_remove_compare.clicked.connect(self.remove_selected_compare)
         self.detail_tabs.addTab(compare_page, "Comparar")
+        self.rebalance_main_splitter()
 
     def pick_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Seleccionar carpeta con CSV", str(RESULTS_DIR))
@@ -1100,6 +1121,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             session_rows.append(row)
         self.sessions_model.set_rows(self.session_headers, session_rows)
         self.sessions_table.resizeColumnsToContents()
+        self.fit_selection_column(self.sessions_table)
         self.sessions_label.setText(f"{len(filtered)} sesiones | {sum(len(s.captures) for s in filtered)} tomas visibles")
         if filtered:
             _select_first_row(self.sessions_table)
@@ -1247,6 +1269,31 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 paths.append(path)
         return paths
 
+    def fit_selection_column(self, table: QtWidgets.QTableView):
+        model = table.model()
+        headers = getattr(model, "headers", [])
+        if SELECTION_HEADER not in headers:
+            return
+        col = headers.index(SELECTION_HEADER)
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(col, 30)
+
+    def rebalance_main_splitter(self, *_args):
+        if not hasattr(self, "main_splitter"):
+            return
+        QtCore.QTimer.singleShot(0, self._apply_main_splitter_sizes)
+
+    def _apply_main_splitter_sizes(self):
+        if not hasattr(self, "main_splitter"):
+            return
+        closed = 30
+        session_size = 230 if self.sessions_section.is_expanded() else closed
+        capture_size = 260 if self.captures_section.is_expanded() else closed
+        total = max(650, self.main_splitter.height())
+        detail_size = max(260, total - session_size - capture_size)
+        self.main_splitter.setSizes([session_size, capture_size, detail_size])
+
     def set_capture_column_group(self, group_key: str, checked: bool):
         if group_key not in self.capture_column_group_state:
             return
@@ -1293,6 +1340,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                         break
         self.captures_model.set_rows(self.visible_capture_headers(rows), rows)
         self.captures_table.resizeColumnsToContents()
+        self.fit_selection_column(self.captures_table)
         if selected_row is not None:
             self.captures_table.selectRow(selected_row)
 
@@ -1312,6 +1360,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if session is None:
             self.captures_label.setText("Raws / tomas de la sesion seleccionada")
             self.captures_model.set_rows(self.visible_capture_headers([]), [])
+            self.fit_selection_column(self.captures_table)
             self.set_capture(None)
             return
         self.captures_label.setText(f"Raws / tomas dentro de {session.name}")
@@ -1322,6 +1371,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             capture_rows.append(row)
         self.captures_model.set_rows(self.visible_capture_headers(capture_rows), capture_rows)
         self.captures_table.resizeColumnsToContents()
+        self.fit_selection_column(self.captures_table)
         if session.captures:
             _select_first_row(self.captures_table)
         else:
@@ -1540,6 +1590,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.summary.clear()
             self.params.clear()
             self.files_model.set_rows(self.files_headers, [])
+            self.fit_selection_column(self.files_table)
             self.plot_capture.clear()
             self.stable_info.clear()
             self.plot_stable.clear()
@@ -1576,6 +1627,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         proc_rows_full = _read_csv(cap.files["processed"]) if "processed" in cap.files else []
         block_rows = _read_csv(cap.files["blocks"], limit=5000) if "blocks" in cap.files else []
         self.files_table.resizeColumnsToContents()
+        self.fit_selection_column(self.files_table)
         self.update_capture_plot(raw_rows, proc_rows, block_rows)
         self.update_stable_tab(cap, raw_rows_full, proc_rows_full)
         self.update_reference_compare_tab(cap, raw_rows_full, proc_rows_full)
