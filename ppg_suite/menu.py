@@ -191,7 +191,8 @@ class ModeSelectDialog(QtWidgets.QDialog):
                 border: 2px solid #3f6f4b;
                 color: #1f4f35;
                 font-weight: 700;
-                padding: 14px 18px;
+                padding: 14px 10px;
+                text-align: center;
             }
             QPushButton#otherToggle {
                 background: #f7fbf5;
