@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PyQt6 import QtCore, QtWidgets
 
 from ppg_suite.windows.animals_window import AnimalMeasurement, AnimalSelectionRecord, AnimalsWindow
 from ppg_suite.windows.relations_window import _read_csv
@@ -82,6 +87,30 @@ def test_selected_animal_mail_paths_use_raws(tmp_path: Path):
     paths = window.selected_paths_for_mail()
 
     assert paths == [raw1, raw2]
+
+
+def test_animal_table_row_selection_uses_animal_key_from_checkbox_metadata():
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    assert app is not None
+    window = make_window()
+    window._loading_form = False
+    window._updating_tables = False
+    window.animals_table = QtWidgets.QTableWidget(1, 2)
+    selected_keys: list[str] = []
+    window.select_animal = selected_keys.append
+
+    selection_item = QtWidgets.QTableWidgetItem("")
+    selection_item.setData(QtCore.Qt.ItemDataRole.UserRole, "animal:oveja:123")
+    selection_item.setData(QtCore.Qt.ItemDataRole.UserRole.value + 3, "oveja:123")
+    window.animals_table.setItem(0, 0, selection_item)
+
+    label_item = QtWidgets.QTableWidgetItem("Oveja 123")
+    label_item.setData(QtCore.Qt.ItemDataRole.UserRole, "oveja:123")
+    window.animals_table.setItem(0, 1, label_item)
+
+    AnimalsWindow.select_animal_from_table(window, 0, 0, -1, -1)
+
+    assert selected_keys == ["oveja:123"]
 
 
 def test_remove_capture_rows_from_sessions_uses_atomic_rewrite(tmp_path: Path):

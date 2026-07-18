@@ -585,7 +585,10 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         if self._loading_form or self._updating_tables or current_row < 0:
             return
         item = self.animals_table.item(current_row, 0)
-        key = item.data(QtCore.Qt.ItemDataRole.UserRole) if item else ""
+        key = item.data(QtCore.Qt.ItemDataRole.UserRole.value + 3) if item else ""
+        if not key:
+            label_item = self.animals_table.item(current_row, 1)
+            key = label_item.data(QtCore.Qt.ItemDataRole.UserRole) if label_item else ""
         if key:
             self.select_animal(str(key))
 
