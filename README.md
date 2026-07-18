@@ -127,6 +127,7 @@ CREAR_INSTALADOR_WINDOWS.cmd
 El comando genera:
 
 - `dist\MedicionPPG\MedicionPPG.exe`: carpeta de aplicacion lista para probar.
+- `release\MEE_VERSION.zip`: copia portable de nombre corto para equipos que bloqueen instaladores o fallen por rutas largas.
 - `release\MedicionPPG_Setup_VERSION.exe`: instalador si Inno Setup 6 esta instalado.
 
 Para publicar una actualizacion:
@@ -137,6 +138,8 @@ Para publicar una actualizacion:
 4. En el ordenador del usuario, abre ese instalador nuevo. Como mantiene el mismo `AppId`, actualiza el ejecutable instalado y conserva los datos.
 
 El instalador usa siempre el mismo `AppId`, asi que una version nueva sustituye a la anterior. Los resultados del usuario no se guardan dentro de la carpeta del programa, por lo que una actualizacion normal no borra mediciones ni fichas.
+
+Si al abrir el instalador aparece `Error 4551` o un aviso de `Control de aplicaciones` indicando que no se pudo ejecutar un archivo en la carpeta temporal, el bloqueo lo esta aplicando Windows o una politica del ordenador destino. En ese caso prueba primero `release\MEE_VERSION.zip`: se descomprime en una carpeta corta, por ejemplo `C:\MEE`, y se abre `MedicionPPG.exe`. Si tambien bloquea ese exe, hace falta que el departamento de informatica permita la aplicacion o que se firme el ejecutable/instalador con un certificado de confianza.
 
 En modo instalado, la aplicacion escribe por defecto en:
 

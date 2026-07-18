@@ -1,11 +1,11 @@
 #define EnvVersion GetEnv("PPG_SUITE_VERSION")
 #if EnvVersion == ""
-#define MyAppVersion "0.1.2"
+#define MyAppVersion "0.1.5"
 #else
 #define MyAppVersion EnvVersion
 #endif
 
-#define MyAppName "meeediciones"
+#define MyAppName "MEEEDICIONES"
 #define MyAppPublisher "Triple M"
 #define MyAppExeName "MedicionPPG.exe"
 
@@ -14,7 +14,7 @@ AppId={{8F1A2E89-6A11-45AD-8F79-62521D7F8F38}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\Programs\Triple M\meeediciones
+DefaultDirName={localappdata}\Programs\Triple M\MEEEDICIONES
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\release

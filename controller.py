@@ -14,11 +14,29 @@ from ppg_suite.windows.vacuum_window import VacuumExperimentWindow
 from ppg_suite.windows.animals_window import AnimalsWindow
 
 
+class LoadingDialog(QtWidgets.QDialog):
+    def __init__(self, message: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Cargando")
+        self.setModal(False)
+        self.setFixedSize(320, 110)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(12)
+        label = QtWidgets.QLabel(message)
+        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label)
+        progress = QtWidgets.QProgressBar()
+        progress.setRange(0, 0)
+        layout.addWidget(progress)
+
+
 class AppController(QtCore.QObject):
     def __init__(self, app: QtWidgets.QApplication):
         super().__init__()
         self.app = app
         self.current_window: QtWidgets.QMainWindow | None = None
+        self.loading_dialog: LoadingDialog | None = None
 
     def close_current_window(self):
         if self.current_window is None:
@@ -30,8 +48,29 @@ class AppController(QtCore.QObject):
         win.close()
         win.deleteLater()
 
-    def _on_current_window_destroyed(self, _obj=None):
-        if self.current_window is None:
+    def _process_events(self):
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.processEvents()
+
+    def show_loading(self, message: str = "Cargando..."):
+        if self.loading_dialog is not None:
+            return
+        self.loading_dialog = LoadingDialog(message)
+        self.loading_dialog.show()
+        self._process_events()
+
+    def hide_loading(self):
+        if self.loading_dialog is None:
+            return
+        dialog = self.loading_dialog
+        self.loading_dialog = None
+        dialog.close()
+        dialog.deleteLater()
+        self._process_events()
+
+    def _on_workspace_window_destroyed(self, win):
+        if self.current_window is not win:
             return
         self.current_window = None
         self.app.quit()
@@ -73,55 +112,46 @@ class AppController(QtCore.QObject):
         self._wire_common_signals(win)
         self.current_window = win
         win.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        win.destroyed.connect(self._on_current_window_destroyed)
+        win.destroyed.connect(lambda _obj=None, watched=win: self._on_workspace_window_destroyed(watched))
         win.showMaximized()
 
+    def _open_workspace(self, factory, message: str = "Cargando..."):
+        self.show_loading(message)
+        try:
+            self.close_current_window()
+            self._process_events()
+            win = factory()
+            self._show_workspace_window(win)
+            self._process_events()
+        finally:
+            self.hide_loading()
+
     def show_real(self):
-        self.close_current_window()
-        win = RealWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(RealWindow)
 
     def show_test(self):
-        self.close_current_window()
-        win = TestWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(TestWindow)
 
     def show_reajustes(self):
-        self.close_current_window()
-        win = ReajustesWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(ReajustesWindow)
 
     def show_configurations(self):
-        self.close_current_window()
-        win = ConfigurationsWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(ConfigurationsWindow)
 
     def show_experiment_3m(self):
-        self.close_current_window()
-        win = Experiment3MWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(Experiment3MWindow)
 
     def show_vacuum_experiment(self):
-        self.close_current_window()
-        win = VacuumExperimentWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(VacuumExperimentWindow)
 
     def show_temperature(self):
-        self.close_current_window()
-        win = TemperatureWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(TemperatureWindow)
 
     def show_relations(self):
-        self.close_current_window()
-        win = RelationExplorerWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(RelationExplorerWindow)
 
     def show_fourier(self):
-        self.close_current_window()
-        win = FourierAnalysisWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(FourierAnalysisWindow)
 
     def show_animals(self):
-        self.close_current_window()
-        win = AnimalsWindow()
-        self._show_workspace_window(win)
+        self._open_workspace(AnimalsWindow)

@@ -27,7 +27,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowTitle("Seleccionar modo de trabajo")
         self.selected_mode: AppMode = "real"
-        self.setMinimumSize(760, 680)
+        self.setMinimumSize(760, 590)
         self.apply_rumiando_style()
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -49,7 +49,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         hero_text = QtWidgets.QVBoxLayout()
         hero_text.setContentsMargins(0, 8, 0, 0)
         hero_text.setSpacing(8)
-        title = QtWidgets.QLabel("meeediciones")
+        title = QtWidgets.QLabel("MEEEDICIONES")
         title.setObjectName("title")
         title.setFont(QtGui.QFont("Arial", 22, QtGui.QFont.Weight.Bold))
         hero_text.addWidget(title)
@@ -158,22 +158,6 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_updates.setIconSize(QtCore.QSize(18, 18))
         layout.addWidget(self.btn_updates, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
 
-        layout.addStretch(1)
-        dev = QtWidgets.QLabel("Desarrollado por Triple M")
-        dev.setObjectName("brandFooter")
-        dev.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(dev)
-
-        logos = QtWidgets.QHBoxLayout()
-        logos.setContentsMargins(4, 0, 4, 0)
-        logos.setSpacing(12)
-        self.ulpgc_logo = self.footer_logo("logo-ulpgc-departamento.png", QtCore.QSize(130, 76))
-        self.fv_logo = self.footer_logo("logo-fv-ulpgc.jpg", QtCore.QSize(76, 76))
-        logos.addWidget(self.ulpgc_logo, alignment=QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignBottom)
-        logos.addStretch(1)
-        logos.addWidget(self.fv_logo, alignment=QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignBottom)
-        layout.addLayout(logos)
-
         self.btn_real.clicked.connect(lambda: self.choose("real"))
         self.btn_test.clicked.connect(lambda: self.choose("test"))
         self.btn_temp.clicked.connect(lambda: self.choose("temp"))
@@ -212,11 +196,6 @@ class ModeSelectDialog(QtWidgets.QDialog):
                 border-radius: 6px;
                 padding: 10px;
                 color: #335f40;
-            }
-            QLabel#brandFooter {
-                color: #536457;
-                font-size: 8pt;
-                padding-top: 2px;
             }
             QPushButton {
                 background: #ffffff;
@@ -286,17 +265,6 @@ class ModeSelectDialog(QtWidgets.QDialog):
         if pix.isNull():
             return pix
         return pix.scaled(size, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
-
-    def footer_logo(self, name: str, size: QtCore.QSize) -> QtWidgets.QLabel:
-        label = QtWidgets.QLabel()
-        label.setFixedSize(size)
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        pix = self.asset_pixmap(name, size)
-        if pix.isNull():
-            label.hide()
-        else:
-            label.setPixmap(pix)
-        return label
 
     def apply_button_icons(self):
         icon_map = {

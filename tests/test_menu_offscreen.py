@@ -58,21 +58,23 @@ def test_menu_has_bottom_import_and_firmware_actions():
     dialog.close()
 
 
-def test_menu_footer_loads_institutional_logos_and_brand():
+def test_menu_header_keeps_only_own_logo_and_uppercase_title():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     dialog = ModeSelectDialog()
     dialog.resize(dialog.minimumSize())
     dialog.show()
     app.processEvents()
 
+    title = dialog.findChild(QtWidgets.QLabel, "title")
     brand = dialog.findChild(QtWidgets.QLabel, "brandFooter")
-    assert brand is not None
-    assert brand.text() == "Desarrollado por Triple M"
-    assert dialog.ulpgc_logo.pixmap() is not None
-    assert not dialog.ulpgc_logo.pixmap().isNull()
-    assert dialog.fv_logo.pixmap() is not None
-    assert not dialog.fv_logo.pixmap().isNull()
-    assert dialog.ulpgc_logo.x() < dialog.fv_logo.x()
-    assert brand.y() < dialog.ulpgc_logo.y()
+    assert title is not None
+    assert title.text() == "MEEEDICIONES"
+    assert brand is None
+    assert dialog.minimumHeight() == 590
+    assert dialog.hero_image.pixmap() is not None
+    assert not dialog.hero_image.pixmap().isNull()
+    assert not hasattr(dialog, "header_fv_logo")
+    assert not hasattr(dialog, "ulpgc_logo")
+    assert not hasattr(dialog, "fv_logo")
 
     dialog.close()

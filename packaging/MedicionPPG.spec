@@ -35,6 +35,20 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+
+def keep_packaged_data(item):
+    target = item[0].replace("\\", "/")
+    if target.startswith("pyqtgraph/colors/maps/"):
+        return False
+    if target.startswith("pyqtgraph/icons/peegee/"):
+        return False
+    if ".dist-info/licenses/" in target:
+        return False
+    return True
+
+
+a.datas = [item for item in a.datas if keep_packaged_data(item)]
 pyz = PYZ(a.pure)
 
 exe = EXE(
