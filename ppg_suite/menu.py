@@ -155,7 +155,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_relations.clicked.connect(lambda: self.choose("relations"))
         self.btn_animals.clicked.connect(lambda: self.choose("animals"))
         self.btn_fourier.clicked.connect(lambda: self.choose("fourier"))
-        self.btn_other_toggle.toggled.connect(self.other_modes_widget.setVisible)
+        self.btn_other_toggle.toggled.connect(self.toggle_other_modes)
         self.btn_updates.clicked.connect(self.show_latest_updates)
 
     def apply_rumiando_style(self):
@@ -259,6 +259,24 @@ class ModeSelectDialog(QtWidgets.QDialog):
     def choose(self, mode: AppMode):
         self.selected_mode = mode
         self.accept()
+
+    def toggle_other_modes(self, checked: bool):
+        self.other_modes_widget.setVisible(checked)
+        QtCore.QTimer.singleShot(0, self.adjust_other_modes_size)
+
+    def adjust_other_modes_size(self):
+        layout = self.layout()
+        if layout is not None:
+            layout.activate()
+        target = self.sizeHint()
+        screen = self.screen() or QtWidgets.QApplication.primaryScreen()
+        max_height = 1200
+        if screen is not None:
+            max_height = max(520, screen.availableGeometry().height() - 40)
+        self.resize(
+            max(self.width(), self.minimumWidth(), target.width()),
+            min(max_height, max(self.height(), self.minimumHeight(), target.height())),
+        )
 
     def show_latest_updates(self):
         update_dir = BASE_DIR / "actualizaciones"

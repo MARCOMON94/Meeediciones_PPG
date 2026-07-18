@@ -23,3 +23,20 @@ def test_primary_menu_button_text_fits_minimum_dialog_width():
     assert "text-align: center;" in dialog.styleSheet()
     assert text_width < button.width()
     dialog.close()
+
+
+def test_other_modes_toggle_rebalances_dialog_size():
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = ModeSelectDialog()
+    dialog.resize(dialog.minimumSize())
+    dialog.show()
+    app.processEvents()
+    before_height = dialog.height()
+
+    dialog.btn_other_toggle.setChecked(True)
+    app.processEvents()
+    app.processEvents()
+
+    assert dialog.other_modes_widget.isVisible()
+    assert dialog.height() >= before_height
+    dialog.close()
