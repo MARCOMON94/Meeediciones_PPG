@@ -4,7 +4,6 @@ import csv
 import html
 import json
 import math
-import stat
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -25,14 +24,16 @@ from ..animal_config import (
     parse_temp_mapping,
 )
 from ..models import AnalysisConfig, SensorConfig
+from ..io_utils import atomic_csv_dict_writer
 from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..processing import estimate_hz, processed_ppg, score_and_merge_metrics, stable_bpm_segment, uniform_resample
+from ..trash import TrashBatch
 from ..utils import fmt
 
 
 MODE_LABELS = {
-    "real": "Medicion de campo",
-    "normal": "Medicion de campo",
+    "real": "Medición de campo",
+    "normal": "Medición de campo",
     "test": "Test de campo",
     "temp": "Solo temperatura",
     "temperature": "Solo temperatura",
@@ -48,38 +49,38 @@ MODE_LABELS = {
 SELECTION_HEADER = "Seleccionar"
 
 HEADER_TOOLTIPS = {
-    SELECTION_HEADER: "Seleccionar sesion, toma/raw o archivo para preparar correo o revisar su eliminacion.",
-    "Sesion": "Archivo o grupo de tomas al que pertenece la medicion.",
-    "Fecha": "Fecha registrada para la sesion o toma.",
-    "Inicio": "Hora inicial registrada para la sesion.",
-    "Modos": "Tipos de medicion incluidos en la sesion.",
-    "Tomas": "Numero de capturas o raws visibles en esta sesion.",
-    "Animales": "Numero de identificadores de animal distintos dentro de la sesion.",
+    SELECTION_HEADER: "Seleccionar sesión, toma/raw o archivo para preparar correo o revisar su eliminación.",
+    "Sesión": "Archivo o grupo de tomas al que pertenece la medición.",
+    "Fecha": "Fecha registrada para la sesión o toma.",
+    "Inicio": "Hora inicial registrada para la sesión.",
+    "Modos": "Tipos de medición incluidos en la sesión.",
+    "Tomas": "Número de capturas o raws visibles en esta sesión.",
+    "Animales": "Número de identificadores de animal distintos dentro de la sesión.",
     "Calidad media": "Media de la calidad guardada en las tomas visibles. Es orientativa y depende del cribado aplicado.",
     "Hora": "Hora registrada para la toma.",
     "Animal": "Identificador introducido para el animal o sujeto de la toma.",
     "Especie": "Tipo de animal seleccionado: oveja, cabra o vaca.",
     "Modo": "Modo de recogida usado: campo, reajustes, configuraciones, experimento 3M, etc.",
-    "Configuracion": "Etiqueta de configuracion usada para el sensor en esa toma.",
+    "Configuración": "Etiqueta de configuración usada para el sensor en esa toma.",
     "Sensor": "Sensor indicado para la toma: derecha o izquierda.",
-    "Termometros": "Asignacion de termometros analogicos A0/A1 a derecha/izquierda usada al capturar.",
+    "Termómetros": "Asignación de termómetros analógicos A0/A1 a derecha/izquierda usada al capturar.",
     "Canal temp": "Canal analogico usado como temperatura primaria de la toma.",
-    "Medicion": "Indica si la toma se hizo con vacio o sin vacio. Es metadato, no entra en calculos.",
-    "Estado": "Lectura rapida de calidad: Buena, Aceptable o Dudosa segun la calidad calculada.",
-    "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
+    "Medición": "Indica si la toma se hizo con vacío o sin vacío. Es metadato, no entra en cálculos.",
+    "Estado": "Lectura rápida de calidad: Buena, Aceptable o Dudosa según la calidad calculada.",
+    "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioxímetro final y fonendo final, ignorando ceros y vacíos.",
     "Dif. BPM-ref": "Diferencia absoluta entre el BPM calculado por el sistema y el BPM de referencia manual.",
     "BPM medio": "Estimacion final de frecuencia cardiaca tras combinar estimadores validos y aplicar cribado.",
     "BPM estable": "BPM del mejor segmento estable de 5 segundos.",
     "Tramo estable": "Inicio y fin del segmento estable usado para BPM estable.",
-    "BPM picos": "BPM estimado detectando picos locales en la senal PPG procesada.",
-    "BPM FFT": "BPM estimado con transformada de Fourier sobre la senal IR procesada.",
-    "BPM autocorr": "BPM estimado con autocorrelacion: repeticion temporal del patron de pulso.",
-    "Oxigeno medio": "SpO2 estimada experimentalmente desde RED/IR. No esta calibrada clinicamente.",
+    "BPM picos": "BPM estimado detectando picos locales en la señal PPG procesada.",
+    "BPM FFT": "BPM estimado con transformada de Fourier sobre la señal IR procesada.",
+    "BPM autocorr": "BPM estimado con autocorrelación: repetición temporal del patrón de pulso.",
+    "Oxígeno medio": "SpO2 estimada experimentalmente desde RED/IR. No está calibrada clínicamente.",
     "Ratio R": "Ratio AC/DC de RED dividido por AC/DC de IR usado para estimar SpO2.",
-    "Temp final": "Maximo del primer golpe de calor tras 1 s de estabilizacion y dentro de los 5 s siguientes.",
+    "Temp final": "Máximo del primer golpe de calor tras 1 s de estabilización y dentro de los 5 s siguientes.",
     "Temp ult.": "Ultima temperatura registrada en la toma.",
-    "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG. Requiere validacion externa.",
-    "Calidad resp.": "Confianza interna de la respiracion experimental, de 0 a 100.",
+    "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG. Requiere validación externa.",
+    "Calidad resp.": "Confianza interna de la respiración experimental, de 0 a 100.",
     "Temp raw": "Valor bruto del ADC de temperatura.",
     "Temp RT final": "Maximo independiente de la ubre derecha en la ventana final 1-6 s.",
     "Temp RT ult.": "Ultima temperatura calculada para la ubre derecha.",
@@ -98,35 +99,35 @@ HEADER_TOOLTIPS = {
     "Temp A1 ult.": "Ultima temperatura calculada desde la fuente analogica A1.",
     "Temp A1 raw": "Ultimo valor bruto ADC de la fuente analogica A1.",
     "Raw": "Archivo raw asociado a la toma.",
-    "Calidad": "Puntuacion global interna de la toma tras BPM, PI, artefactos, saturacion y cribado.",
-    "Contacto": "Etiqueta de contacto/perfusion derivada del nivel DC e indice de perfusion IR.",
-    "PI IR %": "Indice de perfusion IR: componente pulsatile AC respecto al nivel DC. Cuanto mayor, mas visible es el pulso.",
-    "PI RED %": "Indice de perfusion RED: componente pulsatile AC respecto al nivel DC.",
+    "Calidad": "Puntuación global interna de la toma tras BPM, PI, artefactos, saturación y cribado.",
+    "Contacto": "Etiqueta de contacto/perfusión derivada del nivel DC e índice de perfusión IR.",
+    "PI IR %": "Índice de perfusión IR: componente pulsátil AC respecto al nivel DC. Cuanto mayor, más visible es el pulso.",
+    "PI RED %": "Índice de perfusión RED: componente pulsátil AC respecto al nivel DC.",
     "Artef. IR %": "Porcentaje de muestras IR marcadas como artefacto o descartadas por cribado robusto.",
     "Artef. RED %": "Porcentaje de muestras RED marcadas como artefacto por cribado robusto.",
     "Sat. %": "Porcentaje de muestras cerca del techo digital del ADC. Si sube, hay riesgo de perder informacion.",
     "RED": "Amplitud LED roja configurada en el MAX3010x, valor de registro 0-255.",
     "IR": "Amplitud LED infrarroja configurada en el MAX3010x, valor de registro 0-255.",
-    "AVG": "Promedio FIFO configurado en el sensor. Valores mayores suavizan y retrasan mas.",
+    "AVG": "Promedio FIFO configurado en el sensor. Valores mayores suavizan y retrasan más.",
     "RATE": "Frecuencia de muestreo configurada en el sensor.",
     "WIDTH": "Ancho de pulso LED configurado; influye en resolucion y energia de cada muestra.",
     "ADC": "Rango ADC configurado para el sensor.",
-    "Duracion": "Duracion real analizada tras descartes iniciales o de gaps.",
+    "Duración": "Duración real analizada tras descartes iniciales o de gaps.",
     "Hz": "Frecuencia real estimada a partir de los tiempos guardados.",
     "Muestras": "Numero de muestras disponibles o analizadas.",
     "Pulso previo": "BPM manual anotado antes de la toma.",
-    "Temp manual inicio": "Temperatura manual anotada al inicio; es solo referencia y no afecta a ningun calculo.",
+    "Temp manual inicio": "Temperatura manual anotada al inicio; es solo referencia y no afecta a ningún cálculo.",
     "Temp manual RT": "Temperatura manual inicial de la teta derecha.",
     "Temp manual LT": "Temperatura manual inicial de la teta izquierda.",
     "Temp manual FLT": "Temperatura manual inicial de la teta delantera izquierda.",
     "Temp manual FRT": "Temperatura manual inicial de la teta delantera derecha.",
     "Temp manual RLT": "Temperatura manual inicial de la teta trasera izquierda.",
     "Temp manual RRT": "Temperatura manual inicial de la teta trasera derecha.",
-    "Pulso final pulsio": "BPM manual anotado al final con pulsioximetro.",
+    "Pulso final pulsio": "BPM manual anotado al final con pulsioxímetro.",
     "Pulso final fonendo": "BPM manual anotado al final con fonendo.",
     "tipo": "Tipo de archivo asociado a la toma: raw, processed, summary, plot, etc.",
     "archivo": "Nombre del archivo asociado.",
-    "filas": "Numero de filas si el archivo asociado es CSV.",
+    "filas": "Número de filas si el archivo asociado es CSV.",
     "ruta": "Ruta completa del archivo asociado.",
     "Tramo": "Intervalo temporal relativo a la toma seleccionada. Se fuerza el primer dato disponible como segundo 0.",
     "Inicio s": "Inicio del tramo usando tiempo relativo: el primer dato disponible se considera 0 s.",
@@ -173,6 +174,26 @@ def _read_csv(path: Path, limit: int | None = None) -> list[dict[str, str]]:
         if limit is not None and len(rows) >= limit:
             break
     return rows
+
+
+def _csv_row_count(path: Path) -> int:
+    count = 0
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
+            sample = f.read(2048)
+            f.seek(0)
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=";,\t")
+            except csv.Error:
+                dialect = csv.excel
+                dialect.delimiter = ";"
+            reader = csv.reader(f, dialect=dialect)
+            next(reader, None)
+            for _row in reader:
+                count += 1
+    except OSError:
+        return 0
+    return count
 
 
 def _as_float(value: str) -> float:
@@ -293,7 +314,7 @@ class DictTableModel(QtCore.QAbstractTableModel):
         if key == SELECTION_HEADER and role == QtCore.Qt.ItemDataRole.CheckStateRole:
             return QtCore.Qt.CheckState.Checked if row.get("_selection_checked") == "1" else QtCore.Qt.CheckState.Unchecked
         if key == SELECTION_HEADER and role == QtCore.Qt.ItemDataRole.ToolTipRole:
-            return row.get("_selection_tooltip", "Seleccionar para preparar correo o revisar eliminacion")
+            return row.get("_selection_tooltip", "Seleccionar para preparar correo o revisar eliminación")
         if key == SELECTION_HEADER and role == QtCore.Qt.ItemDataRole.DisplayRole:
             return ""
         if role in (QtCore.Qt.ItemDataRole.DisplayRole, QtCore.Qt.ItemDataRole.ToolTipRole):
@@ -436,7 +457,7 @@ class CollapsibleSection(QtWidgets.QWidget):
 class RelationExplorerWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
-    session_headers = [SELECTION_HEADER, "Sesion", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
+    session_headers = [SELECTION_HEADER, "Sesión", "Fecha", "Inicio", "Modos", "Tomas", "Animales", "Calidad media"]
     capture_two_temp_headers = ["Temp RT final", "Temp LT final"]
     capture_cow_temp_headers = ["Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final"]
     capture_two_manual_temp_headers = ["Temp manual RT", "Temp manual LT"]
@@ -445,11 +466,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         SELECTION_HEADER, "Animal", "Especie",
         "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
         "Pulso ref.", "BPM medio", "BPM estable", "Tramo estable", "Pulso final pulsio", "Pulso final fonendo",
-        "Modo", "Sensor", "Termometros",
-        "Oxigeno medio", "Calidad", "Contacto", "Estado",
-        "Dif. BPM-ref", "Medicion", "Configuracion",
+        "Modo", "Sensor", "Termómetros",
+        "Oxígeno medio", "Calidad", "Contacto", "Estado",
+        "Dif. BPM-ref", "Medición", "Configuración",
         "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
-        "Hora", "Duracion", "Hz", "Muestras", "Raw",
+        "Hora", "Duración", "Hz", "Muestras", "Raw",
     ]
     files_headers = [SELECTION_HEADER, "tipo", "archivo", "filas", "ruta"]
     temporal_two_temp_headers = ["Temp RT max tramo", "Temp LT max tramo"]
@@ -457,19 +478,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     temporal_headers = ["Tramo", "Inicio s", "Fin s", "Temp RT max tramo", "Temp LT max tramo", "Temp FLT max tramo", "Temp FRT max tramo", "Temp RLT max tramo", "Temp RRT max tramo", "BPM 10s", "BPM tramo", "SpO2 tramo", "Calidad tramo", "Muestras tramo"]
     capture_column_groups = [
         ("animal", "Animal", ["Animal", "Especie"]),
-        ("sample", "Muestra", ["Modo", "Sensor", "Termometros", "Medicion", "Configuracion", "Hora"]),
+        ("sample", "Muestra", ["Modo", "Sensor", "Termómetros", "Medición", "Configuración", "Hora"]),
         ("quality", "Calidad", ["Calidad", "Contacto", "Estado"]),
         ("pulse", "Pulsaciones", ["Pulso ref.", "BPM medio", "BPM estable", "Tramo estable", "Pulso final pulsio", "Pulso final fonendo", "Dif. BPM-ref"]),
         ("temperature", "Temperatura", [
             "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
             "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
         ]),
-        ("spo2", "SpO2", ["Oxigeno medio"]),
+        ("spo2", "SpO2", ["Oxígeno medio"]),
     ]
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PPG Suite v8 | Estadisticas")
+        self.setWindowTitle("PPG Suite v8 | Estadísticas")
         self.resize(1380, 860)
         self.search_roots: list[Path] = [RESULTS_DIR]
         self.sessions: list[SessionGroup] = []
@@ -501,10 +522,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         top.addWidget(self.btn_back)
         self.mail_status = QtWidgets.QLabel("0 archivos seleccionados")
         self.btn_add_compare = QtWidgets.QPushButton("Anadir raw")
-        self.btn_clear_compare = QtWidgets.QPushButton("Limpiar comparacion")
+        self.btn_clear_compare = QtWidgets.QPushButton("Limpiar comparación")
         self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
         self.btn_delete = QtWidgets.QPushButton("Eliminar")
-        self.btn_clear_mail = QtWidgets.QPushButton("Limpiar seleccion")
+        self.btn_clear_mail = QtWidgets.QPushButton("Limpiar selección")
         self.btn_add_compare.setMinimumHeight(42)
         self.btn_clear_compare.setMinimumHeight(42)
         self.btn_prepare_mail.setMinimumHeight(42)
@@ -527,7 +548,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         filters_body = QtWidgets.QWidget()
         fl = QtWidgets.QGridLayout(filters_body)
         self.text_filter = QtWidgets.QLineEdit()
-        self.text_filter.setPlaceholderText("Animal, modo, configuracion, contacto...")
+        self.text_filter.setPlaceholderText("Animal, modo, configuración, contacto...")
         self.mode_filter = QtWidgets.QComboBox()
         self.mode_filter.addItem("Todos")
         self.udder_filter = QtWidgets.QComboBox()
@@ -545,7 +566,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.mode_filter, 0, 6)
         fl.addWidget(QtWidgets.QLabel("Sensor"), 0, 7)
         fl.addWidget(self.udder_filter, 0, 8)
-        fl.addWidget(QtWidgets.QLabel("Medicion"), 0, 9)
+        fl.addWidget(QtWidgets.QLabel("Medición"), 0, 9)
         fl.addWidget(self.vacuum_filter, 0, 10)
         fl.addWidget(QtWidgets.QLabel("Calidad min."), 1, 0)
         fl.addWidget(self.quality_min, 1, 1)
@@ -617,7 +638,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.captures_table.selectionModel().selectionChanged.connect(self.select_capture)
         self.captures_table.doubleClicked.connect(self.open_selected_capture_file)
         captures_layout.addWidget(self.captures_table)
-        self.captures_section = CollapsibleSection("Raws / tomas de la sesion seleccionada", captures_body, expanded=True)
+        self.captures_section = CollapsibleSection("Raws / tomas de la sesión seleccionada", captures_body, expanded=True)
         self.captures_label = self.captures_section.title_label
         self.captures_section.toggled.connect(self.rebalance_main_splitter)
         self.main_splitter.addWidget(self.captures_section)
@@ -656,18 +677,18 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.chk_signal.setChecked(True)
         self.chk_bpm = QtWidgets.QCheckBox("BPM")
         self.chk_bpm.setChecked(True)
-        self.chk_spo2 = QtWidgets.QCheckBox("Oxigeno")
+        self.chk_spo2 = QtWidgets.QCheckBox("Oxígeno")
         self.chk_temp = QtWidgets.QCheckBox("Temperatura")
         self.chk_blocks = QtWidgets.QCheckBox("Bloques BPM")
         for chk in [self.chk_signal, self.chk_bpm, self.chk_spo2, self.chk_temp, self.chk_blocks]:
             chk.toggled.connect(self.refresh_capture_detail)
             graph_controls.addWidget(chk)
         graph_controls.addStretch(1)
-        self.plot_capture = pg.PlotWidget(title="Graficas de la toma seleccionada")
+        self.plot_capture = pg.PlotWidget(title="Gráficas de la toma seleccionada")
         self.plot_capture.setBackground("w")
         self.plot_capture.showGrid(x=True, y=True, alpha=0.25)
         graph_layout.addWidget(self.plot_capture, stretch=1)
-        self.detail_tabs.addTab(graph_page, "Graficas")
+        self.detail_tabs.addTab(graph_page, "Gráficas")
 
         comparison_graph_page = QtWidgets.QWidget()
         comparison_graph_layout = QtWidgets.QHBoxLayout(comparison_graph_page)
@@ -676,7 +697,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.comparison_graph_info.setMinimumWidth(230)
         self.comparison_graph_info.setMaximumWidth(300)
         comparison_graph_layout.addWidget(self.comparison_graph_info)
-        self.plot_reference_compare = pg.PlotWidget(title="BPM calculado vs referencia manual")
+        self.plot_reference_compare = pg.PlotWidget(title="Espectro FFT y referencias de BPM")
         self.plot_reference_compare.setBackground("w")
         self.plot_reference_compare.showGrid(x=True, y=True, alpha=0.25)
         self.plot_reference_compare.setMinimumWidth(420)
@@ -708,7 +729,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.chk_temporal_signal.setChecked(True)
         self.chk_temporal_bpm = QtWidgets.QCheckBox("BPM")
         self.chk_temporal_bpm.setChecked(True)
-        self.chk_temporal_spo2 = QtWidgets.QCheckBox("Oxigeno")
+        self.chk_temporal_spo2 = QtWidgets.QCheckBox("Oxígeno")
         self.chk_temporal_spo2.setChecked(True)
         self.chk_temporal_temp = QtWidgets.QCheckBox("Temperatura")
         self.chk_temporal_temp.setChecked(True)
@@ -717,23 +738,23 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             chk.toggled.connect(self.update_selected_temporal_plot)
             temporal_controls.addWidget(chk)
         temporal_controls.addStretch(1)
-        self.plot_temporal_signal = pg.PlotWidget(title="Senal del tramo seleccionado")
+        self.plot_temporal_signal = pg.PlotWidget(title="Señal del tramo seleccionado")
         self.plot_temporal_signal.setBackground("w")
         self.plot_temporal_signal.showGrid(x=True, y=True, alpha=0.25)
         self.plot_temporal_signal.setLabel("bottom", "Tiempo relativo", units="s")
         temporal_right.addWidget(self.plot_temporal_signal, stretch=1)
-        self.detail_tabs.addTab(temporal_page, "Temporalizacion")
+        self.detail_tabs.addTab(temporal_page, "Temporalización")
 
         self.params = QtWidgets.QTextEdit()
         self.params.setReadOnly(True)
-        self.detail_tabs.addTab(self.params, "Parametros dispositivo")
+        self.detail_tabs.addTab(self.params, "Parámetros dispositivo")
 
         self.files_model = DictTableModel(self.files_headers)
         self.files_model.check_changed_callback = self.on_selection_checked
         files_page = QtWidgets.QWidget()
         files_layout = QtWidgets.QVBoxLayout(files_page)
         files_buttons = QtWidgets.QHBoxLayout()
-        self.btn_open_selected_files = QtWidgets.QPushButton("Abrir seleccion")
+        self.btn_open_selected_files = QtWidgets.QPushButton("Abrir selección")
         self.btn_copy_file_paths = QtWidgets.QPushButton("Copiar rutas")
         files_buttons.addWidget(self.btn_open_selected_files)
         files_buttons.addWidget(self.btn_copy_file_paths)
@@ -757,14 +778,14 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         compare_controls = QtWidgets.QHBoxLayout()
         compare_layout.addLayout(compare_controls)
         self.compare_view_combo = QtWidgets.QComboBox()
-        self.compare_view_combo.addItems(["Senal IR/RED", "BPM", "SpO2", "Temperatura", "Calidad"])
+        self.compare_view_combo.addItems(["Señal IR/RED", "BPM", "SpO2", "Temperatura", "Calidad"])
         self.btn_remove_compare = QtWidgets.QPushButton("Quitar seleccionado")
         compare_controls.addWidget(QtWidgets.QLabel("Vista"))
         compare_controls.addWidget(self.compare_view_combo)
         compare_controls.addWidget(self.btn_remove_compare)
         compare_controls.addStretch(1)
         self.compare_table = QtWidgets.QTableWidget(0, 6)
-        self.compare_table.setHorizontalHeaderLabels(["Animal", "Fecha", "Modo", "Configuracion", "Fuente", "Archivo"])
+        self.compare_table.setHorizontalHeaderLabels(["Animal", "Fecha", "Modo", "Configuración", "Fuente", "Archivo"])
         self.compare_table.verticalHeader().setVisible(False)
         self.compare_table.setAlternatingRowColors(True)
         self.compare_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -772,7 +793,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.compare_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.compare_table.doubleClicked.connect(self.open_compare_source)
         compare_layout.addWidget(self.compare_table, stretch=1)
-        self.compare_plot = pg.PlotWidget(title="Comparacion de raws")
+        self.compare_plot = pg.PlotWidget(title="Comparación de raws")
         self.compare_plot.setBackground("w")
         self.compare_plot.showGrid(x=True, y=True, alpha=0.25)
         self.compare_plot.setLabel("bottom", "Tiempo relativo", units="s")
@@ -1148,8 +1169,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "_selection_session_key": session.key,
             "_selection_capture_key": "",
             "_selection_checked": self.selection_checked(selection_key),
-            "_selection_tooltip": "Seleccionar sesion para correo o revisar raws asociados",
-            "Sesion": session.name,
+            "_selection_tooltip": "Seleccionar sesión para correo o revisar raws asociados",
+            "Sesión": session.name,
             "Fecha": min(dates) if dates else "",
             "Inicio": min(hours) if hours else "",
             "Modos": ", ".join(modes),
@@ -1408,7 +1429,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_session = session
         self.current_capture = None
         if session is None:
-            self.captures_label.setText("Raws / tomas de la sesion seleccionada")
+            self.captures_label.setText("Raws / tomas de la sesión seleccionada")
             self.captures_model.set_rows(self.visible_capture_headers([]), [])
             self.fit_selection_column(self.captures_table)
             self.set_capture(None)
@@ -1492,10 +1513,10 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Especie": animal_label(cap.value("animal_type")) if cap.value("animal_type") else "",
             "Modo": _mode_label(cap.value("modo")),
             "Sensor": cap.value("ubre"),
-            "Termometros": self._display_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type")),
+            "Termómetros": self._display_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type")),
             "Canal temp": cap.value("temp_primary_channel"),
-            "Medicion": cap.value("medicion_vacio"),
-            "Configuracion": cap.value("config_label"),
+            "Medición": cap.value("medicion_vacio"),
+            "Configuración": cap.value("config_label"),
             "Estado": state,
             "Pulso ref.": fmt(ref_avg, 1, ""),
             "Dif. BPM-ref": fmt(diff_ref, 1, ""),
@@ -1505,7 +1526,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "BPM picos": fmt(_as_float(cap.value("bpm_peak")), 0, ""),
             "BPM FFT": fmt(_as_float(cap.value("bpm_fft")), 0, ""),
             "BPM autocorr": fmt(_as_float(cap.value("bpm_autocorr")), 0, ""),
-            "Oxigeno medio": fmt(_as_float(cap.value("spo2_pct")), 1, ""),
+            "Oxígeno medio": fmt(_as_float(cap.value("spo2_pct")), 1, ""),
             "Ratio R": fmt(_as_float(cap.value("ratio_r")), 4, ""),
             "Resp/min (experimental)": fmt(_as_float(_cap_first(cap, "resp_rate_rpm", "resp_min_exp")), 1, ""),
             "Calidad resp.": fmt(_as_float(_cap_first(cap, "resp_quality", "resp_calidad_exp")), 0, ""),
@@ -1541,7 +1562,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "RATE": cap.value("cfg_rate"),
             "WIDTH": cap.value("cfg_width"),
             "ADC": cap.value("cfg_adc"),
-            "Duracion": fmt(_as_float(cap.value("duracion_real_s")), 1, ""),
+            "Duración": fmt(_as_float(cap.value("duracion_real_s")), 1, ""),
             "Hz": fmt(_as_float(cap.value("hz_real")), 1, ""),
             "Muestras": cap.value("muestras"),
             "Pulso previo": cap.value("pulso_previo"),
@@ -1671,17 +1692,17 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 "_selection_session_key": cap.session_key,
                 "_selection_capture_key": self._capture_delete_key(cap),
                 "_selection_checked": self.selection_checked(selection_key),
-                "_selection_tooltip": "Seleccionar archivo para correo o revisar eliminacion",
+                "_selection_tooltip": "Seleccionar archivo para correo o revisar eliminación",
                 "tipo": kind,
                 "archivo": path.name,
-                "filas": str(len(_read_csv(path))) if path.suffix.lower() == ".csv" else "",
+                "filas": str(_csv_row_count(path)) if path.suffix.lower() == ".csv" else "",
                 "ruta": str(path),
             })
         self.files_model.set_rows(self.files_headers, file_rows)
-        raw_rows = _read_csv(cap.files["raw"], limit=5000) if "raw" in cap.files else []
-        proc_rows = _read_csv(cap.files["processed"], limit=5000) if "processed" in cap.files else []
         raw_rows_full = _read_csv(cap.files["raw"]) if "raw" in cap.files else []
         proc_rows_full = _read_csv(cap.files["processed"]) if "processed" in cap.files else []
+        raw_rows = raw_rows_full[:5000]
+        proc_rows = proc_rows_full[:5000]
         block_rows = _read_csv(cap.files["blocks"], limit=5000) if "blocks" in cap.files else []
         self.files_table.resizeColumnsToContents()
         self.fit_selection_column(self.files_table)
@@ -1798,7 +1819,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def delete_checked_items(self):
         capture_choices, standalone_paths = self._checked_delete_choices()
         if not capture_choices and not standalone_paths:
-            QtWidgets.QMessageBox.information(self, "Eliminar", "Selecciona primero una sesion, toma/raw o archivo.")
+            QtWidgets.QMessageBox.information(self, "Eliminar", "Selecciona primero una sesión, toma/raw o archivo.")
             return
         selected_captures, selected_paths = self._pick_delete_targets(capture_choices, standalone_paths)
         if not selected_captures and not selected_paths:
@@ -1809,32 +1830,35 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         }
         paths = self._delete_paths_for_targets(selected_captures, selected_paths)
         if not paths:
-            QtWidgets.QMessageBox.information(self, "Eliminar", "No hay archivos existentes asociados a la seleccion.")
+            QtWidgets.QMessageBox.information(self, "Eliminar", "No hay archivos existentes asociados a la selección.")
             return
         detail_lines = [str(path) for path in paths]
         session_notes = self._session_update_notes(selected_captures)
         preview_lines = detail_lines[:25]
         if len(detail_lines) > len(preview_lines):
-            preview_lines.append(f"... y {len(detail_lines) - len(preview_lines)} archivo(s) mas")
+            preview_lines.append(f"... y {len(detail_lines) - len(preview_lines)} archivo(s) más")
         msg = QtWidgets.QMessageBox(self)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-        msg.setWindowTitle("Confirmar eliminacion")
-        msg.setText(f"Se van a eliminar {len(paths)} archivo(s).")
-        msg.setInformativeText("\n".join(preview_lines + session_notes) + "\n\nEsta accion no se puede deshacer.")
+        msg.setWindowTitle("Confirmar eliminación")
+        msg.setText(f"Se van a mover {len(paths)} archivo(s) a la papelera interna.")
+        msg.setInformativeText("\n".join(preview_lines + session_notes) + "\n\nLos archivos se conservaran en resultados/.trash.")
         msg.setDetailedText("\n".join(detail_lines + session_notes))
-        delete_btn = msg.addButton("Eliminar seleccionados", QtWidgets.QMessageBox.ButtonRole.DestructiveRole)
+        delete_btn = msg.addButton("Mover a papelera", QtWidgets.QMessageBox.ButtonRole.DestructiveRole)
         msg.addButton("Cancelar", QtWidgets.QMessageBox.ButtonRole.RejectRole)
         msg.exec()
         if msg.clickedButton() != delete_btn:
             return
-        deleted = 0
+        moved = 0
         failed_paths: dict[Path, str] = {}
+        trash_batch = TrashBatch(source="relations_window")
         for path in paths:
-            ok, error = self._unlink_selected_path(path)
+            ok, error = self._trash_selected_path(path, trash_batch)
             if ok:
-                deleted += 1
+                moved += 1
             else:
                 failed_paths[path] = error
+        manifest_ok, manifest_error = trash_batch.write_manifest()
+        manifest_errors = [] if manifest_ok else [f"{trash_batch.batch_dir / 'manifest.json'}: {manifest_error}"]
         successful_captures = [
             cap for cap in selected_captures
             if paths_by_capture.get(self._capture_delete_key(cap))
@@ -1843,16 +1867,21 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         session_errors, failed_sessions = self._remove_capture_rows_from_sessions(successful_captures)
         self._keep_failed_delete_selection(selected_captures, selected_paths, failed_paths, failed_sessions)
         self.reload_data()
-        if failed_paths or session_errors:
+        if failed_paths or session_errors or manifest_errors:
             errors = [f"{path}: {reason}" for path, reason in failed_paths.items()]
             errors.extend(session_errors)
+            errors.extend(manifest_errors)
             QtWidgets.QMessageBox.warning(
                 self,
                 "Eliminar",
-                f"Eliminados {deleted} archivo(s), pero hubo {len(errors)} error(es).\n\n" + "\n".join(errors[:10]),
+                f"Movidos {moved} archivo(s) a papelera, pero hubo {len(errors)} error(es).\n\n" + "\n".join(errors[:10]),
             )
         else:
-            QtWidgets.QMessageBox.information(self, "Eliminar", f"Eliminados {deleted} archivo(s).")
+            QtWidgets.QMessageBox.information(
+                self,
+                "Eliminar",
+                f"Movidos {moved} archivo(s) a papelera interna:\n\n{trash_batch.batch_dir}",
+            )
 
     def _checked_delete_choices(self) -> tuple[dict[str, tuple[CaptureRecord, bool]], list[Path]]:
         captures: dict[str, tuple[CaptureRecord, bool]] = {}
@@ -1883,16 +1912,16 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         standalone_paths: list[Path],
     ) -> tuple[list[CaptureRecord], list[Path]]:
         dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Seleccionar que eliminar")
+        dialog.setWindowTitle("Seleccionar qué mover a papelera")
         dialog.resize(780, 520)
         layout = QtWidgets.QVBoxLayout(dialog)
         info = QtWidgets.QLabel(
-            "Revisa la seleccion antes de borrar. Las sesiones muestran sus raws para que marques solo los que quieres eliminar."
+            "Revisa la selección antes de moverla a papelera. Las sesiones muestran sus raws para que marques solo los que quieres retirar."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
         tree = QtWidgets.QTreeWidget()
-        tree.setHeaderLabels(["Eliminar", "Toma o archivo", "Relacionados"])
+        tree.setHeaderLabels(["Mover", "Toma o archivo", "Relacionados"])
         tree.setRootIsDecorated(True)
         capture_by_key = {key: cap for key, (cap, _checked) in capture_choices.items()}
         path_by_key = {str(path): path for path in standalone_paths}
@@ -1919,7 +1948,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         buttons = QtWidgets.QHBoxLayout()
         btn_all = QtWidgets.QPushButton("Marcar todos")
         btn_none = QtWidgets.QPushButton("Desmarcar")
-        btn_delete = QtWidgets.QPushButton("Eliminar seleccionados")
+        btn_delete = QtWidgets.QPushButton("Mover a papelera")
         btn_cancel = QtWidgets.QPushButton("Cancelar")
         buttons.addWidget(btn_all)
         buttons.addWidget(btn_none)
@@ -1988,18 +2017,8 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 paths.append(path)
         return paths
 
-    def _unlink_selected_path(self, path: Path) -> tuple[bool, str]:
-        try:
-            try:
-                path.chmod(path.stat().st_mode | stat.S_IWRITE)
-            except OSError:
-                pass
-            path.unlink()
-            return True, ""
-        except PermissionError as exc:
-            return False, f"permiso denegado o archivo en uso ({exc})"
-        except OSError as exc:
-            return False, str(exc)
+    def _trash_selected_path(self, path: Path, trash_batch: TrashBatch) -> tuple[bool, str]:
+        return trash_batch.move(path)
 
     def _keep_failed_delete_selection(
         self,
@@ -2031,7 +2050,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         sessions = sorted({cap.files["session"] for cap in captures if cap.files.get("session")})
         if not sessions:
             return []
-        return [f"Actualizar CSV de sesion sin borrar el archivo: {path}" for path in sessions]
+        return [f"Actualizar CSV de sesión sin mover el archivo: {path}" for path in sessions]
 
     def _remove_capture_rows_from_sessions(self, captures: list[CaptureRecord]) -> tuple[list[str], set[Path]]:
         by_session: dict[Path, set[str]] = {}
@@ -2058,13 +2077,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     continue
                 kept.append(row)
             try:
-                with open(session_path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
+                with atomic_csv_dict_writer(session_path, fieldnames, delimiter=";") as writer:
                     writer.writeheader()
                     writer.writerows(kept)
             except OSError as exc:
                 failed_sessions.add(session_path)
-                errors.append(f"{session_path}: no se pudo actualizar la sesion ({exc})")
+                errors.append(f"{session_path}: no se pudo actualizar la sesión ({exc})")
                 continue
         return errors, failed_sessions
 
@@ -2154,7 +2172,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     def update_compare_plot(self):
         self.compare_plot.clear()
         self.compare_plot.setLabel("bottom", "Tiempo relativo", units="s")
-        view = self.compare_view_combo.currentText() if hasattr(self, "compare_view_combo") else "Senal IR/RED"
+        view = self.compare_view_combo.currentText() if hasattr(self, "compare_view_combo") else "Señal IR/RED"
         colors = [
             (0, 80, 220), (220, 40, 35), (40, 150, 70), (150, 70, 160),
             (220, 130, 30), (20, 130, 140), (110, 90, 200), (120, 120, 120),
@@ -2172,12 +2190,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 continue
             color = colors[idx % len(colors)]
             label = self._compare_label(cap, kind)
-            if view == "Senal IR/RED":
+            if view == "Señal IR/RED":
                 ir = self._compare_series(rows, "ir_proc_norm", "ir_raw")
                 red = self._compare_series(rows, "red_proc_norm", "red_raw")
                 plotted += self._plot_compare_series(t, ir, color, f"{label} IR", QtCore.Qt.PenStyle.SolidLine, width=2)
                 plotted += self._plot_compare_series(t, red, color, f"{label} RED", QtCore.Qt.PenStyle.DashLine, width=1)
-                self.compare_plot.setLabel("left", "Senal")
+                self.compare_plot.setLabel("left", "Señal")
             elif view == "BPM":
                 plotted += self._plot_compare_series(t, self._compare_series(rows, "bpm_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
                 self.compare_plot.setLabel("left", "BPM")
@@ -2191,7 +2209,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             elif view == "Calidad":
                 plotted += self._plot_compare_series(t, self._compare_series(rows, "quality_rolling_5s"), color, label, QtCore.Qt.PenStyle.SolidLine, width=2)
                 self.compare_plot.setLabel("left", "Calidad")
-        self.compare_plot.setTitle(f"Comparacion de raws | {view} | {len(self.compare_items)} seleccionado(s), {plotted} curva(s)")
+        self.compare_plot.setTitle(f"Comparación de raws | {view} | {len(self.compare_items)} seleccionado(s), {plotted} curva(s)")
 
     def _compare_label(self, cap: CaptureRecord, kind: str) -> str:
         pieces = [cap.value("id") or cap.base_name, cap.value("config_label") or kind]
@@ -2300,23 +2318,23 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if np.isfinite(quality) and quality < 45:
             warnings.append("Calidad global baja: interpretar con cautela.")
         if np.isfinite(pi_ir) and pi_ir < 0.15:
-            warnings.append("Perfusion/PI IR bajo: el pulso tiene poca amplitud relativa.")
+            warnings.append("Perfusión/PI IR bajo: el pulso tiene poca amplitud relativa.")
         if np.isfinite(artifacts) and artifacts > 8:
             warnings.append("Artefactos IR elevados: posible movimiento, contacto irregular o ruido.")
         if np.isfinite(saturation) and saturation > 0:
             warnings.append("Hay muestras saturadas: revisar potencia LED/rango ADC.")
         if np.isfinite(spo2):
-            warnings.append("Oxigeno calculado de forma no calibrada; usar como orientacion tecnica, no como valor clinico.")
+            warnings.append("Oxígeno calculado de forma no calibrada; usar como orientación técnica, no como valor clínico.")
         if np.isfinite(resp):
             warnings.append("Respiraciones calculadas de forma experimental desde modulaciones lentas de PPG; validar con referencia externa.")
         if np.isfinite(diff_ref) and diff_ref > 12:
             warnings.append(f"La BPM media queda a {diff_ref:.1f} BPM de la referencia manual; revisar contacto/configuracion o la anotacion manual.")
         reason_text = cap.value("metrics_reason") or ""
         if "cribado robusto" in reason_text.lower():
-            warnings.append("El calculo ya aplica cribado robusto: el raw se conserva completo, pero las muestras inestables no pesan en la estimacion.")
+            warnings.append("El cálculo ya aplica cribado robusto: el raw se conserva completo, pero las muestras inestables no pesan en la estimación.")
 
         if not warnings:
-            warnings.append("Sin avisos tecnicos destacados en las metricas guardadas.")
+            warnings.append("Sin avisos técnicos destacados en las métricas guardadas.")
 
         def row(name: str, value: str) -> str:
             return f"<tr><td><b>{html.escape(name)}</b></td><td>{html.escape(value)}</td></tr>"
@@ -2326,15 +2344,15 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Especie", animal_label(cap.value("animal_type")) if cap.value("animal_type") else "-"),
             ("Modo de recogida", _mode_label(cap.value("modo")) or "-"),
             ("Fecha y hora", f"{cap.value('fecha')} {cap.value('hora')}".strip() or "-"),
-            ("Configuracion", cap.value("config_label") or "-"),
-            ("Descripcion configuracion", cap.value("config_description") or "-"),
+            ("Configuración", cap.value("config_label") or "-"),
+            ("Descripción configuración", cap.value("config_description") or "-"),
             ("Sensor", cap.value("ubre") or "-"),
-            ("Termometros", self._display_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type")) or "-"),
+            ("Termómetros", self._display_temp_mapping(cap.value("temp_mapping"), cap.value("animal_type")) or "-"),
             ("Canal temp primario", cap.value("temp_primary_channel") or "-"),
-            ("Medicion", cap.value("medicion_vacio") or "-"),
+            ("Medición", cap.value("medicion_vacio") or "-"),
             ("Condiciones", cap.value("condiciones_medida") or "-"),
             ("Anotaciones finales", cap.value("anotaciones_finales") or "-"),
-            ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) validas; 0/vacio se ignora)"),
+            ("Pulso ref. medio", f"{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s) válidas; 0/vacío se ignora)"),
             ("Pulso previo / temp inicio / pulsio final / fonendo final", f"{cap.value('pulso_previo') or '-'} / {cap.value('temperatura_manual_inicio_c') or '-'} / {cap.value('pulso_final_pulsio') or '-'} / {cap.value('pulso_final_fonendo') or '-'}"),
             ("Temp manual RT / LT", f"{cap.value('temperatura_manual_inicio_rt_c') or '-'} / {cap.value('temperatura_manual_inicio_lt_c') or '-'}"),
             ("Temp manual FLT / FRT / RLT / RRT", f"{cap.value('temperatura_manual_inicio_flt_c') or '-'} / {cap.value('temperatura_manual_inicio_frt_c') or '-'} / {cap.value('temperatura_manual_inicio_rlt_c') or '-'} / {cap.value('temperatura_manual_inicio_rrt_c') or '-'}"),
@@ -2342,17 +2360,17 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("BPM medio", fmt(bpm, 1, "-")),
             ("BPM estable 5 s", f"{fmt(_as_float(cap.value('bpm_estable_5s')), 1, '-')} BPM | {fmt(_as_float(cap.value('bpm_estable_inicio_s')), 2, '-')}-{fmt(_as_float(cap.value('bpm_estable_fin_s')), 2, '-')} s"),
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
-            ("Oxigeno medio", f"{fmt(spo2, 1, '-')} %"),
+            ("Oxígeno medio", f"{fmt(spo2, 1, '-')} %"),
             ("Ratio R", fmt(_as_float(cap.value("ratio_r")), 5, "-")),
             ("Respiraciones (experimental)", f"{fmt(resp, 1, '-')} resp/min | calidad {fmt(resp_quality, 0, '-')}"),
             ("Calidad", f"{fmt(quality, 1, '-')} | {cap.value('calidad_label') or '-'}"),
             ("Contacto", cap.value("contacto") or "-"),
             ("PI IR / PI RED", f"{fmt(pi_ir, 4, '-')} % / {fmt(_as_float(cap.value('pi_red_pct')), 4, '-')} %"),
             ("Artefactos IR / RED", f"{fmt(artifacts, 1, '-')} % / {fmt(_as_float(cap.value('artefactos_red_pct')), 1, '-')} %"),
-            ("Saturacion", f"{fmt(saturation, 1, '-')} %"),
+            ("Saturación", f"{fmt(saturation, 1, '-')} %"),
             ("Temperatura RT / LT final", f"{fmt(self._position_temp_final(cap, 'RT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'LT'), 2, '-')} C"),
             ("Temperatura FLT / FRT / RLT / RRT final", f"{fmt(self._position_temp_final(cap, 'FLT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'FRT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'RLT'), 2, '-')} / {fmt(self._position_temp_final(cap, 'RRT'), 2, '-')} C"),
-            ("Duracion real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
+            ("Duración real / Hz real / muestras", f"{fmt(_as_float(cap.value('duracion_real_s')), 2, '-')} s / {fmt(_as_float(cap.value('hz_real')), 2, '-')} Hz / {cap.value('muestras') or '-'}"),
             ("Motivo fin", cap.value("motivo_fin") or "-"),
             ("Nexo interno", cap.capture_id),
         ]
@@ -2362,12 +2380,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         resp_reason = _cap_first(cap, "resp_reason", "resp_razon_exp") or "-"
         return f"""
         <h2>Toma seleccionada</h2>
-        <p><b>Lectura rapida:</b> esta vista resume como fue la toma, que estimadores coincidieron, si hubo contacto util y que limitaciones tecnicas debe tener presentes quien revise los datos.</p>
+        <p><b>Lectura rápida:</b> esta vista resume cómo fue la toma, qué estimadores coincidieron, si hubo contacto útil y qué limitaciones técnicas debe tener presentes quien revise los datos.</p>
         <table cellspacing='8'>{rows}</table>
-        <h3>Avisos de interpretacion</h3>
+        <h3>Avisos de interpretación</h3>
         <ul>{warning_items}</ul>
-        <p><b>Razon interna del calculo:</b> {html.escape(reason)}</p>
-        <p><b>Razon respiracion (experimental):</b> {html.escape(resp_reason)}</p>
+        <p><b>Razón interna del cálculo:</b> {html.escape(reason)}</p>
+        <p><b>Razón respiración (experimental):</b> {html.escape(resp_reason)}</p>
         """
 
     def _params_html(self, cap: CaptureRecord) -> str:
@@ -2375,7 +2393,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return f"<tr><td><b>{html.escape(name)}</b></td><td>{html.escape(value or '-')}</td></tr>"
 
         sensor_fields = [
-            ("Configuracion", cap.value("config_label")),
+            ("Configuración", cap.value("config_label")),
             ("Descripcion", cap.value("config_description")),
             ("RED", cap.value("cfg_red")),
             ("IR", cap.value("cfg_ir")),
@@ -2385,11 +2403,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("ADC", cap.value("cfg_adc")),
             ("SKIP", cap.value("cfg_skip")),
             ("DEBUG", cap.value("cfg_debug")),
-            ("Confirmacion Arduino", cap.value("cfg_confirmacion")),
+            ("Confirmación Arduino", cap.value("cfg_confirmacion")),
         ]
         analysis_fields = [
-            ("BPM minimo", cap.value("analysis_bpm_min")),
-            ("BPM maximo", cap.value("analysis_bpm_max")),
+            ("BPM mínimo", cap.value("analysis_bpm_min")),
+            ("BPM máximo", cap.value("analysis_bpm_max")),
             ("Detrend", f"{cap.value('analysis_detrend_seconds')} s" if cap.value("analysis_detrend_seconds") else ""),
             ("Suavizado", f"{cap.value('analysis_smooth_seconds')} s" if cap.value("analysis_smooth_seconds") else ""),
             ("Ignorar inicio", f"{cap.value('analysis_ignore_initial_seconds')} s" if cap.value("analysis_ignore_initial_seconds") else ""),
@@ -2398,11 +2416,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         sensor_rows = "".join(row(name, value) for name, value in sensor_fields)
         analysis_rows = "".join(row(name, value) for name, value in analysis_fields)
         return f"""
-        <h2>Parametros dispositivo</h2>
-        <p>Estos son los parametros de sensor y analisis asociados al raw seleccionado. Sirven para saber exactamente con que configuracion se genero la toma.</p>
+        <h2>Parámetros dispositivo</h2>
+        <p>Estos son los parámetros de sensor y análisis asociados al raw seleccionado. Sirven para saber exactamente con qué configuración se generó la toma.</p>
         <h3>Sensor MAX3010x</h3>
         <table cellspacing='8'>{sensor_rows}</table>
-        <h3>Analisis usado al guardar resumen</h3>
+        <h3>Análisis usado al guardar resumen</h3>
         <table cellspacing='8'>{analysis_rows}</table>
         """
 
@@ -2498,7 +2516,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.plot_stable.plot(x, self._normalized_for_display(red[mask]), pen=pg.mkPen((220, 40, 35), width=1), name="RED")
         self.plot_stable.setTitle(f"Segmento estable | {fmt(bpm, 1, '-')} BPM | origen {fmt(start, 1, '-')}-{fmt(end, 1, '-')} s")
         self.plot_stable.setLabel("bottom", "Tiempo del tramo", units="s")
-        self.plot_stable.setLabel("left", "Senal normalizada")
+        self.plot_stable.setLabel("left", "Señal normalizada")
         self.plot_stable.setXRange(0.0, window_len, padding=0.02)
 
     def _fft_spectrum_for_rows(
@@ -2555,7 +2573,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         if using_stable:
             freqs_bpm, spectrum, bpm_fft = self._fft_spectrum_for_rows(cap, rows, stable_start, stable_end)
             bpm_calc = stable_bpm
-            source_label = f"Tramo estable {fmt(stable_start, 2, '-')}-{fmt(stable_end, 2, '-')} s"
+            source_label = f"Ventana estable {fmt(stable_start, 2, '-')}-{fmt(stable_end, 2, '-')} s"
         else:
             freqs_bpm, spectrum, bpm_fft = self._fft_spectrum_for_rows(cap, rows)
             bpm_calc = _as_float(cap.value("bpm"))
@@ -2563,18 +2581,19 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 bpm_calc = _as_float(cap.value("bpm_fft"))
             if not np.isfinite(bpm_calc):
                 bpm_calc = bpm_fft
-            source_label = "Toma completa (sin tramo estable disponible)"
+            source_label = "Toma completa (sin ventana estable disponible)"
         diff = abs(bpm_calc - ref_avg) if np.isfinite(bpm_calc) and np.isfinite(ref_avg) else math.nan
         self.comparison_graph_info.setHtml(
             "<table cellspacing='8'>"
-            f"<tr><td><b>Fuente</b></td><td>{source_label}</td></tr>"
-            f"<tr><td><b>BPM marcado</b></td><td>{fmt(bpm_calc, 1, '-')} BPM</td></tr>"
-            f"<tr><td><b>BPM ref.</b></td><td>{fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s))</td></tr>"
+            f"<tr><td><b>Fuente FFT</b></td><td>{source_label}</td></tr>"
+            f"<tr><td><b>Línea roja</b></td><td>BPM estable/calculado: {fmt(bpm_calc, 1, '-')} BPM</td></tr>"
+            f"<tr><td><b>Línea naranja</b></td><td>Pico dominante FFT IR: {fmt(bpm_fft, 1, '-')} BPM</td></tr>"
+            f"<tr><td><b>Línea verde</b></td><td>Referencia manual: {fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s))</td></tr>"
             f"<tr><td><b>Diferencia</b></td><td>{fmt(diff, 1, '-')} BPM</td></tr>"
             "</table>"
         )
         if not freqs_bpm.size or not spectrum.size:
-            self.plot_reference_compare.setTitle("BPM calculado vs referencia manual")
+            self.plot_reference_compare.setTitle("Espectro FFT y referencias de BPM")
             return
         mask = (freqs_bpm >= 20) & (freqs_bpm <= 240)
         x = freqs_bpm[mask]
@@ -2584,10 +2603,12 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.plot_reference_compare.plot(x, y, pen=pg.mkPen((0, 80, 220), width=2), name="Espectro IR")
         if np.isfinite(bpm_calc):
             self.plot_reference_compare.addItem(pg.InfiniteLine(pos=bpm_calc, angle=90, pen=pg.mkPen((220, 40, 35), width=2)))
+        if np.isfinite(bpm_fft):
+            self.plot_reference_compare.addItem(pg.InfiniteLine(pos=bpm_fft, angle=90, pen=pg.mkPen((230, 130, 20), width=2, style=QtCore.Qt.PenStyle.DashLine)))
         if np.isfinite(ref_avg):
             self.plot_reference_compare.addItem(pg.InfiniteLine(pos=ref_avg, angle=90, pen=pg.mkPen((20, 140, 70), width=2, style=QtCore.Qt.PenStyle.DashLine)))
         self.plot_reference_compare.setTitle(
-            f"{source_label} | BPM {fmt(bpm_calc, 1, '-')} | ref {fmt(ref_avg, 1, '-')} | dif {fmt(diff, 1, '-')} BPM"
+            f"FFT {source_label} | rojo BPM estable {fmt(bpm_calc, 1, '-')} | naranja pico FFT {fmt(bpm_fft, 1, '-')} | verde ref {fmt(ref_avg, 1, '-')}"
         )
         self.plot_reference_compare.setLabel("bottom", "Frecuencia", units="BPM")
         self.plot_reference_compare.setLabel("left", "Magnitud normalizada")
@@ -2612,7 +2633,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 spo2 = np.asarray([_as_float(r.get("spo2_rolling_5s", "")) for r in rows], dtype=float)
                 mask = mask_t & np.isfinite(spo2)
                 if np.any(mask):
-                    self.plot_capture.plot(t[mask], spo2[mask], pen=pg.mkPen((150, 70, 160), width=2), name="Oxigeno")
+                    self.plot_capture.plot(t[mask], spo2[mask], pen=pg.mkPen((150, 70, 160), width=2), name="Oxígeno")
             if self.chk_temp.isChecked():
                 temp_colors = [(220, 120, 30), (20, 130, 140), (120, 80, 190), (170, 90, 40), (80, 140, 70), (180, 70, 120)]
                 for idx, (label, temp, style) in enumerate(self._temperature_series_for_rows(rows)):

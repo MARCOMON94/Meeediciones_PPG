@@ -11,6 +11,7 @@ import numpy as np
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from ..animal_config import POSITION_SUMMARY_PREFIXES, TEMP_CHANNELS, animal_label, parse_temp_mapping, position_values_from_channels
+from ..io_utils import atomic_csv_writer, atomic_write_json
 from ..models import SensorConfig
 from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message, stable_bpm_segment
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
@@ -167,7 +168,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.btn_refresh_ports.clicked.connect(self.refresh_ports)
         self.btn_connect.clicked.connect(self.connect_selected_port)
 
-        self.sensor_widget = SensorConfigWidget("Configuracion MAX3010x actual")
+        self.sensor_widget = SensorConfigWidget("Configuración MAX3010x actual")
         left.addWidget(self.sensor_widget)
         self.analysis_widget = AnalysisConfigWidget()
         self.analysis_widget.setVisible(False)
@@ -184,7 +185,7 @@ class ScheduledConfigWindow(PPGSuite):
         self.temp_mapping_widget = self.create_temp_mapping_widget()
         self.temp_monitor_widget = self.create_temp_monitor_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
-        self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
+        self.vacuum_combo.addItems(["", "con vacío", "sin vacío"])
         self.condition_edit = QtWidgets.QLineEdit(self.scheduled_condition)
         self.duration_spin = NoWheelDoubleSpinBox()
         self.duration_spin.setRange(1, 120)
@@ -199,7 +200,7 @@ class ScheduledConfigWindow(PPGSuite):
         form.addRow("Sensor:", self.udder_combo)
         form.addRow("Termometros:", self.temp_mapping_widget)
         form.addRow("Temperatura:", self.temp_monitor_widget)
-        form.addRow("Medicion:", self.vacuum_combo)
+        form.addRow("Medición:", self.vacuum_combo)
         form.addRow("Anotaciones inicio:", self.condition_edit)
         form.addRow("Duración total:", self.duration_spin)
         self.duration_warning = QtWidgets.QLabel(
@@ -356,7 +357,7 @@ class ScheduledConfigWindow(PPGSuite):
         info = QtWidgets.QLabel(
             f"Terminada:\n{previous_step.label}\n\n"
             f"Siguiente:\n{next_label}\n\n"
-            "Introduce las lecturas manuales. Los valores 0 o vacios se ignoraran en la media de referencia."
+            "Introduce las lecturas manuales. Los valores 0 o vacíos se ignorarán en la media de referencia."
         )
         info.setWordWrap(True)
         pulsio = QtWidgets.QLineEdit()
@@ -364,7 +365,7 @@ class ScheduledConfigWindow(PPGSuite):
         fonendo = QtWidgets.QLineEdit()
         fonendo.setPlaceholderText("Opcional. Ej.: 74")
         notes = QtWidgets.QPlainTextEdit()
-        notes.setPlaceholderText("Anotaciones de esta configuracion: movimiento, recolocacion, cambio de apoyo, incidencia...")
+        notes.setPlaceholderText("Anotaciones de esta configuración: movimiento, recolocación, cambio de apoyo, incidencia...")
         notes.setMinimumHeight(74)
         form.addRow(info)
         form.addRow("Pulsioximetro:", pulsio)
@@ -382,12 +383,12 @@ class ScheduledConfigWindow(PPGSuite):
         if not self.scheduled_segments:
             return "", "", ""
         dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Pulso final de la ultima configuracion")
+        dialog.setWindowTitle("Pulso final de la última configuración")
         form = QtWidgets.QFormLayout(dialog)
         step = self.scheduled_segments[-1].step
         info = QtWidgets.QLabel(
             f"Terminada:\n{step.label}\n\n"
-            "Introduce la lectura final del pulsioximetro para esta ultima configuracion."
+            "Introduce la lectura final del pulsioxímetro para esta última configuración."
         )
         info.setWordWrap(True)
         pulsio = QtWidgets.QLineEdit(self.scheduled_segments[-1].pulse_final_pulsio)
@@ -395,7 +396,7 @@ class ScheduledConfigWindow(PPGSuite):
         fonendo = QtWidgets.QLineEdit(self.scheduled_segments[-1].pulse_final_fonendo)
         fonendo.setPlaceholderText("Opcional. Ej.: 74")
         notes = QtWidgets.QPlainTextEdit(self.scheduled_segments[-1].final_annotations)
-        notes.setPlaceholderText("Anotaciones finales de esta ultima configuracion.")
+        notes.setPlaceholderText("Anotaciones finales de esta última configuración.")
         notes.setMinimumHeight(74)
         form.addRow(info)
         form.addRow("Pulsioximetro final:", pulsio)
@@ -599,7 +600,7 @@ class ScheduledConfigWindow(PPGSuite):
             painter.drawText(QtCore.QRectF(left, 16, right - left, 26), title)
             painter.setFont(QtGui.QFont("Arial", 9))
             painter.setPen(QtGui.QColor("#586673"))
-            painter.drawText(QtCore.QRectF(left, 38, right - left, 18), "IR azul y RED rojo, senales procesadas/normalizadas")
+            painter.drawText(QtCore.QRectF(left, 38, right - left, 18), "IR azul y RED rojo, señales procesadas/normalizadas")
 
             painter.setPen(QtGui.QPen(QtGui.QColor("#d5dde5"), 1))
             painter.drawRect(QtCore.QRectF(left, top, right - left, bottom - top))
@@ -690,8 +691,7 @@ class ScheduledConfigWindow(PPGSuite):
             return channel_values, position_values
 
         raw_file = RAW_DIR / f"raw_{base_name}.csv"
-        with open(raw_file, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, delimiter=";")
+        with atomic_csv_writer(raw_file, delimiter=";") as w:
             w.writerow([
                 "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
                 "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
@@ -743,8 +743,7 @@ class ScheduledConfigWindow(PPGSuite):
             nearest = np.searchsorted(t, peak_t[peaks])
             nearest = nearest[(nearest >= 0) & (nearest < t.size)]
             peak_flags[nearest] = 1
-        with open(processed_file, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, delimiter=";")
+        with atomic_csv_writer(processed_file, delimiter=";") as w:
             w.writerow([
                 "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
                 "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
@@ -775,8 +774,7 @@ class ScheduledConfigWindow(PPGSuite):
                 ])
 
         blocks_file = REPORT_DIR / f"bpm_blocks_10s_{base_name}.csv"
-        with open(blocks_file, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, delimiter=";")
+        with atomic_csv_writer(blocks_file, delimiter=";") as w:
             w.writerow(["session_id", "id", "base_name", "modo", "bloque", "inicio_s", "fin_s", "bpm_medio_10s"])
             for i, bpm in enumerate(blocks):
                 w.writerow([session_id, st.crotal_id, base_name, self.capture_mode_name(), i + 1, i * 10, i * 10 + 10, fmt(bpm, 2, "")])
@@ -784,8 +782,7 @@ class ScheduledConfigWindow(PPGSuite):
         plot_file = FIGURES_DIR / f"plot_{base_name}.png"
         self.save_signal_plot(plot_file, t, red, ir, analysis_cfg, step.label)
         summary_file = REPORT_DIR / f"summary_{base_name}.json"
-        with open(summary_file, "w", encoding="utf-8") as f:
-            json.dump({
+        atomic_write_json(summary_file, {
                 "session_id": session_id,
                 "id": st.crotal_id,
                 "base_name": base_name,
@@ -832,7 +829,7 @@ class ScheduledConfigWindow(PPGSuite):
                     "final": segment.final_annotations,
                 },
                 "created": datetime.now().isoformat(),
-            }, f, indent=2, ensure_ascii=False)
+            })
 
         now = datetime.now()
         self.session_writer.writerow([
@@ -913,7 +910,7 @@ class ScheduledConfigWindow(PPGSuite):
             f"SpO2 estimada: {fmt(m.spo2,1)} % | R={fmt(m.ratio_r,4)}\n"
             f"{spo2_warning_line}"
             f"PI IR/RED: {fmt(m.pi_ir_pct,3)} / {fmt(m.pi_red_pct,3)} %\n"
-            f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} % | Saturacion ADC: {fmt(m.saturation_pct,1)} %\n"
+            f"Artefactos IR/RED: {fmt(m.artifact_ir_pct,1)} / {fmt(m.artifact_red_pct,1)} % | Saturación ADC: {fmt(m.saturation_pct,1)} %\n"
             f"Respiraciones (experimental): {fmt(m.resp_rate_rpm,1)} resp/min | calidad {fmt(m.resp_quality,0)}\n"
             f"Temp: {fmt(temp['temp_c_last'],1)} °C | raw {fmt(temp['temp_raw_last'],0)}\n"
             f"{self.temp_monitor_status_line()}\n"
@@ -1131,7 +1128,7 @@ class ConfigurationsWindow(ScheduledConfigWindow):
                 raise ValueError(f"Fila {row + 1}: valor numerico no valido") from exc
             label = self.generated_config_label(row, cfg)
             self.update_generated_label_for_row(row, label)
-            desc = vals[9] or f"Configuracion personalizada {row + 1}"
+            desc = vals[9] or f"Configuración personalizada {row + 1}"
             steps.append(ScheduledStep(label, desc, cfg))
         if not steps:
             raise ValueError("La tabla no tiene configuraciones.")
@@ -1147,9 +1144,9 @@ class ConfigurationsWindow(ScheduledConfigWindow):
         if seconds_per_config < 10.0:
             QtWidgets.QMessageBox.warning(
                 self,
-                "Duracion corta por configuracion",
+                "Duración corta por configuración",
                 "Cada configuracion tendra menos de 10 segundos.\n\n"
-                "Puede guardarse igualmente, pero el BPM, la calidad y la saturacion pueden salir vacios o poco fiables.\n"
+                "Puede guardarse igualmente, pero el BPM, la calidad y la saturación pueden salir vacíos o poco fiables.\n"
                 "Para comparar configuraciones se recomienda usar al menos 10-15 segundos por fila.",
             )
         self.scheduled_title = f"Configuraciones personalizadas ({len(self.scheduled_steps)})"
@@ -1162,7 +1159,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         self.experiment_max_steps = 12
         self.experiment_history: list[dict[str, float | str | int]] = []
         self.experiment_decisions: list[dict[str, str]] = []
-        self.experiment_last_decision = "Inicio: RED/IR bajos, AVG1 y ADC amplio para evitar saturacion."
+        self.experiment_last_decision = "Inicio: RED/IR bajos, AVG1 y ADC amplio para evitar saturación."
         first_cfg = SensorConfig(red=63, ir=63, avg=4, rate=800, width=411, adc=16384, skip=50)
         placeholder = make_3m_step(1, first_cfg, "inicio conservador")
         steps = [placeholder]
@@ -1184,7 +1181,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         self.duration_spin.setValue(20)
         self.duration_warning.setText(
             "Experimento 3M prueba hasta 12 ajustes en 20 minutos. "
-            "Tras cada tramo pide BPM manual y cambia RED/IR/AVG/ADC buscando pulso parecido a referencia, SpO2 usable, PI suficiente, pocos artefactos y sin saturacion."
+            "Tras cada tramo pide BPM manual y cambia RED/IR/AVG/ADC buscando pulso parecido a referencia, SpO2 usable, PI suficiente, pocos artefactos y sin saturación."
         )
 
     def start_scheduled_capture(self):
@@ -1194,7 +1191,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
             self.scheduled_steps.append(make_3m_step(idx, first_cfg, "pendiente de decision adaptativa"))
         self.experiment_history = []
         self.experiment_decisions = []
-        self.experiment_last_decision = "Inicio: RED/IR bajos, AVG1 y ADC amplio para evitar saturacion."
+        self.experiment_last_decision = "Inicio: RED/IR bajos, AVG1 y ADC amplio para evitar saturación."
         super().start_scheduled_capture()
 
     def _experiment_quality_note(self, diff: float, quality: float, pi_ir: float, pi_red: float, artifact: float, saturation: float, spo2_ready: bool) -> str:
@@ -1220,7 +1217,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         if math.isfinite(artifact) and artifact > 8:
             notes.append("artefactos altos")
         if math.isfinite(saturation) and saturation > 0:
-            notes.append("saturacion detectada")
+            notes.append("saturación detectada")
         return "; ".join(notes)
 
     def _evaluate_experiment_segment(self, segment: ScheduledSegment) -> dict[str, float | str | int]:
@@ -1348,7 +1345,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
         if math.isfinite(saturation) and saturation > 0:
             target_adc = 16384
             target_brightness = max(24, int(float(last.get("ir", 31)) * 0.65))
-            reason_bits.append("baja brillo y mantiene ADC amplio por saturacion")
+            reason_bits.append("baja brillo y mantiene ADC amplio por saturación")
         elif math.isfinite(pi) and pi < 0.08:
             target_brightness = min(159, int(float(last.get("ir", 31)) * 1.8))
             reason_bits.append("sube IR porque el PI IR es muy bajo")
@@ -1422,16 +1419,15 @@ class Experiment3MWindow(ScheduledConfigWindow):
                 "max_duration_min": float(self.duration_spin.value()),
                 "max_steps": self.experiment_max_steps,
                 "search_space_size": len(self.experiment_search_space),
-                "reference_rule": "media de pulso previo, pulsioximetro final y fonendo final; 0/vacio se ignora",
-                "decision_rule": "cercania a referencia manual + calidad PPG + SpO2 usable + PI IR/RED + artefactos + saturacion",
-                "stop_rule": "minimo 4 tramos y mejor candidata con diferencia <=5 BPM, calidad >=55/100, SpO2 usable y saturacion baja",
+                "reference_rule": "media de pulso previo, pulsioxímetro final y fonendo final; 0/vacío se ignora",
+                "decision_rule": "cercanía a referencia manual + calidad PPG + SpO2 usable + PI IR/RED + artefactos + saturación",
+                "stop_rule": "mínimo 4 tramos y mejor candidata con diferencia <=5 BPM, calidad >=55/100, SpO2 usable y saturación baja",
             },
             "best_candidate": best,
             "history": self.experiment_history,
             "decisions": self.experiment_decisions,
         }
-        with open(report_file, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False)
+        atomic_write_json(report_file, payload)
         pdf_file = DOCUMENTS_DIR / f"informe_experimento_3m_{self.state.base_name}.pdf"
         try:
             DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1546,7 +1542,7 @@ class Experiment3MWindow(ScheduledConfigWindow):
             draw_text(
                 f"Animal/crotal: {self.state.crotal_id or '-'} | Motivo de cierre: {reason}. "
                 "El Experimento 3M compara configuraciones del MAX3010x usando la referencia manual como ancla principal, "
-                "y despues penaliza ruido, artefactos, saturacion, PI bajo y SpO2 no usable.",
+                "y después penaliza ruido, artefactos, saturación, PI bajo y SpO2 no usable.",
                 10,
             )
             if best:
@@ -1555,8 +1551,8 @@ class Experiment3MWindow(ScheduledConfigWindow):
                     ["Resultado", "Valor"],
                     [
                         ["Mejor configuracion", str(best.get("label", "-"))],
-                        ["Parametros sensor", best_cfg],
-                        ["Puntuacion", f"{fmt(float(best.get('score', math.nan)), 1, '-')} / 100"],
+                        ["Parámetros sensor", best_cfg],
+                        ["Puntuación", f"{fmt(float(best.get('score', math.nan)), 1, '-')} / 100"],
                         ["Pulso referencia", f"{fmt(float(best.get('ref', math.nan)), 1, '-')} BPM"],
                         ["BPM PPG", f"{fmt(float(best.get('bpm', math.nan)), 1, '-')} BPM"],
                         ["Diferencia", f"{fmt(float(best.get('diff', math.nan)), 1, '-')} BPM"],
@@ -1603,9 +1599,9 @@ class Experiment3MWindow(ScheduledConfigWindow):
             draw_rule()
             draw_text("Criterio de lectura", 15, True)
             draw_text(
-                "La referencia manual es la media de pulso previo, pulsioximetro final y fonendo final; valores 0 o vacios se ignoran. "
-                "La mejor candidata es la que queda mas cerca de esa referencia y mantiene una senal PPG defendible: PI suficiente, pocos artefactos, "
-                "saturacion baja y SpO2 experimental calculable. El resultado orienta la configuracion del sensor; no sustituye validacion fisiologica externa.",
+                "La referencia manual es la media de pulso previo, pulsioxímetro final y fonendo final; valores 0 o vacíos se ignoran. "
+                "La mejor candidata es la que queda más cerca de esa referencia y mantiene una señal PPG defendible: PI suficiente, pocos artefactos, "
+                "saturación baja y SpO2 experimental calculable. El resultado orienta la configuración del sensor; no sustituye validación fisiológica externa.",
                 10,
             )
             footer()

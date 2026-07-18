@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import csv
 import html
-import json
 import math
 import threading
 import time
@@ -14,6 +12,7 @@ from pathlib import Path
 import numpy as np
 from PyQt6 import QtGui, QtWidgets
 
+from ..io_utils import atomic_write_json, atomic_write_text
 from ..models import Metrics
 from ..paths import (
     VACUUM_AUDIO_DIR,
@@ -63,10 +62,10 @@ class VacuumExperimentWindow(PPGSuite):
         self.vacuum_analysis_file: Path | None = None
 
         super().__init__("experimento_vacio")
-        self.setWindowTitle("PPG Suite v8 | Experimento con vacio")
+        self.setWindowTitle("PPG Suite v8 | Experimento con vacío")
         self.duration_spin.setValue(90.0)
-        self.condition_edit.setText("Experimento con vacio: PPG + audio sincronizado")
-        self.btn_start.setText("Iniciar experimento con vacio")
+        self.condition_edit.setText("Experimento con vacío: PPG + audio sincronizado")
+        self.btn_start.setText("Iniciar experimento con vacío")
         self.refresh_audio_devices()
 
     def build_ui(self):
@@ -81,12 +80,12 @@ class VacuumExperimentWindow(PPGSuite):
         if left_layout is None:
             return
 
-        audio_group = QtWidgets.QGroupBox("Microfono")
+        audio_group = QtWidgets.QGroupBox("Micrófono")
         audio_layout = QtWidgets.QGridLayout(audio_group)
         self.audio_device_combo = QtWidgets.QComboBox()
         self.btn_refresh_audio = QtWidgets.QPushButton("Refrescar")
         self.btn_test_audio = QtWidgets.QPushButton("Probar micro")
-        self.audio_status_label = QtWidgets.QLabel("Microfono no comprobado")
+        self.audio_status_label = QtWidgets.QLabel("Micrófono no comprobado")
         self.audio_status_label.setWordWrap(True)
         audio_layout.addWidget(self.audio_device_combo, 0, 0, 1, 2)
         audio_layout.addWidget(self.btn_refresh_audio, 1, 0)
@@ -136,7 +135,7 @@ class VacuumExperimentWindow(PPGSuite):
         return ""
 
     def _clean_audio_device_name(self, raw_name: object, idx: int) -> str:
-        name = " ".join(str(raw_name or f"Microfono {idx}").split())
+        name = " ".join(str(raw_name or f"Micrófono {idx}").split())
         if ";(" in name:
             prefix = name.split("(@", 1)[0].strip()
             friendly = name.rsplit(";(", 1)[-1].rstrip(")").strip()
@@ -167,7 +166,7 @@ class VacuumExperimentWindow(PPGSuite):
         self.audio_device_combo.clear()
         self.audio_device_index = None
         self.audio_device_name = ""
-        status_text = "Microfono no comprobado"
+        status_text = "Micrófono no comprobado"
         try:
             import sounddevice as sd
 
@@ -181,7 +180,7 @@ class VacuumExperimentWindow(PPGSuite):
                 max_inputs = int(dev.get("max_input_channels", 0))
                 if max_inputs <= 0:
                     continue
-                name = self._clean_audio_device_name(dev.get("name", f"Microfono {idx}"), idx)
+                name = self._clean_audio_device_name(dev.get("name", f"Micrófono {idx}"), idx)
                 try:
                     rate = int(float(dev.get("default_samplerate", self.audio_samplerate) or self.audio_samplerate))
                 except (TypeError, ValueError):
@@ -228,7 +227,7 @@ class VacuumExperimentWindow(PPGSuite):
                 selected = self.audio_device_combo.itemData(selected_row) or {}
                 selected_name = str(selected.get("name") or self.audio_device_combo.currentText())
                 default_note = "predeterminado" if selected.get("is_default") else "entrada disponible"
-                status_text = f"Microfono listo: {selected_name} ({default_note})."
+                status_text = f"Micrófono listo: {selected_name} ({default_note})."
         except Exception as exc:
             self.audio_device_combo.addItem("Audio no disponible", None)
             status_text = f"No se pudo listar microfonos: {exc}"
@@ -253,14 +252,14 @@ class VacuumExperimentWindow(PPGSuite):
             self.audio_device_name = ""
         if update_label and hasattr(self, "audio_status_label") and self.audio_stream is None:
             if self.audio_device_name:
-                self.audio_status_label.setText(f"Microfono seleccionado: {self.audio_device_name}")
+                self.audio_status_label.setText(f"Micrófono seleccionado: {self.audio_device_name}")
             else:
                 self.audio_status_label.setText("No hay microfono seleccionado.")
 
     def test_audio_device(self):
         self.select_audio_device(update_label=False)
         if self.audio_device_index is None:
-            QtWidgets.QMessageBox.warning(self, "Microfono", "No hay microfono seleccionado.")
+            QtWidgets.QMessageBox.warning(self, "Micrófono", "No hay micrófono seleccionado.")
             return
         try:
             import sounddevice as sd
@@ -277,17 +276,17 @@ class VacuumExperimentWindow(PPGSuite):
             arr = np.asarray(data, dtype=float).reshape(-1)
             peak = float(np.max(np.abs(arr))) if arr.size else 0.0
             rms = float(np.sqrt(np.mean(arr * arr))) if arr.size else 0.0
-            status = f"Microfono OK: {self.audio_device_name} | pico {peak:.3f} | RMS {rms:.3f}"
+            status = f"Micrófono OK: {self.audio_device_name} | pico {peak:.3f} | RMS {rms:.3f}"
             if peak < 0.005:
-                status += " | senal baja"
+                status += " | señal baja"
             self.audio_status = status
             self.audio_status_label.setText(status)
-            QtWidgets.QMessageBox.information(self, "Microfono", status)
+            QtWidgets.QMessageBox.information(self, "Micrófono", status)
         except Exception as exc:
             device_text = self.audio_device_name or f"microfono {self.audio_device_index}"
             self.audio_status = f"micro no disponible en {device_text}: {exc}"
             self.audio_status_label.setText(self.audio_status)
-            QtWidgets.QMessageBox.warning(self, "Microfono", self.audio_status)
+            QtWidgets.QMessageBox.warning(self, "Micrófono", self.audio_status)
 
     def _audio_callback(self, indata, frames, time_info, status):
         del frames, time_info
@@ -436,7 +435,7 @@ class VacuumExperimentWindow(PPGSuite):
     def update_info(self):
         super().update_info()
         if self.state.capturing or self.audio_status:
-            self.info.setText(self.info.text() + f"\nAudio/vacio: {self.audio_status}\n")
+            self.info.setText(self.info.text() + f"\nAudio/vacío: {self.audio_status}\n")
 
     def _load_audio_samples(self) -> tuple[np.ndarray, int]:
         if self.audio_path is None or not self.audio_path.exists():
@@ -613,11 +612,10 @@ class VacuumExperimentWindow(PPGSuite):
             },
         }
         self.vacuum_analysis_file = self.report_dir / f"analisis_vacio_{st.base_name}.json"
-        with open(self.vacuum_analysis_file, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False)
+        atomic_write_json(self.vacuum_analysis_file, payload)
         self.vacuum_report_file = self.report_dir / f"informe_vacio_{st.base_name}.html"
         html_text = self._report_html(payload)
-        self.vacuum_report_file.write_text(html_text, encoding="utf-8")
+        atomic_write_text(self.vacuum_report_file, html_text)
         self.vacuum_report_pdf = self.report_dir / f"informe_vacio_{st.base_name}.pdf"
         self._write_pdf(html_text, self.vacuum_report_pdf)
 
@@ -650,8 +648,8 @@ class VacuumExperimentWindow(PPGSuite):
             ("BPM final PPG", fmt(metrics.get("bpm"), 1, "-")),
             ("Calidad PPG", f"{fmt(metrics.get('quality'), 1, '-')} ({html.escape(str(metrics.get('quality_label', '-')))})"),
             ("SpO2", fmt(metrics.get("spo2"), 1, "-")),
-            ("Frecuencia vacio audio", f"{fmt(audio.get('vacuum_bpm'), 1, '-')} ciclos/min"),
-            ("Microfono", str(audio_device.get("name") or "-")),
+            ("Frecuencia vacío audio", f"{fmt(audio.get('vacuum_bpm'), 1, '-')} ciclos/min"),
+            ("Micrófono", str(audio_device.get("name") or "-")),
             ("Dominancia audio", fmt(audio.get("dominance"), 2, "-")),
             ("FFT PPG antes de notch", fmt(ppg.get("ppg_fft_bpm_before_notch"), 1, "-")),
             ("FFT PPG excluyendo pico audio", fmt(ppg.get("ppg_fft_bpm_excluding_audio_peak"), 1, "-")),
@@ -674,17 +672,17 @@ th {{ width: 34%; background: #f2f2f2; }}
 p, li {{ font-size: 12px; line-height: 1.45; }}
 .note {{ border-left: 4px solid #777; padding-left: 10px; }}
 </style></head><body>
-<h1>Informe experimento con vacio</h1>
-<p><b>Sesion:</b> {html.escape(str(payload["base_name"]))}</p>
+<h1>Informe experimento con vacío</h1>
+<p><b>Sesión:</b> {html.escape(str(payload["base_name"]))}</p>
 <p><b>Animal:</b> {html.escape(str(payload["id"]))} | <b>Fin:</b> {html.escape(str(payload["reason"]))}</p>
 <h2>Lectura resumida</h2>
 <p class="note">{html.escape(conclusion)}</p>
 <h2>Resultados</h2>
 <table>{table}</table>
-<h2>Metodo aplicado</h2>
-<p>El microfono se graba en paralelo con la toma PPG. Se guarda un sello de tiempo de inicio de audio y de PPG para estimar el desfase.</p>
-<p>El audio se analiza al final con Fourier sobre la envolvente RMS para buscar la frecuencia dominante del vacio. El notch se aplica solo en post-proceso sobre la senal IR procesada y sus armonicos; no modifica el raw PPG.</p>
-<p>La prioridad de decision sigue siendo BPM. SpO2 queda como dato secundario y solo se interpreta si hay apoyo suficiente, PI RED/IR estable y ratio RED/IR razonable.</p>
+<h2>Método aplicado</h2>
+<p>El micrófono se graba en paralelo con la toma PPG. Se guarda un sello de tiempo de inicio de audio y de PPG para estimar el desfase.</p>
+<p>El audio se analiza al final con Fourier sobre la envolvente RMS para buscar la frecuencia dominante del vacío. El notch se aplica solo en post-proceso sobre la señal IR procesada y sus armónicos; no modifica el raw PPG.</p>
+<p>La prioridad de decisión sigue siendo BPM. SpO2 queda como dato secundario y solo se interpreta si hay apoyo suficiente, PI RED/IR estable y ratio RED/IR razonable.</p>
 <h2>Archivos</h2>
 <table>{file_rows}</table>
 </body></html>"""
@@ -696,11 +694,11 @@ p, li {{ font-size: 12px; line-height: 1.45; }}
         vacuum = audio.get("vacuum_bpm", math.nan)
         distance = ppg.get("audio_ppg_peak_distance_bpm", math.nan)
         if not np.isfinite(vacuum):
-            return "No se pudo estimar una frecuencia de vacio con audio; usa el BPM PPG final y revisa colocacion/senal."
+            return "No se pudo estimar una frecuencia de vacío con audio; usa el BPM PPG final y revisa colocación/señal."
         if np.isfinite(distance) and distance <= 6:
             return (
-                "El pico dominante PPG esta muy cerca de la frecuencia detectada en audio. "
-                "El BPM despues de notch debe revisarse como candidato, pero no sustituye automaticamente el BPM final."
+                "El pico dominante PPG está muy cerca de la frecuencia detectada en audio. "
+                "El BPM después de notch debe revisarse como candidato, pero no sustituye automáticamente el BPM final."
             )
         if np.isfinite(after) and np.isfinite(before) and abs(after - before) > 8:
             return (

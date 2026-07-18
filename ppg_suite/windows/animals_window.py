@@ -13,6 +13,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
 from ..animal_config import ANIMAL_OPTIONS, animal_label, normalize_animal_type
+from ..io_utils import atomic_write_json
 from ..paths import (
     ANIMAL_PHOTO_DIR,
     ANIMALS_DIR,
@@ -294,8 +295,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
     def save_profiles(self):
         ANIMALS_DIR.mkdir(parents=True, exist_ok=True)
         payload = {"animals": self.profiles, "updated": datetime.now().isoformat()}
-        with open(self.data_file, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False)
+        atomic_write_json(self.data_file, payload)
 
     def all_animal_keys(self) -> list[str]:
         keys = set(self.profiles) | set(self.measurements_by_animal)

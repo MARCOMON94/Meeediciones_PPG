@@ -179,19 +179,19 @@ def spo2_support_message(m: Metrics) -> str:
     missing_spo2 = not (np.isfinite(m.spo2) and np.isfinite(m.ratio_r))
 
     if saturation:
-        return "Aviso SpO2: saturacion ADC; baja brillo o amplia rango para oxigeno fiable."
+        return "Aviso SpO2: saturación ADC; baja brillo o amplía rango para oxígeno fiable."
     if low_ir and low_red:
         return "Aviso SpO2: poco apoyo/contacto; PI IR y RED bajos. BPM puede seguir siendo util."
     if low_red:
-        return "Aviso SpO2: senal RED pulsatile baja; oxigeno poco fiable."
+        return "Aviso SpO2: señal RED pulsátil baja; oxígeno poco fiable."
     if low_ir:
-        return "Aviso SpO2: senal IR pulsatile baja; revisa apoyo estable del sensor."
+        return "Aviso SpO2: señal IR pulsátil baja; revisa apoyo estable del sensor."
     if artifacts:
-        return "Aviso SpO2: movimiento/contacto irregular; oxigeno poco fiable."
+        return "Aviso SpO2: movimiento/contacto irregular; oxígeno poco fiable."
     if ratio_bad:
         return "Aviso SpO2: ratio RED/IR fuera de rango; revisa apoyo y luz ambiente."
     if missing_spo2 and np.isfinite(m.dc_ir) and m.dc_ir > 1000:
-        return "Aviso SpO2: falta senal RED/IR suficiente para calcular oxigeno."
+        return "Aviso SpO2: falta señal RED/IR suficiente para calcular oxígeno."
     return ""
 
 

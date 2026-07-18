@@ -31,40 +31,40 @@ from ..processing import (
 from ..utils import fmt, now_stamp, open_folder
 
 HEADER_TOOLTIPS = {
-    "Usar": "Marca este raw para incluirlo en el analisis comparativo.",
+    "Usar": "Marca este raw para incluirlo en el análisis comparativo.",
     "Correo": "Marca este raw para incluirlo en el ZIP de correo.",
     "Animal": "Identificador del animal o sujeto guardado en el raw.",
     "Fecha": "Fecha detectada a partir del nombre o metadatos del raw.",
     "Filas": "Numero de filas o muestras aproximadas del archivo raw.",
     "Configuraciones": "Resumen de las configuraciones presentes en el raw.",
     "Archivo": "Nombre del archivo raw analizado.",
-    "Puntuacion": "Puntuacion comparativa interna de 0 a 100. Fourier y referencia manual mandan; Hilbert y Wavelet actuan como apoyos temporales, con Wavelet por debajo de Hilbert.",
-    "Veredicto": "Lectura rapida de la puntuacion: mejor candidata, buena, usable con cautela o no recomendable.",
-    "Configuracion": "Etiqueta de configuracion del sensor usada en ese tramo.",
-    "BPM ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioximetro final y fonendo final, ignorando ceros y vacios.",
+    "Puntuación": "Puntuación comparativa interna de 0 a 100. Fourier y referencia manual mandan; Hilbert y Wavelet actúan como apoyos temporales, con Wavelet por debajo de Hilbert.",
+    "Veredicto": "Lectura rápida de la puntuación: mejor candidata, buena, usable con cautela o no recomendable.",
+    "Configuración": "Etiqueta de configuración del sensor usada en ese tramo.",
+    "BPM ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioxímetro final y fonendo final, ignorando ceros y vacíos.",
     "Dif FFT-ref": "Diferencia absoluta entre BPM por Fourier IR y BPM de referencia manual.",
-    "BPM FFT IR": "BPM estimado por transformada de Fourier sobre la senal IR tras cribado robusto.",
+    "BPM FFT IR": "BPM estimado por transformada de Fourier sobre la señal IR tras cribado robusto.",
     "BPM autocorr": "BPM estimado por autocorrelacion; sirve como comprobacion temporal de repeticion del pulso.",
     "BPM Hilbert": "BPM estimado por fase instantanea de Hilbert. Es apoyo temporal, no veredicto unico.",
     "BPM FFT RED": "BPM estimado por Fourier sobre canal RED para comprobar coherencia con IR.",
-    "Hilbert env. CV %": "Coeficiente de variacion de la envolvente Hilbert. Menor suele indicar amplitud de pulso mas estable.",
+    "Hilbert env. CV %": "Coeficiente de variación de la envolvente Hilbert. Menor suele indicar amplitud de pulso más estable.",
     "Hilbert calidad": "Calidad interna de Hilbert, 0-100, basada en envolvente y fase instantanea.",
-    "BPM Wavelet": "BPM estimado por un analisis wavelet Morlet experimental sobre IR. Sirve como filtro de apoyo, no como criterio principal.",
-    "Wavelet calidad": "Calidad wavelet experimental, 0-100. Mide concentracion tiempo-frecuencia y estabilidad del pulso; peso secundario, maximo +5 puntos.",
-    "Dominancia": "Relacion entre el pico principal y el segundo pico en banda cardiaca. Mayor indica pico mas claro.",
+    "BPM Wavelet": "BPM estimado por un análisis wavelet Morlet experimental sobre IR. Sirve como filtro de apoyo, no como criterio principal.",
+    "Wavelet calidad": "Calidad wavelet experimental, 0-100. Mide concentración tiempo-frecuencia y estabilidad del pulso; peso secundario, máximo +5 puntos.",
+    "Dominancia": "Relación entre el pico principal y el segundo pico en banda cardiaca. Mayor indica pico más claro.",
     "Banda": "Proporcion de energia util concentrada en la banda cardiaca esperada.",
-    "SNR dB": "Relacion senal-ruido del pico Fourier IR en decibelios.",
+    "SNR dB": "Relación señal-ruido del pico Fourier IR en decibelios.",
     "PI IR %": "Indice de perfusion IR: AC/DC. Indica cuanto pulso visible hay respecto al nivel de luz recibido.",
     "Artefactos %": "Porcentaje de muestras IR marcadas como artefacto por el cribado.",
-    "Retenido %": "Porcentaje de muestras que entran al calculo tras estabilizacion inicial y descarte robusto.",
+    "Retenido %": "Porcentaje de muestras que entran al cálculo tras estabilización inicial y descarte robusto.",
     "Descartado %": "Porcentaje de muestras descartadas por outliers, saltos o valores invalidos.",
     "SpO2 est.": "SpO2 experimental estimada desde RED/IR. No esta calibrada clinicamente.",
     "Calidad SpO2": "Confianza interna de la SpO2 experimental, 0-100; no equivale a validacion clinica.",
     "Resp/min (experimental)": "Respiraciones por minuto estimadas desde modulaciones lentas de PPG.",
-    "Calidad Resp.": "Confianza interna de la estimacion respiratoria experimental.",
-    "Saturacion %": "Porcentaje de muestras cerca del techo digital ADC.",
+    "Calidad Resp.": "Confianza interna de la estimación respiratoria experimental.",
+    "Saturación %": "Porcentaje de muestras cerca del techo digital ADC.",
     "Jitter %": "Variabilidad relativa del intervalo entre muestras. Alto jitter puede distorsionar FFT/Hilbert.",
-    "Duracion": "Duracion del tramo efectivamente analizado.",
+    "Duración": "Duración del tramo efectivamente analizado.",
     "Muestras": "Numero de muestras efectivamente analizadas.",
 }
 
@@ -352,7 +352,7 @@ def _hilbert_details(t: np.ndarray, y: np.ndarray, cfg: AnalysisConfig) -> dict[
     reason = (
         f"envolvente CV={envelope_cv:.1f} %; "
         f"fase IQR={phase_iqr:.1f} BPM; "
-        f"muestras de fase validas={valid_ratio * 100.0:.0f} %"
+        f"muestras de fase válidas={valid_ratio * 100.0:.0f} %"
     )
     return {"bpm": bpm, "envelope_cv_pct": envelope_cv, "phase_iqr_bpm": phase_iqr, "quality": quality, "reason": reason}
 
@@ -485,7 +485,7 @@ def _estimate_spo2_quality(
     if np.isfinite(saturation_pct) and saturation_pct > 0:
         penalty = min(25.0, saturation_pct * 2.0)
         quality -= penalty
-        reasons.append(f"saturacion penaliza SpO2 ({saturation_pct:.1f} %)")
+        reasons.append(f"saturación penaliza SpO2 ({saturation_pct:.1f} %)")
     if np.isfinite(duration_s) and duration_s < 12.0:
         quality -= 10
         reasons.append("tramo corto para ratio RED/IR estable")
@@ -681,7 +681,7 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         if np.isfinite(pulse_ref_avg):
             reasons.append(
                 f"referencia manual media {pulse_ref_avg:.1f} BPM "
-                f"({pulse_ref_count} lectura(s), ignorando ceros/vacios)"
+                f"({pulse_ref_count} lectura(s), ignorando ceros/vacíos)"
             )
             if np.isfinite(diff_fft_ref):
                 if diff_fft_ref <= 5:
@@ -700,7 +700,7 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                     score -= min(28.0, diff_fft_ref * 0.9)
                     reasons.append(f"FFT IR lejos de referencia: diferencia {diff_fft_ref:.1f} BPM")
         else:
-            reasons.append("sin referencia manual valida: no se puntua cercania a pulsioximetro/fonendo")
+            reasons.append("sin referencia manual válida: no se puntúa cercanía a pulsioxímetro/fonendo")
 
         if np.isfinite(agreement):
             if agreement <= 8:
@@ -747,10 +747,10 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
         if np.isfinite(bpm_wavelet):
             if wavelet_quality >= 60 and wavelet_strict_agreement:
                 score += 5
-                reasons.append(f"Wavelet confirma la senal ({bpm_wavelet:.1f} BPM; calidad {wavelet_quality:.0f}/100; +5 max secundario)")
+                reasons.append(f"Wavelet confirma la señal ({bpm_wavelet:.1f} BPM; calidad {wavelet_quality:.0f}/100; +5 max secundario)")
             elif wavelet_quality >= 45 and wavelet_loose_agreement:
                 score += 3
-                reasons.append(f"Wavelet apoya la senal ({bpm_wavelet:.1f} BPM; calidad {wavelet_quality:.0f}/100; +3)")
+                reasons.append(f"Wavelet apoya la señal ({bpm_wavelet:.1f} BPM; calidad {wavelet_quality:.0f}/100; +3)")
             elif wavelet_quality >= 35 and wavelet_strict_agreement:
                 score += 1
                 reasons.append(f"Wavelet coincide pero con calidad limitada ({bpm_wavelet:.1f} BPM; calidad {wavelet_quality:.0f}/100; +1)")
@@ -779,7 +779,7 @@ def analyze_raw_file(path: Path, cfg: AnalysisConfig) -> list[SpectrumResult]:
                 reasons.append(f"cribado muy alto ({discarded_pct:.1f} %): lectura poco robusta")
         if np.isfinite(saturation) and saturation > 0:
             score -= min(35.0, saturation * 2.0)
-            reasons.append(f"saturacion cerca del techo digital raw {saturation:.1f} %")
+            reasons.append(f"saturación cerca del techo digital raw {saturation:.1f} %")
         if np.isfinite(spo2_quality):
             if spo2_quality >= 70:
                 score += 6
@@ -879,16 +879,16 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
     result_headers = [
-        "Correo", "Puntuacion", "Veredicto", "Animal", "Configuracion", "BPM ref.", "Dif FFT-ref",
+        "Correo", "Puntuación", "Veredicto", "Animal", "Configuración", "BPM ref.", "Dif FFT-ref",
         "BPM FFT IR", "BPM autocorr", "BPM Hilbert", "BPM FFT RED", "Hilbert env. CV %", "Hilbert calidad",
         "BPM Wavelet", "Wavelet calidad", "Dominancia", "Banda", "SNR dB", "PI IR %", "Artefactos %", "Retenido %", "Descartado %",
-        "SpO2 est.", "Calidad SpO2", "Resp/min (experimental)", "Calidad Resp.", "Saturacion %",
-        "Jitter %", "Duracion", "Muestras", "Archivo",
+        "SpO2 est.", "Calidad SpO2", "Resp/min (experimental)", "Calidad Resp.", "Saturación %",
+        "Jitter %", "Duración", "Muestras", "Archivo",
     ]
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PPG Suite v8 | Analisis experimental de Fourier")
+        self.setWindowTitle("PPG Suite v8 | Análisis experimental de Fourier")
         self.resize(1420, 900)
         self.raw_files: list[RawFileInfo] = []
         self.results: list[SpectrumResult] = []
@@ -918,11 +918,11 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         self.btn_reload.clicked.connect(self.reload_raws)
         top.addWidget(self.btn_reload)
 
-        controls = QtWidgets.QGroupBox("Seleccion de raws")
+        controls = QtWidgets.QGroupBox("Selección de raws")
         cl = QtWidgets.QGridLayout(controls)
         self.animal_filter = QtWidgets.QComboBox()
         self.text_filter = QtWidgets.QLineEdit()
-        self.text_filter.setPlaceholderText("Filtrar por archivo, sesion o configuracion")
+        self.text_filter.setPlaceholderText("Filtrar por archivo, sesión o configuración")
         self.chk_show_aggregates = QtWidgets.QCheckBox("Mostrar agregados")
         self.chk_show_aggregates.setToolTip("Muestra raws BLOQUE completos aunque existan sus raws separados por configuracion.")
         self.btn_select_visible = QtWidgets.QPushButton("Marcar visibles")
@@ -1063,7 +1063,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 raw_key = self.mail_key(info.path)
                 check.setCheckState(QtCore.Qt.CheckState.Checked if raw_key in self.selected_raw_paths else QtCore.Qt.CheckState.Unchecked)
                 check.setData(QtCore.Qt.ItemDataRole.UserRole, str(info.path))
-                check.setToolTip(info.hidden_reason or "Marcar raw para incluirlo en el analisis comparativo")
+                check.setToolTip(info.hidden_reason or "Marcar raw para incluirlo en el análisis comparativo")
                 self.raw_table.setItem(row, 0, check)
                 mail_check = QtWidgets.QTableWidgetItem("")
                 mail_check.setFlags(mail_check.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
@@ -1194,7 +1194,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         if path is None:
             return
         if not path.exists():
-            QtWidgets.QMessageBox.warning(self, "Abrir raw", f"No se encontro el archivo:\n{path}")
+            QtWidgets.QMessageBox.warning(self, "Abrir raw", f"No se encontró el archivo:\n{path}")
             return
         ok = QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
         if not ok:
@@ -1234,7 +1234,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
     def analyze_selected(self):
         paths = self.selected_paths()
         if not paths:
-            QtWidgets.QMessageBox.information(self, "Analisis Fourier", "Marca uno o varios raw antes de analizar.")
+            QtWidgets.QMessageBox.information(self, "Análisis Fourier", "Marca uno o varios raw antes de analizar.")
             return
         cfg = AnalysisConfig()
         results: list[SpectrumResult] = []
@@ -1335,7 +1335,7 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         comparison = ""
         if best and best is not result:
             comparison = (
-                f"<p><b>Comparacion con la mejor:</b> esta configuracion queda "
+                f"<p><b>Comparación con la mejor:</b> esta configuración queda "
                 f"{best.score - result.score:.1f} puntos por debajo de "
                 f"{html.escape(best.config_label)}.</p>"
             )
@@ -1343,25 +1343,25 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
             comparison = "<p><b>Resultado:</b> es la mejor candidata dentro de los raw seleccionados.</p>"
         html_text = f"""
         <h2>{html.escape(result.config_label or result.base_name)}</h2>
-        <p><b>Puntuacion experimental:</b> {fmt(result.score, 1, '-')} / 100 | <b>{html.escape(result.verdict)}</b></p>
+        <p><b>Puntuación experimental:</b> {fmt(result.score, 1, '-')} / 100 | <b>{html.escape(result.verdict)}</b></p>
         {comparison}
         <table cellspacing="7">
         <tr><td><b>Archivo</b></td><td>{html.escape(result.file.name)}</td></tr>
         <tr><td><b>Animal</b></td><td>{html.escape(result.animal)}</td></tr>
         <tr><td><b>Sensor</b></td><td>RED {result.cfg_red} | IR {result.cfg_ir} | AVG {result.cfg_avg} | RATE {result.cfg_rate} | WIDTH {result.cfg_width} | ADC {result.cfg_adc}</td></tr>
         <tr><td><b>Muestras</b></td><td>{result.n} en {fmt(result.duration_s, 2, '-')} s; Hz real {fmt(result.hz, 2, '-')}</td></tr>
-        <tr><td><b>Cribado robusto</b></td><td>retenido {fmt(result.retained_pct, 1, '-')} % | descartado {fmt(result.discarded_pct, 1, '-')} %. El raw no se borra; solo se decide que tramo entra en el calculo.</td></tr>
-        <tr><td><b>Referencia manual</b></td><td>media {fmt(result.pulse_ref_avg, 1, '-')} BPM ({result.pulse_ref_count} lectura(s) validas; 0/vacio se ignora). Previo {fmt(result.pulse_prev_ref, 1, '-')} | pulsio final {fmt(result.pulse_final_pulsio_ref, 1, '-')} | fonendo final {fmt(result.pulse_final_fonendo_ref, 1, '-')}</td></tr>
+        <tr><td><b>Cribado robusto</b></td><td>retenido {fmt(result.retained_pct, 1, '-')} % | descartado {fmt(result.discarded_pct, 1, '-')} %. El raw no se borra; solo se decide qué tramo entra en el cálculo.</td></tr>
+        <tr><td><b>Referencia manual</b></td><td>media {fmt(result.pulse_ref_avg, 1, '-')} BPM ({result.pulse_ref_count} lectura(s) válidas; 0/vacío se ignora). Previo {fmt(result.pulse_prev_ref, 1, '-')} | pulsio final {fmt(result.pulse_final_pulsio_ref, 1, '-')} | fonendo final {fmt(result.pulse_final_fonendo_ref, 1, '-')}</td></tr>
         <tr><td><b>Diferencia vs referencia</b></td><td>FFT IR {fmt(result.diff_fft_ref_bpm, 1, '-')} BPM | autocorrelacion {fmt(result.diff_autocorr_ref_bpm, 1, '-')} BPM | Hilbert {fmt(result.diff_hilbert_ref_bpm, 1, '-')} BPM | Wavelet {fmt(result.diff_wavelet_ref_bpm, 1, '-')} BPM</td></tr>
         <tr><td><b>Fourier IR</b></td><td>{fmt(result.bpm_fft_ir, 1, '-')} BPM; dominancia {fmt(result.dominance_ir, 2, '-')}; banda cardiaca {fmt(result.band_ratio_ir, 3, '-')}; SNR {fmt(result.peak_snr_db, 1, '-')} dB; entropia {fmt(result.entropy_ir, 3, '-')}</td></tr>
         <tr><td><b>Hilbert IR</b></td><td>{fmt(result.bpm_hilbert_ir, 1, '-')} BPM por fase instantanea; envolvente CV {fmt(result.hilbert_envelope_cv_pct, 1, '-')} %; fase IQR {fmt(result.hilbert_phase_iqr_bpm, 1, '-')} BPM; calidad {fmt(result.hilbert_quality, 0, '-')} / 100; {html.escape(result.hilbert_reason)}</td></tr>
         <tr><td><b>Wavelet IR</b></td><td>{fmt(result.bpm_wavelet_ir, 1, '-')} BPM; calidad {fmt(result.wavelet_quality, 0, '-')} / 100; dominancia {fmt(result.wavelet_dominance, 2, '-')}; CV potencia {fmt(result.wavelet_power_cv_pct, 1, '-')} %. Peso secundario en puntuacion: max +5, menor que Hilbert. {html.escape(result.wavelet_reason)}</td></tr>
         <tr><td><b>Acuerdo</b></td><td>FFT RED {fmt(result.bpm_fft_red, 1, '-')} BPM; autocorrelacion {fmt(result.bpm_autocorr, 1, '-')} BPM; Hilbert {fmt(result.bpm_hilbert_ir, 1, '-')} BPM; Wavelet {fmt(result.bpm_wavelet_ir, 1, '-')} BPM; diferencia maxima {fmt(result.agreement_bpm, 1, '-')} BPM</td></tr>
-        <tr><td><b>Senal</b></td><td>PI IR {fmt(result.pi_ir_pct, 3, '-')} %; PI RED {fmt(result.pi_red_pct, 3, '-')} %; artefactos IR {fmt(result.artifact_ir_pct, 1, '-')} %; saturacion {fmt(result.saturation_pct, 1, '-')} %</td></tr>
+        <tr><td><b>Señal</b></td><td>PI IR {fmt(result.pi_ir_pct, 3, '-')} %; PI RED {fmt(result.pi_red_pct, 3, '-')} %; artefactos IR {fmt(result.artifact_ir_pct, 1, '-')} %; saturación {fmt(result.saturation_pct, 1, '-')} %</td></tr>
         <tr><td><b>SpO2 experimental</b></td><td>{fmt(result.spo2_est_pct, 1, '-')} %; ratio R {fmt(result.spo2_ratio_r, 4, '-')}; calidad {fmt(result.spo2_quality, 0, '-')} / 100; {html.escape(result.spo2_reason)}</td></tr>
         <tr><td><b>Respiraciones (experimental)</b></td><td>{fmt(result.resp_rate_rpm, 1, '-')} resp/min; calidad {fmt(result.resp_quality, 0, '-')} / 100; {html.escape(result.resp_reason)}</td></tr>
         </table>
-        <h3>Por que puntua asi</h3>
+        <h3>Por qué puntúa así</h3>
         <ul>{reasons}</ul>
         """
         self.details.setHtml(html_text)
@@ -1549,19 +1549,19 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         draw_text("Resumen ejecutivo", 16, True, gap=10)
         draw_metric_boxes([
             ("Mejor configuracion", best.config_label or best.base_name),
-            ("Puntuacion", f"{fmt(best.score, 1, '-')} / 100"),
+            ("Puntuación", f"{fmt(best.score, 1, '-')} / 100"),
             ("Pulso ref.", f"{fmt(best.pulse_ref_avg, 1, '-')} BPM"),
             ("BPM FFT IR", fmt(best.bpm_fft_ir, 1, "-")),
             ("Dif. vs ref.", f"{fmt(best.diff_fft_ref_bpm, 1, '-')} BPM"),
         ])
         draw_text(
             f"La configuracion seleccionada como mejor candidata es {best.config_label or best.base_name}. "
-            "El criterio principal es que la BPM estimada por PPG se acerque al pulso de referencia anotado con pulsioximetro/fonendo. "
-            "Como apoyo tecnico se revisa que la senal tenga pulso visible, poca saturacion, pocos artefactos y estimadores internos coherentes.",
+            "El criterio principal es que la BPM estimada por PPG se acerque al pulso de referencia anotado con pulsioxímetro/fonendo. "
+            "Como apoyo técnico se revisa que la señal tenga pulso visible, poca saturación, pocos artefactos y estimadores internos coherentes.",
             10,
         )
         draw_text(
-            "Pulso ref. es la media de pulso previo, pulsioximetro final y fonendo final. Las lecturas 0 o vacias se ignoran porque se interpretan como no anotadas.",
+            "Pulso ref. es la media de pulso previo, pulsioxímetro final y fonendo final. Las lecturas 0 o vacías se ignoran porque se interpretan como no anotadas.",
             9,
             color="muted",
         )
@@ -1588,12 +1588,12 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 fmt(result.pi_ir_pct, 3, "-"),
             ])
         draw_table(
-            ["#", "Punt.", "Veredicto", "Configuracion", "Ref.", "FFT", "Autoc.", "Hilbert", "Wavelet", "WQ", "SpO2", "QSpO2", "Dif.", "PI IR"],
+            ["#", "Punt.", "Veredicto", "Configuración", "Ref.", "FFT", "Autoc.", "Hilbert", "Wavelet", "WQ", "SpO2", "QSpO2", "Dif.", "PI IR"],
             ranking_rows,
             [20, 32, 58, 96, 34, 34, 36, 38, 39, 25, 34, 34, 32, 34],
         )
 
-        draw_text("Por que gana la mejor configuracion", 15, True)
+        draw_text("Por qué gana la mejor configuración", 15, True)
         for reason in best.reasons[:12]:
             draw_text(f"- {reason}", 9, gap=3)
 
@@ -1603,12 +1603,12 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 ["Metrica", "Valor", "Lectura"],
                 [
                     ["Fourier IR", f"{fmt(result.bpm_fft_ir, 1, '-')} BPM", f"Dominancia {fmt(result.dominance_ir, 2, '-')} | SNR {fmt(result.peak_snr_db, 1, '-')} dB"],
-                    ["Referencia", f"{fmt(result.pulse_ref_avg, 1, '-')} BPM", f"Dif. FFT-ref {fmt(result.diff_fft_ref_bpm, 1, '-')} BPM | validas {result.pulse_ref_count}"],
+                    ["Referencia", f"{fmt(result.pulse_ref_avg, 1, '-')} BPM", f"Dif. FFT-ref {fmt(result.diff_fft_ref_bpm, 1, '-')} BPM | válidas {result.pulse_ref_count}"],
                     ["Autocorrelacion", f"{fmt(result.bpm_autocorr, 1, '-')} BPM", f"Diferencia maxima estimadores {fmt(result.agreement_bpm, 1, '-')} BPM"],
                     ["Hilbert", f"{fmt(result.bpm_hilbert_ir, 1, '-')} BPM", f"Envolvente CV {fmt(result.hilbert_envelope_cv_pct, 1, '-')} % | calidad {fmt(result.hilbert_quality, 0, '-')}"],
                     ["Wavelet", f"{fmt(result.bpm_wavelet_ir, 1, '-')} BPM", f"Calidad {fmt(result.wavelet_quality, 0, '-')} | dominancia {fmt(result.wavelet_dominance, 2, '-')} | max +5, secundario"],
                     ["SpO2 experimental", f"{fmt(result.spo2_est_pct, 1, '-')} %", f"Ratio R {fmt(result.spo2_ratio_r, 4, '-')} | calidad {fmt(result.spo2_quality, 0, '-')} | no calibrada clinicamente"],
-                    ["Senal", f"PI IR {fmt(result.pi_ir_pct, 3, '-')} %", f"Artefactos {fmt(result.artifact_ir_pct, 1, '-')} % | saturacion {fmt(result.saturation_pct, 1, '-')} %"],
+                    ["Señal", f"PI IR {fmt(result.pi_ir_pct, 3, '-')} %", f"Artefactos {fmt(result.artifact_ir_pct, 1, '-')} % | saturación {fmt(result.saturation_pct, 1, '-')} %"],
                     ["Cribado", f"Retenido {fmt(result.retained_pct, 1, '-')} %", f"Descartado {fmt(result.discarded_pct, 1, '-')} %"],
                 ],
                 [112, 120, width - 232],
@@ -1618,32 +1618,32 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         draw_rule()
         if y > page.y() + margin + height - 260:
             new_page()
-        draw_text("Anexo tecnico: como leer el analisis", 18, True)
+        draw_text("Anexo técnico: cómo leer el análisis", 18, True)
         explanations = [
             ("Referencia manual",
-             "La referencia manual es la media de las pulsaciones anotadas antes y al final de la toma con pulsioximetro/fonendo. Si una lectura esta a 0 o vacia no se usa en la media. Esta referencia es el criterio externo mas defendible del informe y se usa para penalizar configuraciones que estiman BPM muy alejadas."),
+             "La referencia manual es la media de las pulsaciones anotadas antes y al final de la toma con pulsioxímetro/fonendo. Si una lectura está a 0 o vacía no se usa en la media. Esta referencia es el criterio externo más defendible del informe y se usa para penalizar configuraciones que estiman BPM muy alejadas."),
             ("Cribado robusto",
-             "El analisis conserva siempre el raw completo, pero para calcular BPM descarta el periodo inicial de estabilizacion y muestras con saltos/outliers simultaneos en RED o IR. Esto imita la logica de un pulsioximetro comercial: espera estabilidad antes de mostrar un numero y evita que movimiento, mal contacto o presion variable generen BPM irreales."),
+             "El análisis conserva siempre el raw completo, pero para calcular BPM descarta el periodo inicial de estabilización y muestras con saltos/outliers simultáneos en RED o IR. Esto imita la lógica de un pulsioxímetro comercial: espera estabilidad antes de mostrar un número y evita que movimiento, mal contacto o presión variable generen BPM irreales."),
             ("Fourier",
-             "La transformada de Fourier descompone la senal PPG en frecuencias. En este proyecto se mira si hay un pico claro dentro de la banda cardiaca esperada. Un pico dominante, con buena energia de banda y buen SNR, indica que la configuracion esta separando bien una periodicidad compatible con pulso. Fourier responde sobre todo a: que frecuencia domina en esta toma."),
-            ("Autocorrelacion",
-             "La autocorrelacion compara la senal consigo misma desplazada en el tiempo. Si el pulso se repite de forma regular, aparece un retardo dominante que puede convertirse a BPM. Sirve como comprobacion temporal independiente de Fourier: no busca energia en frecuencia, busca repeticion del patron."),
-            ("Como leer Hilbert",
-             "La transformada de Hilbert construye una senal analitica a partir del PPG filtrado. De ella salen dos lecturas complementarias: la envolvente, que resume como cambia la amplitud del pulso, y la fase instantanea, que permite estimar un BPM segundo a segundo. En este proyecto se usa como apoyo para detectar si una configuracion mantiene un pulso estable o si solo parece buena por un pico aislado en Fourier."),
-            ("Interpretacion de Hilbert",
-             "Una envolvente con CV bajo indica amplitud mas regular. Una fase con IQR bajo indica ritmo mas coherente. Si Hilbert, Fourier y autocorrelacion coinciden, la configuracion gana confianza. Si Hilbert se vuelve inestable, suele apuntar a movimiento, mal contacto, saturacion, poca componente pulsatile o una senal demasiado ruidosa."),
+             "La transformada de Fourier descompone la señal PPG en frecuencias dentro de la ventana temporal analizada. En este proyecto se mira si hay un pico claro dentro de la banda cardiaca esperada. Un pico dominante, con buena energía de banda y buen SNR, indica que la configuración está separando bien una periodicidad compatible con pulso. Fourier responde sobre todo a qué frecuencia domina en esa ventana, no a una lectura instantánea segundo a segundo."),
+            ("Autocorrelación",
+             "La autocorrelación compara la señal consigo misma desplazada en el tiempo. Si el pulso se repite de forma regular, aparece un retardo dominante que puede convertirse a BPM. Sirve como comprobación temporal independiente de Fourier: no busca energía en frecuencia, busca repetición del patrón."),
+            ("Cómo leer Hilbert",
+             "La transformada de Hilbert construye una señal analítica a partir del PPG filtrado. De ella salen dos lecturas complementarias: la envolvente, que resume cómo cambia la amplitud del pulso, y la fase instantánea, que permite estimar un BPM local a lo largo del tiempo. En este proyecto se usa como apoyo para detectar si una configuración mantiene un pulso estable o si solo parece buena por un pico aislado en Fourier."),
+            ("Interpretación de Hilbert",
+             "Una envolvente con CV bajo indica amplitud más regular. Una fase con IQR bajo indica ritmo más coherente. Si Hilbert, Fourier y autocorrelación coinciden, la configuración gana confianza. Si Hilbert se vuelve inestable, suele apuntar a movimiento, mal contacto, saturación, poca componente pulsátil o una señal demasiado ruidosa."),
             ("Wavelet experimental",
-             "El analisis Wavelet usa una wavelet Morlet sobre la senal IR para comprobar si la energia cardiaca esta concentrada y se mantiene estable en el tiempo. En los datos disponibles de la oveja 184, Wavelet no es tan buen estimador principal como Fourier, pero cuando tiene calidad suficiente y coincide con FFT o referencia manual funciona bien como confirmacion. Por eso se usa como filtro secundario: maximo +5 puntos, por debajo de Hilbert (+7), y nunca sustituye a Fourier ni a la referencia manual."),
-            ("PI, artefactos y saturacion",
-             "El PI estima cuanto componente pulsatile hay respecto al nivel DC. Un PI bajo sugiere que el pulso esta poco visible. Los artefactos penalizan cambios bruscos incompatibles con una senal estable. La saturacion avisa de muestras cerca del techo digital del ADC; si hay saturacion, el sensor puede estar perdiendo informacion real."),
+             "El análisis Wavelet usa una wavelet Morlet sobre la señal IR para comprobar si la energía cardiaca está concentrada y se mantiene estable en el tiempo. En los datos disponibles de la oveja 184, Wavelet no es tan buen estimador principal como Fourier, pero cuando tiene calidad suficiente y coincide con FFT o referencia manual funciona bien como confirmación. Por eso se usa como filtro secundario: máximo +5 puntos, por debajo de Hilbert (+7), y nunca sustituye a Fourier ni a la referencia manual."),
+            ("PI, artefactos y saturación",
+             "El PI estima cuánto componente pulsátil hay respecto al nivel DC. Un PI bajo sugiere que el pulso está poco visible. Los artefactos penalizan cambios bruscos incompatibles con una señal estable. La saturación avisa de muestras cerca del techo digital del ADC; si hay saturación, el sensor puede estar perdiendo información real."),
             ("SpO2 experimental",
-             "La SpO2 se estima desde el ratio RED/IR, pero no esta calibrada clinicamente. Por eso se informa con calidad experimental: ratio plausible, PI suficiente, poca saturacion, pocos artefactos y duracion adecuada aumentan confianza. Debe validarse con referencia externa antes de usarla como criterio definitivo."),
-            ("Respiracion experimental",
-             "La respiracion se estima a partir de modulaciones lentas de la PPG. Necesita tomas mas largas que el pulso para ser estable. En tomas cortas puede salir como no estimable o con calidad baja."),
-            ("Puntuacion final",
-             "La puntuacion combina cercania a la referencia manual cuando existe, calidad Fourier IR, acuerdo entre FFT/autocorrelacion/Hilbert, estabilidad de Hilbert, PI, artefactos, saturacion, calidad SpO2, jitter de muestreo y duracion. Wavelet aporta una correccion secundaria: +5 si confirma muy bien, +3 si apoya, +1 si coincide con calidad limitada, -3 si una Wavelet media contradice FFT/ref y -1 si es debil o cae en borde de banda. Es un criterio comparativo interno para elegir configuraciones."),
+             "La SpO2 se estima desde el ratio RED/IR, pero no está calibrada clínicamente. Por eso se informa con calidad experimental: ratio plausible, PI suficiente, poca saturación, pocos artefactos y duración adecuada aumentan confianza. Debe validarse con referencia externa antes de usarla como criterio definitivo."),
+            ("Respiración experimental",
+             "La respiración se estima a partir de modulaciones lentas de la PPG. Necesita tomas más largas que el pulso para ser estable. En tomas cortas puede salir como no estimable o con calidad baja."),
+            ("Puntuación final",
+             "La puntuación combina cercanía a la referencia manual cuando existe, calidad Fourier IR, acuerdo entre FFT/autocorrelación/Hilbert, estabilidad de Hilbert, PI, artefactos, saturación, calidad SpO2, jitter de muestreo y duración. Wavelet aporta una corrección secundaria: +5 si confirma muy bien, +3 si apoya, +1 si coincide con calidad limitada, -3 si una Wavelet media contradice FFT/ref y -1 si es débil o cae en borde de banda. Es un criterio comparativo interno para elegir configuraciones."),
             ("Lectura rigurosa",
-             "Fourier mide periodicidad espectral; Hilbert mira evolucion temporal de amplitud y fase; autocorrelacion comprueba repeticion del patron. Una configuracion es preferible si concentra energia en la banda cardiaca esperada, tiene un pico dominante y estrecho, coincide con RED/autocorrelacion/Hilbert, evita saturacion ADC y mantiene suficiente componente pulsatile. No sustituye validacion con pulso de referencia."),
+             "Fourier mide periodicidad espectral en la ventana analizada; Hilbert mira evolución temporal de amplitud y fase; autocorrelación comprueba repetición del patrón. Una configuración es preferible si concentra energía en la banda cardiaca esperada, tiene un pico dominante y estrecho, coincide con RED/autocorrelación/Hilbert, evita saturación ADC y mantiene suficiente componente pulsátil. No sustituye validación con pulso de referencia."),
         ]
         for title, body in explanations:
             if y > page.y() + margin + height - 95:
@@ -1654,32 +1654,32 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
         draw_rule()
         if y > page.y() + margin + height - 260:
             new_page()
-        draw_text("Leyenda de escalas e interpretacion", 18, True)
+        draw_text("Leyenda de escalas e interpretación", 18, True)
         draw_table(
             ["Metrica", "Escala / unidad", "Interpretacion practica"],
             [
-                ["Puntuacion", "0-100", "Mas alto es mejor. >=75 mejor candidata; 58-74 buena; 42-57 usable con cautela; <42 no recomendable."],
-                ["Pulso ref.", "BPM", "Media de lecturas manuales validas. Se ignoran 0/vacios. Es la referencia externa principal si esta disponible."],
+                ["Puntuación", "0-100", "Más alto es mejor. >=75 mejor candidata; 58-74 buena; 42-57 usable con cautela; <42 no recomendable."],
+                ["Pulso ref.", "BPM", "Media de lecturas manuales válidas. Se ignoran 0/vacíos. Es la referencia externa principal si está disponible."],
                 ["Dif. FFT-ref", "BPM", "Diferencia absoluta entre BPM por Fourier IR y pulso de referencia. Menor es mejor."],
                 ["Calidad Hilbert", "0-100", "Mas alto indica envolvente mas regular y fase mas coherente. Usar como apoyo, no como criterio unico."],
                 ["Calidad Wavelet", "0-100", "Metrica experimental de concentracion tiempo-frecuencia y estabilidad. Peso secundario: max +5, menor que Hilbert, y condicionada a que no contradiga FFT/ref."],
-                ["Calidad SpO2", "0-100", "Confianza interna en el calculo experimental RED/IR. No equivale a validacion clinica."],
+                ["Calidad SpO2", "0-100", "Confianza interna en el cálculo experimental RED/IR. No equivale a validación clínica."],
                 ["Calidad Resp.", "0-100", "Confianza interna en la respiracion estimada desde modulaciones lentas. Requiere tomas largas."],
-                ["Retenido", "%", "Porcentaje de muestras que entran al calculo tras estabilizacion inicial y descarte robusto de outliers."],
+                ["Retenido", "%", "Porcentaje de muestras que entran al cálculo tras estabilización inicial y descarte robusto de outliers."],
                 ["BPM", "latidos/min", "Estimacion de frecuencia cardiaca por FFT, autocorrelacion o Hilbert."],
                 ["Dominancia", "ratio", "Relacion entre pico principal y segundo pico en banda cardiaca. Mayor suele indicar pico mas claro."],
                 ["Banda cardiaca", "0-1", "Proporcion de energia util concentrada en la banda fisiologica esperada."],
                 ["SNR", "dB", "Separacion del pico frente al ruido de fondo espectral. Mayor suele ser mejor."],
                 ["PI IR/RED", "%", "Indice de perfusion aproximado: componente pulsatile frente a nivel DC. Bajo PI implica pulso poco visible."],
                 ["Artefactos", "%", "Porcentaje de muestras o cambios sospechosos. Menor es mejor."],
-                ["Saturacion", "%", "Porcentaje cerca del techo digital ADC. Menor es mejor; saturacion alta indica perdida de informacion."],
+                ["Saturación", "%", "Porcentaje cerca del techo digital ADC. Menor es mejor; saturación alta indica pérdida de información."],
                 ["Jitter", "%", "Irregularidad temporal del muestreo. Menor es mejor."],
             ],
             [92, 92, width - 184],
             row_h=42,
         )
 
-        draw_text("Mini nota de formulas y criterios usados", 18, True)
+        draw_text("Mini nota de fórmulas y criterios usados", 18, True)
         draw_table(
             ["Bloque", "Formula / criterio resumido"],
             [
@@ -1687,28 +1687,28 @@ class FourierAnalysisWindow(QtWidgets.QMainWindow):
                 ["Dominancia", "pico_principal / segundo_pico en la banda cardiaca. Evita elegir configuraciones con varios picos parecidos."],
                 ["Energia de banda", "energia_en_banda_cardiaca / energia_util. Favorece configuraciones que concentran energia donde se espera pulso."],
                 ["SNR", "20*log10(pico / suelo_de_ruido). El suelo se aproxima con la mediana del espectro alrededor de la banda sin el pico principal."],
-                ["Autocorrelacion", "Se busca el retardo de repeticion mas fuerte dentro de los retardos compatibles con BPM minimo/maximo."],
-                ["Hilbert", "La senal analitica se obtiene anulando frecuencias negativas y duplicando positivas mediante FFT. Envolvente=abs(senal_analitica); fase=unwrap(angle())."],
+                ["Autocorrelación", "Se busca el retardo de repetición más fuerte dentro de los retardos compatibles con BPM mínimo/máximo."],
+                ["Hilbert", "La señal analítica se obtiene anulando frecuencias negativas y duplicando positivas mediante FFT. Envolvente=abs(señal_analítica); fase=unwrap(angle())."],
                 ["BPM Hilbert", "Derivada temporal de la fase instantanea: diff(fase) * Hz * 60 / (2*pi), usando valores dentro de banda fisiologica."],
                 ["Wavelet", "Se aplica una familia de wavelets Morlet sobre IR en la banda cardiaca. El BPM Wavelet es el pico de energia; la calidad combina dominancia, concentracion frente a la mediana y CV temporal de potencia."],
-                ["Pulso ref.", "mean(pulso_previo, pulso_final_pulsio, pulso_final_fonendo), descartando valores no numericos, vacios o iguales a 0."],
+                ["Pulso ref.", "mean(pulso_previo, pulso_final_pulsio, pulso_final_fonendo), descartando valores no numéricos, vacíos o iguales a 0."],
                 ["Dif. ref.", "abs(BPM_estimado - pulso_ref). Se usa como criterio externo de comparacion cuando hay referencia manual."],
                 ["CV envolvente", "std(envolvente) / media(envolvente) * 100. CV menor implica amplitud mas estable."],
-                ["PI", "AC/DC * 100, donde AC se estima como energia RMS de la senal pulsatile procesada y DC como media raw."],
+                ["PI", "AC/DC * 100, donde AC se estima como energía RMS de la señal pulsátil procesada y DC como media raw."],
                 ["SpO2", "Estimacion experimental desde ratio R=(AC_RED/DC_RED)/(AC_IR/DC_IR). No calibrada para uso clinico."],
                 ["Respiracion", "Estimacion experimental desde modulaciones lentas de la PPG; solo orientativa sin referencia externa."],
-                ["Puntuacion", "Suma ponderada experimental con bonus por cercania a referencia y acuerdo entre estimadores. Wavelet pesa menos que Hilbert: +5/+3/+1 si confirma, -3 si contradice con calidad media y -1 si es debil."],
+                ["Puntuación", "Suma ponderada experimental con bonus por cercanía a referencia y acuerdo entre estimadores. Wavelet pesa menos que Hilbert: +5/+3/+1 si confirma, -3 si contradice con calidad media y -1 si es débil."],
             ],
             [110, width - 110],
             row_h=48,
         )
 
-        draw_text("Recomendacion para documentacion", 13, True, gap=6)
+        draw_text("Recomendación para documentación", 13, True, gap=6)
         draw_text(
-            "En memoria o tesis, describir este informe como un analisis comparativo interno de calidad de senal PPG. "
+            "En memoria o tesis, describir este informe como un análisis comparativo interno de calidad de señal PPG. "
             "La mejor configuracion no debe presentarse como verdad fisiologica absoluta, sino como la opcion que, dentro de las tomas seleccionadas, "
-            "maximiza coherencia espectral, estabilidad temporal y visibilidad del pulso con menor presencia de artefactos o saturacion. "
-            "Para conclusiones fisiologicas, contrastar con pulsioximetro o referencia externa.",
+            "maximiza coherencia espectral, estabilidad temporal y visibilidad del pulso con menor presencia de artefactos o saturación. "
+            "Para conclusiones fisiológicas, contrastar con pulsioxímetro o referencia externa.",
             10,
             gap=12,
         )

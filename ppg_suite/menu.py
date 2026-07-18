@@ -13,6 +13,10 @@ AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m
 RUMIANDO_ASSET_DIR = Path(__file__).resolve().parent / "assets" / "rumiando"
 
 
+def icon_text(text: str) -> str:
+    return f"  {text}"
+
+
 class ModeSelectDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,12 +44,12 @@ class ModeSelectDialog(QtWidgets.QDialog):
         hero_text = QtWidgets.QVBoxLayout()
         hero_text.setContentsMargins(0, 8, 0, 0)
         hero_text.setSpacing(8)
-        title = QtWidgets.QLabel("Medicion PPG")
+        title = QtWidgets.QLabel("Medición PPG")
         title.setObjectName("title")
         title.setFont(QtGui.QFont("Arial", 22, QtGui.QFont.Weight.Bold))
         hero_text.addWidget(title)
 
-        subtitle = QtWidgets.QLabel("Medicion de campo: toma rapida con la interfaz minima y los datos esenciales.")
+        subtitle = QtWidgets.QLabel("Medición de campo: toma rápida con la interfaz mínima y los datos esenciales.")
         subtitle.setObjectName("subtitle")
         subtitle.setWordWrap(True)
         hero_text.addWidget(subtitle)
@@ -53,21 +57,21 @@ class ModeSelectDialog(QtWidgets.QDialog):
         hero.addLayout(hero_text, stretch=1)
         layout.addLayout(hero)
 
-        self.btn_real = QtWidgets.QPushButton("Medicion de campo")
+        self.btn_real = QtWidgets.QPushButton(icon_text("Medición de campo"))
         self.btn_real.setObjectName("primaryMode")
         self.btn_real.setMinimumHeight(104)
         self.btn_real.setFont(QtGui.QFont("Arial", 16, QtGui.QFont.Weight.Bold))
         layout.addWidget(self.btn_real)
 
-        self.btn_test = QtWidgets.QPushButton("Test de campo")
-        self.btn_temp = QtWidgets.QPushButton("Solo temperatura")
-        self.btn_reajustes = QtWidgets.QPushButton("Reajustes")
-        self.btn_configurations = QtWidgets.QPushButton("Configuraciones")
-        self.btn_3m = QtWidgets.QPushButton("Experimento 3M")
-        self.btn_vacuum = QtWidgets.QPushButton("Experimento con vacio")
-        self.btn_relations = QtWidgets.QPushButton("Estadisticas")
-        self.btn_animals = QtWidgets.QPushButton("Animales")
-        self.btn_fourier = QtWidgets.QPushButton("Analisis experimental de Fourier")
+        self.btn_test = QtWidgets.QPushButton(icon_text("Test de campo"))
+        self.btn_temp = QtWidgets.QPushButton(icon_text("Solo temperatura"))
+        self.btn_reajustes = QtWidgets.QPushButton(icon_text("Reajustes"))
+        self.btn_configurations = QtWidgets.QPushButton(icon_text("Configuraciones"))
+        self.btn_3m = QtWidgets.QPushButton(icon_text("Experimento 3M"))
+        self.btn_vacuum = QtWidgets.QPushButton(icon_text("Experimento con vacío"))
+        self.btn_relations = QtWidgets.QPushButton(icon_text("Estadísticas"))
+        self.btn_animals = QtWidgets.QPushButton(icon_text("Animales"))
+        self.btn_fourier = QtWidgets.QPushButton(icon_text("Análisis experimental de Fourier"))
 
         secondary_buttons = [
             self.btn_relations, self.btn_animals, self.btn_fourier, self.btn_configurations,
@@ -114,21 +118,21 @@ class ModeSelectDialog(QtWidgets.QDialog):
         layout.addWidget(self.other_modes_widget)
 
         info = QtWidgets.QLabel(
-            "Test de campo: toma con notas, parametros desplegables y graficas diagnosticas.\n"
+            "Test de campo: toma con notas, parámetros desplegables y gráficas diagnósticas.\n"
             "Solo temperatura: registro NTC sin PPG.\n"
-            "Reajustes: calibracion larga con controles completos.\n"
+            "Reajustes: calibración larga con controles completos.\n"
             "Configuraciones: tabla editable para crear, pegar y ejecutar pruebas de sensor.\n"
-            "Experimento 3M: optimizacion adaptativa del sensor usando BPM manual, pulso PPG, SpO2, ruido, PI y saturacion.\n"
-            "Experimento con vacio: PPG y microfono sincronizados; el notch se aplica solo al informe final.\n"
-            "Estadisticas: sesiones, resultados, configuraciones y graficas comparativas.\n"
-            "Animales: fichas, notas, archivos, medias e historico por animal.\n"
-            "Fourier experimental: compara varios raw y razona que configuracion separa mejor el pulso."
+            "Experimento 3M: optimización adaptativa del sensor usando BPM manual, pulso PPG, SpO2, ruido, PI y saturación.\n"
+            "Experimento con vacío: PPG y micrófono sincronizados; el notch se aplica solo al informe final.\n"
+            "Estadísticas: sesiones, resultados, configuraciones y gráficas comparativas.\n"
+            "Animales: fichas, notas, archivos, medias e histórico por animal.\n"
+            "Fourier experimental: compara varios raw y razona qué configuración separa mejor el pulso."
         )
         info.setObjectName("infoText")
         info.setWordWrap(True)
         layout.addWidget(info, stretch=1)
 
-        self.btn_updates = QtWidgets.QPushButton("Ultimas actualizaciones")
+        self.btn_updates = QtWidgets.QPushButton(icon_text("Últimas actualizaciones"))
         self.btn_updates.setObjectName("updatesButton")
         self.btn_updates.setMinimumHeight(30)
         self.btn_updates.setIcon(self.asset_icon("icon-listado-green.png"))
@@ -199,7 +203,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
                 border: 2px solid #3f6f4b;
                 color: #1f4f35;
                 font-weight: 700;
-                padding: 14px 28px;
+                padding: 14px 10px;
                 text-align: center;
             }
             QPushButton#otherToggle {
@@ -260,16 +264,16 @@ class ModeSelectDialog(QtWidgets.QDialog):
         update_dir = BASE_DIR / "actualizaciones"
         files = sorted(update_dir.glob("ACTUALIZACIONES_*.txt"), key=self.update_file_date)
         if not files:
-            QtWidgets.QMessageBox.information(self, "Ultimas actualizaciones", "No hay archivo de actualizaciones.")
+            QtWidgets.QMessageBox.information(self, "Últimas actualizaciones", "No hay archivo de actualizaciones.")
             return
         path = files[-1]
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as exc:
-            QtWidgets.QMessageBox.warning(self, "Ultimas actualizaciones", f"No se pudo leer:\n{path}\n\n{exc}")
+            QtWidgets.QMessageBox.warning(self, "Últimas actualizaciones", f"No se pudo leer:\n{path}\n\n{exc}")
             return
         dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle(f"Ultimas actualizaciones - {path.name}")
+        dialog.setWindowTitle(f"Últimas actualizaciones - {path.name}")
         dialog.resize(720, 520)
         layout = QtWidgets.QVBoxLayout(dialog)
         view = QtWidgets.QPlainTextEdit()

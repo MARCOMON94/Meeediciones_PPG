@@ -44,6 +44,7 @@ from ..animal_config import (
     positions_for_animal,
 )
 from ..menu import AppMode
+from ..io_utils import atomic_csv_dict_writer, atomic_csv_writer, atomic_write_json
 from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
 from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR, log
 from ..processing import (
@@ -336,7 +337,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.temp_mapping_widget = self.create_temp_mapping_widget()
         self.temp_monitor_widget = self.create_temp_monitor_widget()
         self.vacuum_combo = QtWidgets.QComboBox()
-        self.vacuum_combo.addItems(["", "con vacio", "sin vacio"])
+        self.vacuum_combo.addItems(["", "con vacío", "sin vacío"])
         self.condition_edit = QtWidgets.QLineEdit()
         self.animal_combo.currentIndexChanged.connect(self.refresh_animal_dependent_controls)
         self.condition_edit.setPlaceholderText("Ej.: campo, ordeño activo, sensor reajustado, animal inquieto...")
@@ -348,7 +349,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         cap.addRow("Sensor:", self.udder_combo)
         cap.addRow("Termometros:", self.temp_mapping_widget)
         cap.addRow("Temperatura:", self.temp_monitor_widget)
-        cap.addRow("Medicion:", self.vacuum_combo)
+        cap.addRow("Medición:", self.vacuum_combo)
         cap.addRow("Anotaciones inicio:", self.condition_edit)
         left.addWidget(capture_group)
         self.refresh_animal_dependent_controls()
@@ -706,8 +707,7 @@ class PPGSuite(QtWidgets.QMainWindow):
 
     def save_animal_profiles(self, profiles: dict[str, dict]):
         path = self.animal_profile_path()
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(profiles, f, indent=2, ensure_ascii=False)
+        atomic_write_json(path, profiles)
 
     def current_animal_profile(self) -> dict:
         animal_type = self.current_animal_type()
@@ -794,22 +794,22 @@ class PPGSuite(QtWidgets.QMainWindow):
         if previous:
             msg = QtWidgets.QMessageBox(self)
             msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
-            msg.setWindowTitle("Cambiar configuracion de especie")
-            msg.setText(f"La configuracion anterior predefinida para {animal_name} es esta:")
+            msg.setWindowTitle("Cambiar configuración de especie")
+            msg.setText(f"La configuración anterior predefinida para {animal_name} es esta:")
             msg.setInformativeText(
                 f"{self.profile_summary_text(previous)}\n\n"
                 f"La configuracion seleccionada ahora es esta:\n"
                 f"{self.profile_summary_text(profile)}\n\n"
                 "Quieres cambiarla por la seleccionada?"
             )
-            change_btn = msg.addButton("Cambiar configuracion", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            change_btn = msg.addButton("Cambiar configuración", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
             msg.addButton("Cancelar", QtWidgets.QMessageBox.ButtonRole.RejectRole)
             msg.exec()
             if msg.clickedButton() != change_btn:
                 return
         profiles[animal_key] = profile
         self.save_animal_profiles(profiles)
-        QtWidgets.QMessageBox.information(self, "Configuracion de especie", f"Configuracion guardada para {animal_name}.")
+        QtWidgets.QMessageBox.information(self, "Configuración de especie", f"Configuración guardada para {animal_name}.")
 
     def is_bluetooth_port(self, port_info) -> bool:
         txt = f"{getattr(port_info, 'device', '')} {getattr(port_info, 'description', '')} {getattr(port_info, 'hwid', '')}".upper()
@@ -910,6 +910,23 @@ class PPGSuite(QtWidgets.QMainWindow):
         if finish_capture:
             self._finish_capture_after_serial_loss("DESCONEXION_SERIAL")
 
+    def _open_serial_connection(self, port: str):
+        if port == BLE_PORT_ID:
+            log.info("Abriendo BLE Nano 33 IoT")
+            return BleSerialAdapter(), "BLE Nano 33 IoT"
+        log.info("Abriendo puerto %s @ 115200", port)
+        serial_port = serial.Serial(port, 115200, timeout=0, write_timeout=1)
+        serial_port.reset_output_buffer()
+        time.sleep(2.0)
+        return serial_port, port
+
+    def _send_initial_sensor_handshake(self):
+        self.send_command("REINIT_SENSOR")
+        self.send_command("STATUS")
+        # El firmware recibe la configuracion actual al conectar, no solo al iniciar toma.
+        self.last_sensor_config = self.sensor_widget.get_config()
+        self.send_command(self.last_sensor_config.command())
+
     def connect_port(self, port: str):
         self._close_serial_safely()
         self.serial_port = None
@@ -920,21 +937,8 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.state.last_config_ack = self.last_config_ack
         self.state.last_config_line = self.last_config_line
         try:
-            if port == BLE_PORT_ID:
-                log.info("Abriendo BLE Nano 33 IoT")
-                self.serial_port = BleSerialAdapter()
-                self.port_name = "BLE Nano 33 IoT"
-            else:
-                log.info("Abriendo puerto %s @ 115200", port)
-                self.serial_port = serial.Serial(port, 115200, timeout=0, write_timeout=1)
-                self.serial_port.reset_output_buffer()
-                time.sleep(2.0)
-                self.port_name = port
-            self.send_command("REINIT_SENSOR")
-            self.send_command("STATUS")
-            # El firmware recibe la configuración actual al conectar, no solo al iniciar toma.
-            self.last_sensor_config = self.sensor_widget.get_config()
-            self.send_command(self.last_sensor_config.command())
+            self.serial_port, self.port_name = self._open_serial_connection(port)
+            self._send_initial_sensor_handshake()
         except Exception as exc:
             self._close_serial_safely()
             self.serial_port = None
@@ -1146,7 +1150,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         except ValueError:
             bpm = math.nan
         if not (math.isfinite(bpm) and bpm > 0):
-            QtWidgets.QMessageBox.warning(self, "Pulso inicial", "Introduce un BPM inicial valido o inicia sin BPM.")
+            QtWidgets.QMessageBox.warning(self, "Pulso inicial", "Introduce un BPM inicial válido o inicia sin BPM.")
             return self.ensure_initial_pulse_or_confirm()
         self.prev_pulse_edit.setText(value)
         return value
@@ -1879,7 +1883,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         form.addRow("Pulsaciones finales pulsioxímetro:", pulsio)
         form.addRow("Pulsaciones finales fonendo:", fonendo)
         notes = QtWidgets.QPlainTextEdit(st.final_annotations)
-        notes.setPlaceholderText("Ej.: animal se movio al final, sensor recolocado, tos, retirada parcial, incidencia...")
+        notes.setPlaceholderText("Ej.: animal se movió al final, sensor recolocado, tos, retirada parcial, incidencia...")
         notes.setMinimumHeight(74)
         form.addRow("Anotaciones finales:", notes)
         buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
@@ -1932,8 +1936,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             row["bpm_estable_calidad"] = fmt(st.metrics.bpm_estable_calidad, 1, "")
             row["bpm_estable_muestras"] = str(st.metrics.bpm_estable_muestras or "")
         try:
-            with open(path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";", extrasaction="ignore")
+            with atomic_csv_dict_writer(path, fieldnames, delimiter=";", extrasaction="ignore") as writer:
                 writer.writeheader()
                 writer.writerows(rows)
         except OSError as exc:
@@ -1942,8 +1945,7 @@ class PPGSuite(QtWidgets.QMainWindow):
     def save_current_config_json(self, prefix: str):
         data = {"sensor": asdict(self.sensor_widget.get_config()), "analysis": asdict(self.analysis_widget.get_config()), "base_dir": str(BASE_DIR), "results_dir": str(self.results_dir), "created": datetime.now().isoformat()}
         path = self.config_dir / f"{prefix}_{now_stamp()}.json"
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        atomic_write_json(path, data)
         self.state.config_file = path
 
     def save_processed(self):
@@ -1981,8 +1983,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             nearest = nearest[(nearest >= 0) & (nearest < t.size)]
             peak_flags[nearest] = 1
         st.processed_file = self.processed_dir / f"proc_{st.base_name}.csv"
-        with open(st.processed_file, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, delimiter=";")
+        with atomic_csv_writer(st.processed_file, delimiter=";") as w:
             w.writerow([
                 "session_id", "id", "base_name", "modo", "animal_type", "condiciones_medida", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label", "sample_index", "tiempo_s",
                 "red_raw", "ir_raw", "temp_c", "temp_raw", "temp_a0_c", "temp_a0_raw", "temp_a1_c", "temp_a1_raw", "temp_a2_c", "temp_a2_raw", "temp_a3_c", "temp_a3_raw",
@@ -2024,8 +2025,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         if not st.base_name:
             return
         st.blocks_file = self.report_dir / f"bpm_blocks_10s_{st.base_name}.csv"
-        with open(st.blocks_file, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, delimiter=";")
+        with atomic_csv_writer(st.blocks_file, delimiter=";") as w:
             w.writerow(["session_id", "id", "base_name", "modo", "bloque", "inicio_s", "fin_s", "bpm_medio_10s"] )
             for i, bpm in enumerate(st.bpm_blocks_10s):
                 start = i * 10
@@ -2102,8 +2102,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             },
             "created": datetime.now().isoformat(),
         }
-        with open(st.summary_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        atomic_write_json(st.summary_file, data)
 
     def write_session_header(self):
         header = [
