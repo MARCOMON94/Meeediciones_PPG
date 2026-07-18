@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+from dataclasses import replace
 import math
 from typing import Optional
 
@@ -563,6 +565,128 @@ def block_bpm(t: np.ndarray, ir: np.ndarray, sensor_cfg: SensorConfig, cfg: Anal
     return out
 
 
+def _stable_window_shape_score(
+    local_t: np.ndarray,
+    local_red: np.ndarray,
+    local_ir: np.ndarray,
+    sensor_cfg: SensorConfig,
+    cfg: AnalysisConfig,
+) -> tuple[bool, float, list[str], dict[str, float]]:
+    local_cfg = replace(cfg, ignore_initial_seconds=0.0)
+    met = score_and_merge_metrics(local_t, local_red, local_ir, sensor_cfg, local_cfg)
+    reasons: list[str] = []
+    values = {
+        "artifact_ir_pct": met.artifact_ir_pct,
+        "artifact_red_pct": met.artifact_red_pct,
+        "saturation_pct": met.saturation_pct,
+        "pi_ir_pct": met.pi_ir_pct,
+        "ir_drift": math.nan,
+        "red_drift": math.nan,
+        "ir_baseline_shift_pct": math.nan,
+        "red_baseline_shift_pct": math.nan,
+    }
+    if np.isfinite(met.artifact_ir_pct) and met.artifact_ir_pct > 12.0:
+        return False, -25.0, [f"artefactos IR altos ({met.artifact_ir_pct:.1f} %)"], values
+    if np.isfinite(met.artifact_red_pct) and met.artifact_red_pct > 14.0:
+        return False, -20.0, [f"artefactos RED altos ({met.artifact_red_pct:.1f} %)"], values
+    if np.isfinite(met.saturation_pct) and met.saturation_pct > 1.0:
+        return False, -20.0, [f"saturación ADC ({met.saturation_pct:.1f} %)"], values
+    if np.isfinite(met.pi_ir_pct):
+        if met.pi_ir_pct < 0.04:
+            return False, -15.0, [f"PI IR demasiado bajo ({met.pi_ir_pct:.3f} %)"], values
+        if met.pi_ir_pct < 0.12:
+            reasons.append(f"PI IR bajo ({met.pi_ir_pct:.3f} %)")
+
+    def drift_span(values: np.ndarray) -> float:
+        finite = np.isfinite(local_t) & np.isfinite(values)
+        if int(np.sum(finite)) < 20:
+            return math.inf
+        x = local_t[finite] - float(local_t[finite][0])
+        y = robust_normalize(values[finite])
+        if x.size < 20 or float(x[-1] - x[0]) <= 0:
+            return math.inf
+        slope, _intercept = np.polyfit(x, y, 1)
+        return float(abs(slope) * (x[-1] - x[0]))
+
+    def baseline_shift_pct(values: np.ndarray) -> float:
+        finite = np.isfinite(local_t) & np.isfinite(values)
+        if int(np.sum(finite)) < 20:
+            return math.inf
+        x = local_t[finite] - float(local_t[finite][0])
+        y = values[finite]
+        if x.size < 20 or float(x[-1] - x[0]) <= 0:
+            return math.inf
+        slope, _intercept = np.polyfit(x, y, 1)
+        shift = float(abs(slope) * (x[-1] - x[0]))
+        dc = max(abs(float(np.median(y))), 1.0)
+        return float((shift / dc) * 100.0)
+
+    ir_drift = drift_span(local_ir)
+    red_drift = drift_span(local_red) if np.any(np.isfinite(local_red)) else math.nan
+    ir_shift_pct = baseline_shift_pct(local_ir)
+    red_shift_pct = baseline_shift_pct(local_red) if np.any(np.isfinite(local_red)) else math.nan
+    values["ir_drift"] = ir_drift
+    values["red_drift"] = red_drift
+    values["ir_baseline_shift_pct"] = ir_shift_pct
+    values["red_baseline_shift_pct"] = red_shift_pct
+    if np.isfinite(ir_shift_pct) and ir_shift_pct > 10.0:
+        return False, -25.0, [f"deriva de línea base IR alta ({ir_shift_pct:.1f} %)"], values
+    if np.isfinite(red_shift_pct) and red_shift_pct > 10.0:
+        return False, -18.0, [f"deriva de línea base RED alta ({red_shift_pct:.1f} %)"], values
+    if np.isfinite(ir_drift):
+        if ir_drift > 3.2:
+            return False, -25.0, [f"deriva IR alta ({ir_drift:.2f})"], values
+        if ir_drift > 1.8:
+            reasons.append(f"deriva IR moderada ({ir_drift:.2f})")
+    if np.isfinite(red_drift):
+        if red_drift > 3.6:
+            return False, -18.0, [f"deriva RED alta ({red_drift:.2f})"], values
+        if red_drift > 2.2:
+            reasons.append(f"deriva RED moderada ({red_drift:.2f})")
+
+    drift_penalty = 0.0
+    if np.isfinite(ir_drift):
+        drift_penalty += min(18.0, ir_drift * 6.0)
+    if np.isfinite(red_drift):
+        drift_penalty += min(12.0, red_drift * 4.0)
+    artifact_penalty = 0.0
+    if np.isfinite(met.artifact_ir_pct):
+        if met.artifact_ir_pct > 6.0:
+            reasons.append(f"artefactos IR moderados ({met.artifact_ir_pct:.1f} %)")
+        artifact_penalty += met.artifact_ir_pct * 1.5
+    if np.isfinite(met.artifact_red_pct):
+        if met.artifact_red_pct > 8.0:
+            reasons.append(f"artefactos RED moderados ({met.artifact_red_pct:.1f} %)")
+        artifact_penalty += met.artifact_red_pct
+    pi_bonus = min(12.0, max(0.0, met.pi_ir_pct * 3.0)) if np.isfinite(met.pi_ir_pct) else 0.0
+    low_signal_penalty = max(0.0, (0.12 - met.pi_ir_pct) * 120.0) if np.isfinite(met.pi_ir_pct) else 0.0
+    return True, float(70.0 + pi_bonus - low_signal_penalty - drift_penalty - artifact_penalty), reasons, values
+
+
+def _stable_reason_summary(total_windows: int, accepted_windows: int, rejection_counts: Counter[str], extra: list[str] | None = None) -> str:
+    parts: list[str] = []
+    if accepted_windows:
+        parts.append(f"{accepted_windows}/{total_windows} ventanas de 5 s pasaron el filtro estable")
+    else:
+        parts.append(f"0/{total_windows} ventanas de 5 s pasaron el filtro estable")
+    if rejection_counts:
+        grouped: Counter[str] = Counter()
+        for reason, count in rejection_counts.items():
+            label = reason
+            if not reason.startswith("BPM fuera de referencia manual"):
+                label = reason.split(" (", 1)[0]
+            grouped[label] += count
+        common = ", ".join(f"{reason} ({count})" for reason, count in grouped.most_common(4))
+        parts.append(f"motivos principales: {common}")
+    if extra:
+        parts.extend(extra)
+    return "; ".join(part for part in parts if part)
+
+
+def _stable_reference_tolerance(reference_bpm: float) -> float:
+    return float(max(24.0, min(32.0, abs(reference_bpm) * 0.38)))
+
+
 def stable_bpm_segment(
     t: np.ndarray,
     red: np.ndarray,
@@ -570,8 +694,17 @@ def stable_bpm_segment(
     sensor_cfg: SensorConfig,
     cfg: AnalysisConfig,
     window_s: float = 5.0,
+    reference_bpm: float | None = None,
 ) -> Metrics:
     out = Metrics()
+    ref_bpm = math.nan
+    if reference_bpm is not None:
+        try:
+            ref_bpm = float(reference_bpm)
+        except (TypeError, ValueError):
+            ref_bpm = math.nan
+    ref_ok = np.isfinite(ref_bpm) and ref_bpm > 0
+    ref_tolerance = _stable_reference_tolerance(ref_bpm) if ref_ok else math.nan
     n = min(t.size, red.size, ir.size)
     if n < 80:
         return out
@@ -592,17 +725,27 @@ def stable_bpm_segment(
     min_samples = 80
     if np.isfinite(hz) and hz > 0:
         min_samples = max(min_samples, int(round(hz * window_s * 0.45)))
-    best: tuple[float, float, float, Metrics, int] | None = None
+    best: tuple[float, float, float, Metrics, int, list[str]] | None = None
+    total_windows = 0
+    accepted_windows = 0
+    rejection_counts: Counter[str] = Counter()
     step_s = 0.5
     start = 0.0
     max_start = max(0.0, duration - window_s)
     while start <= max_start + 1e-9:
+        total_windows += 1
         end = start + window_s
         mask = (t >= start) & (t <= end)
         samples = int(np.sum(mask))
         if samples >= min_samples:
             local_t = t[mask] - float(t[mask][0])
+            local_red = red[mask]
             local_ir = ir[mask]
+            shape_ok, shape_score, shape_reasons, shape_values = _stable_window_shape_score(local_t, local_red, local_ir, sensor_cfg, cfg)
+            if not shape_ok:
+                rejection_counts.update(shape_reasons or ["señal no limpia"])
+                start += step_s
+                continue
             bpm_peak, q_peak, _r_peak, _polarity, _peaks, _peak_t = estimate_bpm_peaks(local_t, local_ir, cfg)
             bpm_fft, q_fft, _r_fft = estimate_bpm_fft(local_t, local_ir, cfg)
             bpm_acorr, q_acorr, _r_acorr = estimate_bpm_autocorr(local_t, local_ir, cfg)
@@ -612,11 +755,17 @@ def stable_bpm_segment(
                 if np.isfinite(value) and cfg.bpm_min <= value <= cfg.bpm_max and quality > 10.0
             ]
             if not candidates:
+                rejection_counts["sin candidatos BPM válidos"] += 1
                 start += step_s
                 continue
             values = [value for value, _quality in candidates]
             qualities = [quality for _value, quality in candidates]
             spread = (max(values) - min(values)) if len(values) >= 2 else 18.0
+            needs_strong_agreement = bool(shape_reasons)
+            if needs_strong_agreement and (len(candidates) < 2 or spread > 12.0):
+                rejection_counts["señal débil/variable sin acuerdo suficiente"] += 1
+                start += step_s
+                continue
             if len(candidates) >= 2 and spread <= 18.0:
                 weights = np.asarray(qualities, dtype=float)
                 bpm = float(np.average(np.asarray(values, dtype=float), weights=weights))
@@ -625,9 +774,20 @@ def stable_bpm_segment(
                 best_idx = int(np.argmax(qualities))
                 bpm = values[best_idx]
                 quality = float(np.clip(qualities[best_idx] * 0.55, 0.0, 60.0))
-            if quality < 30.0:
+            quality_floor = max(35.0, cfg.min_quality_to_accept)
+            if needs_strong_agreement:
+                quality_floor = max(60.0, quality_floor)
+            if quality < quality_floor:
+                rejection_counts[f"calidad de ventana baja ({quality:.0f}/100)"] += 1
                 start += step_s
                 continue
+            if ref_ok:
+                ref_diff = abs(bpm - ref_bpm)
+                if ref_diff > ref_tolerance:
+                    rejection_counts[f"BPM fuera de referencia manual (> {ref_tolerance:.0f} BPM)"] += 1
+                    start += step_s
+                    continue
+            accepted_windows += 1
             met = Metrics(
                 n=samples,
                 hz=estimate_hz(local_t),
@@ -639,17 +799,41 @@ def stable_bpm_segment(
                 quality=quality,
                 quality_label="estable",
             )
-            score = float(quality - min(45.0, spread * 2.0) + min(10.0, samples / max(1, min_samples)))
+            score = float(quality + shape_score - min(45.0, spread * 2.0) + min(10.0, samples / max(1, min_samples)))
             if best is None or score > best[0]:
-                best = (score, float(start), float(end), met, samples)
+                best_notes = list(shape_reasons)
+                best_notes.append(f"acuerdo entre estimadores: spread {spread:.1f} BPM")
+                if np.isfinite(shape_values.get("pi_ir_pct", math.nan)):
+                    best_notes.append(f"PI IR {shape_values['pi_ir_pct']:.3f} %")
+                if np.isfinite(shape_values.get("ir_drift", math.nan)):
+                    best_notes.append(f"deriva IR {shape_values['ir_drift']:.2f}")
+                if np.isfinite(shape_values.get("red_drift", math.nan)):
+                    best_notes.append(f"deriva RED {shape_values['red_drift']:.2f}")
+                if np.isfinite(shape_values.get("ir_baseline_shift_pct", math.nan)):
+                    best_notes.append(f"deriva línea base IR {shape_values['ir_baseline_shift_pct']:.1f} %")
+                if ref_ok:
+                    best_notes.append(f"diferencia con referencia manual {abs(bpm - ref_bpm):.1f} BPM")
+                best = (score, float(start), float(end), met, samples, best_notes)
+        else:
+            rejection_counts["pocas muestras en ventana"] += 1
         start += step_s
     if best is None:
+        out.bpm_estable_motivo = _stable_reason_summary(total_windows, accepted_windows, rejection_counts)
         return out
-    _score, start, end, met, samples = best
+    if total_windows > 1 and accepted_windows < 2:
+        out.bpm_estable_motivo = _stable_reason_summary(
+            total_windows,
+            accepted_windows,
+            rejection_counts,
+            ["solo apareció una ventana aislada; se deja vacío para evitar un tramo frágil"],
+        )
+        return out
+    _score, start, end, met, samples, best_notes = best
     out.bpm_estable_5s = float(met.bpm)
     out.bpm_estable_inicio_s = start
     out.bpm_estable_fin_s = end
     out.bpm_estable_calidad = float(met.quality)
     out.bpm_estable_muestras = int(samples)
+    out.bpm_estable_motivo = _stable_reason_summary(total_windows, accepted_windows, rejection_counts, [f"ventana elegida {start:.2f}-{end:.2f} s", *best_notes])
     return out
 

@@ -67,6 +67,18 @@ BLE_RX_UUID = "7f510002-1b15-4b91-9f4b-3a4d5f6e0001"
 BLE_TX_UUID = "7f510003-1b15-4b91-9f4b-3a4d5f6e0001"
 
 
+def _manual_reference_bpm(*values: object) -> float:
+    valid: list[float] = []
+    for value in values:
+        try:
+            bpm = float(str(value if value is not None else "").replace(",", "."))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(bpm) and bpm > 0:
+            valid.append(bpm)
+    return float(np.mean(valid)) if valid else math.nan
+
+
 def normalize_udder_text(value: str) -> str:
     return normalize_position(value)
 
@@ -1396,6 +1408,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                     "",
                     "",
                     "",
+                    "",
                     self.last_config_ack,
                     datetime.now().isoformat(timespec="milliseconds"),
                     st.measurement_condition,
@@ -1453,7 +1466,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
             "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
             "pulso_final_pulsio", "pulso_final_fonendo",
-            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
+            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
             "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales"
         ])
         st.raw_handle.flush()
@@ -1857,22 +1870,53 @@ class PPGSuite(QtWidgets.QMainWindow):
         t, red, ir = self.arrays()
         if t.size >= 20:
             st.metrics = score_and_merge_metrics(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config())
-            stable = stable_bpm_segment(t, red, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), window_s=5.0)
+        self.ask_final_reference(include_pulse=st.mode in ("normal", "long", "experimento_vacio"))
+        if t.size >= 20:
+            ref_bpm = _manual_reference_bpm(st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo)
+            stable = stable_bpm_segment(
+                t,
+                red,
+                ir,
+                self.sensor_widget.get_config(),
+                self.analysis_widget.get_config(),
+                window_s=5.0,
+                reference_bpm=ref_bpm,
+            )
             st.metrics.bpm_estable_5s = stable.bpm_estable_5s
             st.metrics.bpm_estable_inicio_s = stable.bpm_estable_inicio_s
             st.metrics.bpm_estable_fin_s = stable.bpm_estable_fin_s
             st.metrics.bpm_estable_calidad = stable.bpm_estable_calidad
             st.metrics.bpm_estable_muestras = stable.bpm_estable_muestras
+            st.metrics.bpm_estable_motivo = stable.bpm_estable_motivo
             st.bpm_blocks = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=2)
             st.bpm_blocks_10s = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=10)
-        self.ask_final_reference(include_pulse=st.mode in ("normal", "long", "experimento_vacio"))
         self.update_raw_manual_reference()
         self.save_processed()
         self.save_blocks_file()
         self.save_images()
         self.save_summary(reason)
         self.write_session_row(reason)
+        self.show_stable_bpm_warning_if_needed()
         log.info("Captura finalizada: %s muestras=%s motivo=%s", st.base_name, len(st.t), reason)
+
+    def show_stable_bpm_warning_if_needed(self):
+        st = self.state
+        m = st.metrics
+        if st.mode in {"idle", "temp", "temp_ajuste"}:
+            return
+        if not np.isfinite(m.duration_s) or m.duration_s < 5.0:
+            return
+        if np.isfinite(m.bpm_estable_5s):
+            return
+        reason = m.bpm_estable_motivo or "No se encontró ninguna ventana de 5 segundos con señal limpia y BPM coherente."
+        QtWidgets.QMessageBox.warning(
+            self,
+            "BPM estable no fiable",
+            "Esta toma no tiene ningún tramo estable fiable de 5 segundos.\n\n"
+            f"Raw: {st.raw_file.name if st.raw_file else st.base_name or '-'}\n\n"
+            f"Motivo: {reason}\n\n"
+            "Aviso para Julián: repetir o revisar esta toma antes de usarla como referencia estable.",
+        )
 
     def ask_final_reference(self, include_pulse: bool = True):
         st = self.state
@@ -1913,7 +1957,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
             "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
             "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales",
-            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
+            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
         ):
             if field not in fieldnames:
                 fieldnames.append(field)
@@ -1935,6 +1979,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             row["bpm_estable_fin_s"] = fmt(st.metrics.bpm_estable_fin_s, 3, "")
             row["bpm_estable_calidad"] = fmt(st.metrics.bpm_estable_calidad, 1, "")
             row["bpm_estable_muestras"] = str(st.metrics.bpm_estable_muestras or "")
+            row["bpm_estable_motivo"] = st.metrics.bpm_estable_motivo
         try:
             with atomic_csv_dict_writer(path, fieldnames, delimiter=";", extrasaction="ignore") as writer:
                 writer.writeheader()
@@ -1990,7 +2035,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
-                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
+                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -2017,7 +2062,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, ""),
                     fmt(st.metrics.bpm_estable_5s, 2, ""), fmt(st.metrics.bpm_estable_inicio_s, 3, ""), fmt(st.metrics.bpm_estable_fin_s, 3, ""),
-                    fmt(st.metrics.bpm_estable_calidad, 1, ""), str(st.metrics.bpm_estable_muestras or ""),
+                    fmt(st.metrics.bpm_estable_calidad, 1, ""), str(st.metrics.bpm_estable_muestras or ""), st.metrics.bpm_estable_motivo,
                 ])
 
     def save_blocks_file(self):
@@ -2110,7 +2155,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "animal_type", "ubre", "temp_mapping", "temp_primary_channel", "medicion_vacio", "config_label",
             "motivo_fin", "duracion_solicitada_s", "muestras", "duracion_real_s", "hz_real",
             "bpm", "bpm_peak", "bpm_fft", "bpm_autocorr", "calidad", "calidad_label",
-            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
+            "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
             "spo2_pct", "ratio_r", "resp_min_exp", "resp_calidad_exp", "resp_razon_exp",
             "temp_c_final_max_5s", "temp_c_final_time_s", "temp_c_final_raw_at_max", "temp_c_ultima", "temp_c_media", "temp_raw_ultima",
             "temp_rt_c_final_max_5s", "temp_rt_c_final_time_s", "temp_rt_c_final_raw_at_max", "temp_rt_c_ultima", "temp_rt_c_media", "temp_rt_raw_ultima",
@@ -2141,7 +2186,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             fmt(m.bpm, 1, ""), fmt(m.bpm_peak, 1, ""), fmt(m.bpm_fft, 1, ""), fmt(m.bpm_autocorr, 1, ""),
             fmt(m.quality, 1, ""), m.quality_label,
             fmt(m.bpm_estable_5s, 1, ""), fmt(m.bpm_estable_inicio_s, 3, ""), fmt(m.bpm_estable_fin_s, 3, ""),
-            fmt(m.bpm_estable_calidad, 1, ""), str(m.bpm_estable_muestras or ""),
+            fmt(m.bpm_estable_calidad, 1, ""), str(m.bpm_estable_muestras or ""), m.bpm_estable_motivo,
             fmt(m.spo2, 1, ""), fmt(m.ratio_r, 5, ""),
             fmt(m.resp_rate_rpm, 1, ""), fmt(m.resp_quality, 0, ""), m.resp_reason,
             fmt(temp["temp_c_final_max_5s"], 2, ""), fmt(temp["temp_c_final_time_s"], 3, ""), fmt(temp["temp_c_final_raw_at_max"], 0, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),

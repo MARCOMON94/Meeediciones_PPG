@@ -671,12 +671,22 @@ class ScheduledConfigWindow(PPGSuite):
         session_id = base_name
         analysis_cfg = self.analysis_widget.get_config()
         metrics = score_and_merge_metrics(t, red, ir, step.config, analysis_cfg)
-        stable = stable_bpm_segment(t, red, ir, step.config, analysis_cfg, window_s=5.0)
+        ref_avg, ref_count = _ref_average(segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo)
+        stable = stable_bpm_segment(
+            t,
+            red,
+            ir,
+            step.config,
+            analysis_cfg,
+            window_s=5.0,
+            reference_bpm=ref_avg if ref_count else None,
+        )
         metrics.bpm_estable_5s = stable.bpm_estable_5s
         metrics.bpm_estable_inicio_s = stable.bpm_estable_inicio_s
         metrics.bpm_estable_fin_s = stable.bpm_estable_fin_s
         metrics.bpm_estable_calidad = stable.bpm_estable_calidad
         metrics.bpm_estable_muestras = stable.bpm_estable_muestras
+        metrics.bpm_estable_motivo = stable.bpm_estable_motivo
         blocks = block_bpm(t, ir, step.config, analysis_cfg, block_s=10)
         temp = self.temp_summary_for_arrays(t, temp_c, temp_raw, channel_arrays)
         def row_temperature_values(i: int) -> tuple[dict[str, tuple[float, float]], dict[str, tuple[float, float]]]:
@@ -700,7 +710,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "pulso_previo", "temperatura_manual_inicio_c", "temperatura_manual_inicio_rt_c", "temperatura_manual_inicio_lt_c",
                 "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
                 "pulso_final_pulsio", "pulso_final_fonendo",
-                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
+                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
                 "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales",
             ])
             for i in range(t.size):
@@ -726,7 +736,7 @@ class ScheduledConfigWindow(PPGSuite):
                     segment.temp_manual_initial_by_position.get("RRT", ""), segment.temp_manual_initial_by_position.get("RLT", ""),
                     segment.pulse_final_pulsio, segment.pulse_final_fonendo,
                     fmt(metrics.bpm_estable_5s, 2, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
-                    fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""),
+                    fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""), metrics.bpm_estable_motivo,
                     self.last_config_ack, datetime.now().isoformat(timespec="milliseconds"),
                     st.measurement_condition, segment.final_annotations,
                 ])
@@ -750,7 +760,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "temp_rt_c", "temp_rt_raw", "temp_lt_c", "temp_lt_raw", "temp_flt_c", "temp_flt_raw", "temp_frt_c", "temp_frt_raw", "temp_rlt_c", "temp_rlt_raw", "temp_rrt_c", "temp_rrt_raw",
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
-                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras",
+                "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -770,7 +780,7 @@ class ScheduledConfigWindow(PPGSuite):
                     f"{red_proc[i]:.5f}", f"{ir_proc[i]:.5f}", int(art_red[i]), int(art_ir[i]), int(peak_flags[i]),
                     "", "", "", "",
                     fmt(metrics.bpm_estable_5s, 2, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
-                    fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""),
+                    fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""), metrics.bpm_estable_motivo,
                 ])
 
         blocks_file = REPORT_DIR / f"bpm_blocks_10s_{base_name}.csv"
@@ -839,7 +849,7 @@ class ScheduledConfigWindow(PPGSuite):
             fmt(metrics.bpm_peak, 1, ""), fmt(metrics.bpm_fft, 1, ""), fmt(metrics.bpm_autocorr, 1, ""),
             fmt(metrics.quality, 1, ""), metrics.quality_label,
             fmt(metrics.bpm_estable_5s, 1, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
-            fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""),
+            fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""), metrics.bpm_estable_motivo,
             fmt(metrics.spo2, 1, ""), fmt(metrics.ratio_r, 5, ""),
             fmt(metrics.resp_rate_rpm, 1, ""), fmt(metrics.resp_quality, 0, ""), metrics.resp_reason,
             fmt(temp["temp_c_final_max_5s"], 2, ""), fmt(temp["temp_c_final_time_s"], 3, ""), fmt(temp["temp_c_final_raw_at_max"], 0, ""), fmt(temp["temp_c_last"], 2, ""), fmt(temp["temp_c_mean"], 2, ""), fmt(temp["temp_raw_last"], 0, ""),

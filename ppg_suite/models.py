@@ -64,6 +64,7 @@ class Metrics:
     bpm_estable_fin_s: float = math.nan
     bpm_estable_calidad: float = math.nan
     bpm_estable_muestras: int = 0
+    bpm_estable_motivo: str = ""
     spo2: float = math.nan
     ratio_r: float = math.nan
     resp_rate_rpm: float = math.nan

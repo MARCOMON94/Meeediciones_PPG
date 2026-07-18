@@ -498,6 +498,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.current_session: SessionGroup | None = None
         self.current_capture: CaptureRecord | None = None
         self.temporal_source_rows: list[dict[str, str]] = []
+        self.temporal_plot_rows: list[dict[str, str]] = []
         self.temporal_rel_t = np.asarray([], dtype=float)
         self.selected_items: dict[str, SelectionRecord] = {}
         self.compare_items: dict[str, CaptureRecord] = {}
@@ -521,7 +522,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_back.setMinimumHeight(42)
         top.addWidget(self.btn_back)
         self.mail_status = QtWidgets.QLabel("0 archivos seleccionados")
-        self.btn_add_compare = QtWidgets.QPushButton("Anadir raw")
+        self.btn_add_compare = QtWidgets.QPushButton("Comparar")
         self.btn_clear_compare = QtWidgets.QPushButton("Limpiar comparación")
         self.btn_prepare_mail = QtWidgets.QPushButton("Preparar correo")
         self.btn_delete = QtWidgets.QPushButton("Eliminar")
@@ -713,12 +714,13 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_model = DictTableModel(self.temporal_headers)
         self.temporal_table = QtWidgets.QTableView()
         self.temporal_table.setModel(self.temporal_model)
-        self.temporal_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.temporal_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectColumns)
         self.temporal_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.temporal_table.setAlternatingRowColors(True)
         self.temporal_table.verticalHeader().setVisible(False)
-        self.temporal_table.setSortingEnabled(True)
-        self.temporal_table.setMinimumWidth(520)
+        self.temporal_table.setSortingEnabled(False)
+        self.temporal_table.setMinimumWidth(360)
+        self.temporal_table.setMaximumWidth(520)
         self.temporal_table.selectionModel().selectionChanged.connect(self.update_selected_temporal_plot)
         temporal_layout.addWidget(self.temporal_table, stretch=0)
         temporal_right = QtWidgets.QVBoxLayout()
@@ -908,6 +910,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "bpm_estable_fin_s": metrics.get("bpm_estable_fin_s"),
             "bpm_estable_calidad": metrics.get("bpm_estable_calidad"),
             "bpm_estable_muestras": metrics.get("bpm_estable_muestras"),
+            "bpm_estable_motivo": metrics.get("bpm_estable_motivo"),
             "calidad": metrics.get("quality"),
             "calidad_label": metrics.get("quality_label"),
             "spo2_pct": metrics.get("spo2"),
@@ -1676,6 +1679,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.plot_reference_compare.clear()
             self.temporal_model.set_rows(self.temporal_headers, [])
             self.temporal_source_rows = []
+            self.temporal_plot_rows = []
             self.temporal_rel_t = np.asarray([], dtype=float)
             self.plot_temporal_signal.clear()
             return
@@ -2101,17 +2105,45 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             return "raw", raw
         return "", None
 
+    def selected_captures_for_compare(self) -> list[CaptureRecord]:
+        captures: dict[str, CaptureRecord] = {}
+        for record in self.selected_items.values():
+            if record.kind == "session":
+                session = self.session_by_selection(record)
+                if session is not None:
+                    for cap in session.captures:
+                        captures.setdefault(self._capture_delete_key(cap), cap)
+            elif record.kind == "capture":
+                cap = self.capture_by_selection(record)
+                if cap is not None:
+                    captures[self._capture_delete_key(cap)] = cap
+            elif record.kind == "file":
+                cap = self.capture_for_path(record.path)
+                if cap is not None:
+                    captures[self._capture_delete_key(cap)] = cap
+        if not captures and self.current_capture is not None:
+            captures[self._capture_delete_key(self.current_capture)] = self.current_capture
+        return list(captures.values())
+
     def add_current_capture_to_compare(self):
-        cap = self.current_capture
-        if cap is None:
-            QtWidgets.QMessageBox.information(self, "Comparar", "Selecciona primero una toma/raw.")
+        captures = self.selected_captures_for_compare()
+        if not captures:
+            QtWidgets.QMessageBox.information(self, "Comparar", "Selecciona primero una o varias tomas/raw.")
             return
-        _kind, path = self.compare_source_for_capture(cap)
-        if path is None:
-            QtWidgets.QMessageBox.information(self, "Comparar", "La toma seleccionada no tiene raw o processed localizado.")
+        added = 0
+        missing = 0
+        for cap in captures:
+            _kind, path = self.compare_source_for_capture(cap)
+            if path is None:
+                missing += 1
+                continue
+            key = self.mail_key(path)
+            if key not in self.compare_items:
+                added += 1
+            self.compare_items[key] = cap
+        if not added and missing:
+            QtWidgets.QMessageBox.information(self, "Comparar", "Las tomas seleccionadas no tienen raw o processed localizado.")
             return
-        key = self.mail_key(path)
-        self.compare_items[key] = cap
         self.populate_compare_table()
         self.update_compare_plot()
         self.show_compare_tab()
@@ -2329,6 +2361,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             warnings.append("Respiraciones calculadas de forma experimental desde modulaciones lentas de PPG; validar con referencia externa.")
         if np.isfinite(diff_ref) and diff_ref > 12:
             warnings.append(f"La BPM media queda a {diff_ref:.1f} BPM de la referencia manual; revisar contacto/configuracion o la anotacion manual.")
+        stable_reason = cap.value("bpm_estable_motivo") or ""
+        if stable_reason and not np.isfinite(_as_float(cap.value("bpm_estable_5s"))):
+            warnings.append(f"No se guardó BPM estable 5 s: {stable_reason}")
         reason_text = cap.value("metrics_reason") or ""
         if "cribado robusto" in reason_text.lower():
             warnings.append("El cálculo ya aplica cribado robusto: el raw se conserva completo, pero las muestras inestables no pesan en la estimación.")
@@ -2359,6 +2394,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             ("Diferencia BPM medio - ref.", f"{fmt(diff_ref, 1, '-')} BPM"),
             ("BPM medio", fmt(bpm, 1, "-")),
             ("BPM estable 5 s", f"{fmt(_as_float(cap.value('bpm_estable_5s')), 1, '-')} BPM | {fmt(_as_float(cap.value('bpm_estable_inicio_s')), 2, '-')}-{fmt(_as_float(cap.value('bpm_estable_fin_s')), 2, '-')} s"),
+            ("Motivo BPM estable", stable_reason or "-"),
             ("BPM por picos / FFT / autocorr", f"{fmt(_as_float(cap.value('bpm_peak')), 1, '-')} / {fmt(_as_float(cap.value('bpm_fft')), 1, '-')} / {fmt(_as_float(cap.value('bpm_autocorr')), 1, '-')}"),
             ("Oxígeno medio", f"{fmt(spo2, 1, '-')} %"),
             ("Ratio R", fmt(_as_float(cap.value("ratio_r")), 5, "-")),
@@ -2438,11 +2474,14 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         t, red, ir = t[mask], red[mask], ir[mask]
         return t - float(t[0]), red, ir
 
-    def _stored_stable_values(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> dict[str, float | int]:
+    def _stored_stable_values(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> dict[str, float | int | str]:
         sources: list[dict[str, str]] = [cap.row]
         if rows:
             sources.append(rows[0])
+        fallback_reason = ""
         for source in sources:
+            if not fallback_reason:
+                fallback_reason = str(source.get("bpm_estable_motivo", "") or "")
             bpm = _as_float(source.get("bpm_estable_5s", ""))
             start = _as_float(source.get("bpm_estable_inicio_s", ""))
             end = _as_float(source.get("bpm_estable_fin_s", ""))
@@ -2454,23 +2493,45 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                     "end": end,
                     "quality": _as_float(source.get("bpm_estable_calidad", "")),
                     "samples": int(samples_value) if np.isfinite(samples_value) else 0,
+                    "reason": str(source.get("bpm_estable_motivo", "") or fallback_reason),
                 }
-        return {"bpm": math.nan, "start": math.nan, "end": math.nan, "quality": math.nan, "samples": 0}
+        return {"bpm": math.nan, "start": math.nan, "end": math.nan, "quality": math.nan, "samples": 0, "reason": fallback_reason}
 
-    def _stable_values_for_rows(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> dict[str, float | int]:
+    def _stable_values_for_rows(self, cap: CaptureRecord, rows: list[dict[str, str]]) -> dict[str, float | int | str]:
         stored = self._stored_stable_values(cap, rows)
-        if np.isfinite(float(stored["bpm"])):
-            return stored
         t, red, ir = self._signal_arrays_from_rows(rows)
         if not t.size:
             return stored
-        stable = stable_bpm_segment(t, red, ir, self._sensor_config_from_capture(cap), self._analysis_config_from_capture(cap), window_s=5.0)
+        ref_avg, ref_count = _mean_ref_pulse(
+            cap.value("pulso_previo"),
+            cap.value("pulso_final_pulsio"),
+            cap.value("pulso_final_fonendo"),
+        )
+        stable = stable_bpm_segment(
+            t,
+            red,
+            ir,
+            self._sensor_config_from_capture(cap),
+            self._analysis_config_from_capture(cap),
+            window_s=5.0,
+            reference_bpm=ref_avg if ref_count else None,
+        )
+        if not np.isfinite(stable.bpm_estable_5s):
+            return {
+                "bpm": math.nan,
+                "start": math.nan,
+                "end": math.nan,
+                "quality": math.nan,
+                "samples": 0,
+                "reason": stable.bpm_estable_motivo or str(stored.get("reason", "") or ""),
+            }
         return {
             "bpm": stable.bpm_estable_5s,
             "start": stable.bpm_estable_inicio_s,
             "end": stable.bpm_estable_fin_s,
             "quality": stable.bpm_estable_calidad,
             "samples": stable.bpm_estable_muestras,
+            "reason": stable.bpm_estable_motivo or str(stored.get("reason", "") or ""),
         }
 
     def _normalized_for_display(self, values: np.ndarray) -> np.ndarray:
@@ -2492,9 +2553,15 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         end = float(stable["end"])
         quality = float(stable["quality"])
         samples = int(stable["samples"] or 0)
+        reason = str(stable.get("reason", "") or "")
         if not np.isfinite(bpm):
-            self.stable_info.setHtml("<p>No hay un segmento estable de 5 s con BPM fiable para esta toma.</p>")
-            self.plot_stable.setTitle("Segmento BPM estable")
+            self.stable_info.setHtml(
+                "<p><b>Sin tramo estable fiable de 5 s.</b></p>"
+                "<p>La toma no contiene una ventana de 5 segundos que combine BPM coherente, señal limpia, baja deriva, "
+                "pocos artefactos y calidad suficiente. Los campos de BPM estable quedan vacíos.</p>"
+                f"<p><b>Motivo:</b> {html.escape(reason or '-')}</p>"
+            )
+            self.plot_stable.setTitle("Sin segmento estable fiable")
             return
         self.stable_info.setHtml(
             "<table cellspacing='8'>"
@@ -2502,6 +2569,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             f"<tr><td><b>Ventana</b></td><td>{fmt(start, 2, '-')} - {fmt(end, 2, '-')} s</td></tr>"
             f"<tr><td><b>Calidad</b></td><td>{fmt(quality, 1, '-')} / 100</td></tr>"
             f"<tr><td><b>Muestras</b></td><td>{samples}</td></tr>"
+            f"<tr><td><b>Diagnóstico</b></td><td>{html.escape(reason or '-')}</td></tr>"
             "</table>"
         )
         t, red, ir = self._signal_arrays_from_rows(rows)
@@ -2586,6 +2654,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.comparison_graph_info.setHtml(
             "<table cellspacing='8'>"
             f"<tr><td><b>Fuente FFT</b></td><td>{source_label}</td></tr>"
+            "<tr><td><b>Lectura</b></td><td>Espectro de frecuencia de la señal IR: muestra qué BPM domina en la ventana analizada, no una lectura de 1 segundo.</td></tr>"
             f"<tr><td><b>Línea roja</b></td><td>BPM estable/calculado: {fmt(bpm_calc, 1, '-')} BPM</td></tr>"
             f"<tr><td><b>Línea naranja</b></td><td>Pico dominante FFT IR: {fmt(bpm_fft, 1, '-')} BPM</td></tr>"
             f"<tr><td><b>Línea verde</b></td><td>Referencia manual: {fmt(ref_avg, 1, '-')} BPM ({ref_count} lectura(s))</td></tr>"
@@ -2607,9 +2676,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self.plot_reference_compare.addItem(pg.InfiniteLine(pos=bpm_fft, angle=90, pen=pg.mkPen((230, 130, 20), width=2, style=QtCore.Qt.PenStyle.DashLine)))
         if np.isfinite(ref_avg):
             self.plot_reference_compare.addItem(pg.InfiniteLine(pos=ref_avg, angle=90, pen=pg.mkPen((20, 140, 70), width=2, style=QtCore.Qt.PenStyle.DashLine)))
-        self.plot_reference_compare.setTitle(
-            f"FFT {source_label} | rojo BPM estable {fmt(bpm_calc, 1, '-')} | naranja pico FFT {fmt(bpm_fft, 1, '-')} | verde ref {fmt(ref_avg, 1, '-')}"
-        )
+        self.plot_reference_compare.setTitle(f"FFT IR | {source_label}")
         self.plot_reference_compare.setLabel("bottom", "Frecuencia", units="BPM")
         self.plot_reference_compare.setLabel("left", "Magnitud normalizada")
 
@@ -2660,6 +2727,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.temporal_rel_t = np.asarray([], dtype=float)
         if not rows and not block_rows:
             self.temporal_model.set_rows(self.temporal_headers, [])
+            self.temporal_plot_rows = []
             return
 
         source_rows = rows
@@ -2673,6 +2741,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         duration = self._temporal_duration(cap, rel_t, block_rows)
         if not np.isfinite(duration) or duration <= 0:
             self.temporal_model.set_rows(self.temporal_headers, [])
+            self.temporal_plot_rows = []
             return
 
         block_bpm = [_as_float(row.get("bpm_medio_10s", "")) for row in block_rows]
@@ -2787,23 +2856,38 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
                 for header in self.temporal_cow_temp_headers
             ),
         )
-        self.temporal_model.set_rows(temporal_headers, table_rows)
+        vertical_headers = ["Métrica"] + [f"Tramo {row.get('Tramo', idx + 1)}" for idx, row in enumerate(table_rows)]
+        visible_metrics = [header for header in temporal_headers if header != "Tramo"]
+        vertical_rows: list[dict[str, str]] = []
+        for metric in visible_metrics:
+            row = {"Métrica": metric}
+            for idx, temporal_row in enumerate(table_rows):
+                row[vertical_headers[idx + 1]] = temporal_row.get(metric, "")
+            vertical_rows.append(row)
+        self.temporal_plot_rows = table_rows
+        self.temporal_model.set_rows(vertical_headers, vertical_rows)
         self.temporal_table.resizeColumnsToContents()
         if table_rows:
-            self.temporal_table.selectRow(0)
+            self.temporal_table.selectColumn(1)
         else:
+            self.temporal_plot_rows = []
             self.plot_temporal_signal.clear()
 
     def update_selected_temporal_plot(self):
-        indexes = self.temporal_table.selectionModel().selectedRows()
-        if not indexes:
+        selection_model = self.temporal_table.selectionModel()
+        if selection_model is None:
             self.plot_temporal_signal.clear()
             return
-        row_index = indexes[0].row()
-        if not (0 <= row_index < len(self.temporal_model.rows)):
+        current = self.temporal_table.currentIndex()
+        column_index = current.column() if current.isValid() else -1
+        if column_index <= 0:
+            columns = selection_model.selectedColumns()
+            column_index = columns[0].column() if columns else -1
+        tramo_index = column_index - 1
+        if not (0 <= tramo_index < len(self.temporal_plot_rows)):
             self.plot_temporal_signal.clear()
             return
-        row = self.temporal_model.rows[row_index]
+        row = self.temporal_plot_rows[tramo_index]
         start = _as_float(row.get("Inicio s", ""))
         end = _as_float(row.get("Fin s", ""))
         self.plot_temporal_signal.clear()
