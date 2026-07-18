@@ -108,6 +108,50 @@ Tambien se puede lanzar manualmente:
 .venv\Scripts\python.exe main.py
 ```
 
+## Empaquetado Windows
+
+El empaquetado actual no usa una carpeta espejo del proyecto. El instalador se construye desde el codigo real del repositorio y copia solo el resultado generado por PyInstaller.
+
+Primero instala las dependencias de desarrollo en tu entorno:
+
+```bat
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+```
+
+Para crear la aplicacion empaquetada:
+
+```bat
+CREAR_INSTALADOR_WINDOWS.cmd
+```
+
+El comando genera:
+
+- `dist\MedicionPPG\MedicionPPG.exe`: carpeta de aplicacion lista para probar.
+- `release\MedicionPPG_Setup_VERSION.exe`: instalador si Inno Setup 6 esta instalado.
+
+Para publicar una actualizacion:
+
+1. Sube la version en `ppg_suite\__init__.py`.
+2. Ejecuta otra vez `CREAR_INSTALADOR_WINDOWS.cmd`.
+3. Entrega el nuevo `release\MedicionPPG_Setup_VERSION.exe`.
+4. En el ordenador del usuario, abre ese instalador nuevo. Como mantiene el mismo `AppId`, actualiza el ejecutable instalado y conserva los datos.
+
+El instalador usa siempre el mismo `AppId`, asi que una version nueva sustituye a la anterior. Los resultados del usuario no se guardan dentro de la carpeta del programa, por lo que una actualizacion normal no borra mediciones ni fichas.
+
+En modo instalado, la aplicacion escribe por defecto en:
+
+```txt
+%LOCALAPPDATA%\TripleM\PPGSuite\resultados
+```
+
+Si hace falta forzar otra carpeta de datos, se puede crear un `.env` junto al exe instalado, o en `%LOCALAPPDATA%\TripleM\PPGSuite\.env`, con:
+
+```txt
+PROJECT_DIR=C:\ruta\a\carpeta_de_datos
+```
+
+El menu inicial incluye `IMPORTAR DATOS`. Ese boton solo acepta una carpeta llamada exactamente `resultados` y mezcla su contenido en la carpeta de datos actual. Los archivos ya existentes se omiten para evitar sobrescribir mediciones nuevas.
+
 ## Modos principales
 
 - Medicion de campo: toma rapida con la interfaz minima.
@@ -121,10 +165,16 @@ Tambien se puede lanzar manualmente:
 
 ## Datos generados
 
-Durante el uso normal, la aplicacion escribe resultados en:
+Durante el uso normal desde el repositorio, la aplicacion escribe resultados en:
 
 ```txt
 resultados/
+```
+
+En la version instalada, los resultados se escriben en la carpeta de datos del usuario:
+
+```txt
+%LOCALAPPDATA%\TripleM\PPGSuite\resultados
 ```
 
 Esa carpeta esta ignorada por Git porque puede contener datos experimentales, capturas, informes y archivos pesados. Si se clona el proyecto desde cero, la carpeta se crea durante la ejecucion cuando sea necesaria.
@@ -165,6 +215,13 @@ El firmware esta en:
 ```txt
 arduino/ppg_max3010x_firmware/ppg_max3010x_firmware.ino
 ```
+
+Desde el menu inicial, `ACTUALIZAR FIRMWARE` usa el firmware incluido en la version actual de la app:
+
+- Si el ordenador tiene `arduino-cli`, la app detecta puertos USB, permite elegir el Arduino conectado y ejecuta `compile` + `upload` para `arduino:samd:nano_33_iot`.
+- Si no encuentra `arduino-cli`, abre el archivo `.ino` para cargarlo manualmente desde Arduino IDE.
+
+Para la subida automatica con `arduino-cli`, el ordenador debe tener instalado el core `arduino:samd` y las librerias `ArduinoBLE` y `SparkFun MAX3010x Pulse and Proximity Sensor Library`.
 
 Configuracion recomendada para Arduino Nano 33 IoT:
 

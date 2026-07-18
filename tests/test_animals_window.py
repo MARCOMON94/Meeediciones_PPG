@@ -113,6 +113,19 @@ def test_animal_table_row_selection_uses_animal_key_from_checkbox_metadata():
     assert selected_keys == ["oveja:123"]
 
 
+def test_selection_column_header_is_compact_like_statistics():
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    assert app is not None
+    window = make_window()
+    table = QtWidgets.QTableWidget(0, len(window.file_headers))
+
+    AnimalsWindow.configure_table(window, table, window.file_headers)
+
+    assert table.horizontalHeaderItem(0).text() == ""
+    assert table.horizontalHeaderItem(0).toolTip()
+    assert table.columnWidth(0) == 34
+
+
 def test_remove_capture_rows_from_sessions_uses_atomic_rewrite(tmp_path: Path):
     session_path = tmp_path / "session_demo.csv"
     session_path.write_text(

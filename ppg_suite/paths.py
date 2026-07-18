@@ -1,17 +1,54 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from .app_info import APP_DATA_NAME, APP_DATA_VENDOR
+
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+SOURCE_ROOT = Path(__file__).resolve().parents[1]
+EXECUTABLE_DIR = Path(sys.executable).resolve().parent if IS_FROZEN else SOURCE_ROOT
+RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", SOURCE_ROOT)).resolve()
+PROJECT_ROOT = EXECUTABLE_DIR if IS_FROZEN else SOURCE_ROOT
+UPDATES_DIR = RESOURCE_ROOT / "actualizaciones"
+RUMIANDO_ASSET_DIR = RESOURCE_ROOT / "ppg_suite" / "assets" / "rumiando"
+APP_ICON_PATH = RUMIANDO_ASSET_DIR / "rumiando-sheep-tech-app-colors.png"
+ARDUINO_FIRMWARE_DIR = RESOURCE_ROOT / "arduino" / "ppg_max3010x_firmware"
+ARDUINO_FIRMWARE_SKETCH = ARDUINO_FIRMWARE_DIR / "ppg_max3010x_firmware.ino"
 
 
-def _read_project_dir_from_env() -> Path:
-    env_file = PROJECT_ROOT / ".env"
-    if not env_file.exists():
-        return PROJECT_ROOT
+def _default_user_data_dir() -> Path:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data) / APP_DATA_VENDOR / APP_DATA_NAME
+    return Path.home() / "AppData" / "Local" / APP_DATA_VENDOR / APP_DATA_NAME
 
+
+def _env_files() -> tuple[Path, ...]:
+    files = [PROJECT_ROOT / ".env"]
+    if IS_FROZEN:
+        files.append(_default_user_data_dir() / ".env")
+    return tuple(dict.fromkeys(files))
+
+
+def _read_data_dir_from_env() -> Path | None:
+    env_override = os.environ.get("PPG_SUITE_DATA_DIR")
+    if env_override:
+        return Path(env_override).expanduser()
+
+    for env_file in _env_files():
+        if not env_file.exists():
+            continue
+        found = _read_project_dir_from_env_file(env_file)
+        if found is not None:
+            return found
+    return None
+
+
+def _read_project_dir_from_env_file(env_file: Path) -> Path | None:
     try:
         for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -25,12 +62,12 @@ def _read_project_dir_from_env() -> Path:
                     if path.exists():
                         return path
     except OSError:
-        return PROJECT_ROOT
+        return None
 
-    return PROJECT_ROOT
+    return None
 
 
-BASE_DIR = _read_project_dir_from_env()
+BASE_DIR = _read_data_dir_from_env() or (_default_user_data_dir() if IS_FROZEN else PROJECT_ROOT)
 RESULTS_DIR = BASE_DIR / "resultados"
 RAW_DIR = RESULTS_DIR / "raw"
 PROCESSED_DIR = RESULTS_DIR / "processed"

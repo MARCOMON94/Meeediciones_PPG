@@ -30,6 +30,12 @@ class AppController(QtCore.QObject):
         win.close()
         win.deleteLater()
 
+    def _on_current_window_destroyed(self, _obj=None):
+        if self.current_window is None:
+            return
+        self.current_window = None
+        self.app.quit()
+
     def show_menu(self):
         self.close_current_window()
         dialog = ModeSelectDialog()
@@ -66,6 +72,8 @@ class AppController(QtCore.QObject):
     def _show_workspace_window(self, win: QtWidgets.QMainWindow):
         self._wire_common_signals(win)
         self.current_window = win
+        win.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        win.destroyed.connect(self._on_current_window_destroyed)
         win.showMaximized()
 
     def show_real(self):

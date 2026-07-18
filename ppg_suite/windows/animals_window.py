@@ -160,6 +160,8 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         table.setHorizontalHeaderLabels(headers)
         for col, header in enumerate(headers):
             item = table.horizontalHeaderItem(col) or QtWidgets.QTableWidgetItem(header)
+            if header == SELECTION_HEADER:
+                item.setText("")
             item.setToolTip(ANIMAL_HEADER_TOOLTIPS.get(header, header))
             table.setHorizontalHeaderItem(col, item)
         table.verticalHeader().setVisible(False)
@@ -172,6 +174,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         header.setSectionsMovable(True)
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
         if headers and headers[0] == SELECTION_HEADER:
+            header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Fixed)
             table.setColumnWidth(0, 34)
 
     def make_selection_item(
@@ -283,6 +286,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         for col, header in enumerate(self.history_headers):
             self.history_table.setColumnHidden(col, header not in visible)
         self.history_table.resizeColumnsToContents()
+        self.history_table.setColumnWidth(0, 34)
 
     def _build_ui(self):
         central = QtWidgets.QWidget()
