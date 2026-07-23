@@ -99,6 +99,17 @@ def safe_file_part(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_") or "animal"
 
 
+def load_oriented_pixmap(path: Path) -> QtGui.QPixmap:
+    """Load an image applying its EXIF orientation, so it matches how the
+    file looks in Windows Explorer/Photos instead of the raw sensor pixels."""
+    reader = QtGui.QImageReader(str(path))
+    reader.setAutoTransform(True)
+    image = reader.read()
+    if image.isNull():
+        return QtGui.QPixmap()
+    return QtGui.QPixmap.fromImage(image)
+
+
 class AnimalPhotoCell(QtWidgets.QFrame):
     """Drag-and-droppable image slot used by BulkPhotoDialog's table."""
 
@@ -129,7 +140,7 @@ class AnimalPhotoCell(QtWidgets.QFrame):
     def set_photo(self, path: Path | None):
         self.photo_path = path
         if path and path.exists():
-            pix = QtGui.QPixmap(str(path))
+            pix = load_oriented_pixmap(path)
             if not pix.isNull():
                 self.thumb.setPixmap(
                     pix.scaled(82, 60, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
@@ -1009,7 +1020,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
                 self, "Fotos", "Marca la casilla de al menos un animal en la tabla para asignarle una foto."
             )
             return
-        ordered_keys = sorted(seen, key=lambda key: self.profile_for_key(key).get("created") or "")
+        ordered_keys = sorted(seen, key=lambda key: self.registration_stamp(key) or "￿")
         rows = []
         for key in ordered_keys:
             profile = self.profile_for_key(key)
@@ -1020,7 +1031,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
                     "animal_key": key,
                     "label": f"{label} ({name})" if name else label,
                     "crotal": str(profile.get("id") or key.split(":", 1)[-1]),
-                    "created_label": self.format_created_stamp(profile.get("created")),
+                    "created_label": self.format_created_stamp(self.registration_stamp(key)),
                 }
             )
         dialog = BulkPhotoDialog(self, rows)
@@ -1048,7 +1059,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         if not path or not path.exists():
             self.photo_label.setText("Sin foto")
             return
-        pix = QtGui.QPixmap(str(path))
+        pix = load_oriented_pixmap(path)
         if pix.isNull():
             self.photo_label.setText("No se pudo cargar la foto")
             return
@@ -1998,6 +2009,19 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         if not measurements:
             return ""
         return max((self.measurement_stamp(m.row) for m in measurements), default="")
+
+    def first_measurement_stamp(self, key: str) -> str:
+        measurements = self.measurements_by_animal.get(key, [])
+        if not measurements:
+            return ""
+        return min((self.measurement_stamp(m.row) for m in measurements), default="")
+
+    def registration_stamp(self, key: str) -> str:
+        """Best-effort 'age' of an animal: explicit profile creation date,
+        falling back to its earliest known measurement when the profile was
+        never saved manually (animal only exists via discovered measurements)."""
+        created = str(self.profile_for_key(key).get("created") or "")
+        return created or self.first_measurement_stamp(key)
 
     def measurement_stamp(self, row: dict[str, str]) -> str:
         return f"{row.get('fecha', '')} {row.get('hora', '')}".strip() or row.get("created", "")

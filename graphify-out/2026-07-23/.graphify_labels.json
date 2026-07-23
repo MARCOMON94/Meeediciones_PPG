@@ -46,15 +46,5 @@
   "44": "CLAUDE.md",
   "45": ".claude/CLAUDE.md",
   "46": ".claude/skills/graphify/references/extraction-spec.md",
-  "47": ".codex/skills/graphify/references/extraction-spec.md",
-  "48": "CaptureRecord",
-  "49": ".select_animal",
-  "50": "BleSerialAdapter",
-  "51": ".populate_animal_list",
-  "52": "_read_csv",
-  "53": ".recommended_alerts_for_measurements",
-  "54": "test_animals_window.py",
-  "55": ".update_photo",
-  "56": ".temperature_summary",
-  "57": ".open_history_raw"
+  "47": ".codex/skills/graphify/references/extraction-spec.md"
 }
