@@ -33,6 +33,27 @@ def finite_or_nan(value: float) -> float:
         return math.nan
 
 
+def mean_valid_reference(*values: object) -> tuple[float, int]:
+    """Mean of manually-entered reference BPM values, ignoring blanks, non-numeric
+    text and values <= 0 (e.g. an unfilled pulsioximeter/fonendo reading).
+
+    Single source of truth for this rule - used wherever a manual reference
+    (pulso previo / pulsioximetro / fonendo) needs to be averaged, so the
+    inclusion criteria stay identical across capture, display and analysis code.
+    """
+    valid: list[float] = []
+    for value in values:
+        try:
+            bpm = float(str(value if value is not None else "").replace(",", "."))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(bpm) and bpm > 0:
+            valid.append(bpm)
+    if not valid:
+        return math.nan, 0
+    return float(np.mean(valid)), len(valid)
+
+
 def fmt(value: object, decimals: int = 2, dash: str = "-") -> str:
     if value is None:
         return dash

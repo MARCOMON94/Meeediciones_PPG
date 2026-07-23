@@ -49,9 +49,9 @@ from ..models import AnalysisConfig, CaptureState, Metrics, SensorConfig
 from ..paths import BASE_DIR, CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR, log
 from ..processing import (
     block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, find_local_peaks,
-    processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, stable_bpm_segment, uniform_resample,
+    compute_blind_and_assisted_stable, processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, uniform_resample,
 )
-from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
+from ..utils import fmt, mean_valid_reference, now_stamp, safe_float_text, sanitize_id
 from ..widgets import AnalysisConfigWidget, AnimalCrotalPicker, NoWheelDoubleSpinBox, SensorConfigWidget
 
 
@@ -68,15 +68,29 @@ BLE_TX_UUID = "7f510003-1b15-4b91-9f4b-3a4d5f6e0001"
 
 
 def _manual_reference_bpm(*values: object) -> float:
-    valid: list[float] = []
-    for value in values:
-        try:
-            bpm = float(str(value if value is not None else "").replace(",", "."))
-        except (TypeError, ValueError):
-            continue
-        if math.isfinite(bpm) and bpm > 0:
-            valid.append(bpm)
-    return float(np.mean(valid)) if valid else math.nan
+    bpm, _count = mean_valid_reference(*values)
+    return bpm
+
+
+# Blind/assisted stable-BPM + per-estimator metadata columns appended to
+# session_*.csv and proc_*.csv (measurement_window.py and scheduled_window.py
+# write matching pairs of header/row so both stay in sync).
+NEW_STABLE_METRIC_FIELDS = [
+    "bpm_estable_ciego_5s", "bpm_estable_ciego_inicio_s", "bpm_estable_ciego_fin_s", "bpm_estable_ciego_calidad", "bpm_estable_ciego_muestras", "bpm_estable_ciego_motivo",
+    "bpm_estable_asistido_5s", "bpm_estable_asistido_inicio_s", "bpm_estable_asistido_fin_s", "bpm_estable_asistido_calidad", "bpm_estable_asistido_muestras", "bpm_estable_asistido_motivo",
+    "bpm_peak_quality", "bpm_fft_quality", "bpm_autocorr_quality", "bpm_estimators_valid", "bpm_estimators_spread", "bpm_final_source", "bpm_final_reason",
+]
+
+
+def new_stable_metric_row_values(m: Metrics) -> list[str]:
+    return [
+        fmt(m.bpm_estable_ciego_5s, 2, ""), fmt(m.bpm_estable_ciego_inicio_s, 3, ""), fmt(m.bpm_estable_ciego_fin_s, 3, ""),
+        fmt(m.bpm_estable_ciego_calidad, 1, ""), str(m.bpm_estable_ciego_muestras or ""), m.bpm_estable_ciego_motivo,
+        fmt(m.bpm_estable_asistido_5s, 2, ""), fmt(m.bpm_estable_asistido_inicio_s, 3, ""), fmt(m.bpm_estable_asistido_fin_s, 3, ""),
+        fmt(m.bpm_estable_asistido_calidad, 1, ""), str(m.bpm_estable_asistido_muestras or ""), m.bpm_estable_asistido_motivo,
+        fmt(m.bpm_peak_quality, 1, ""), fmt(m.bpm_fft_quality, 1, ""), fmt(m.bpm_autocorr_quality, 1, ""),
+        str(m.bpm_estimators_valid or ""), fmt(m.bpm_estimators_spread, 1, ""), m.bpm_final_source, m.bpm_final_reason,
+    ]
 
 
 def normalize_udder_text(value: str) -> str:
@@ -1873,7 +1887,7 @@ class PPGSuite(QtWidgets.QMainWindow):
         self.ask_final_reference(include_pulse=st.mode in ("normal", "long", "experimento_vacio"))
         if t.size >= 20:
             ref_bpm = _manual_reference_bpm(st.pulse_prev, st.pulse_final_pulsio, st.pulse_final_fonendo)
-            stable = stable_bpm_segment(
+            blind, assisted = compute_blind_and_assisted_stable(
                 t,
                 red,
                 ir,
@@ -1882,12 +1896,25 @@ class PPGSuite(QtWidgets.QMainWindow):
                 window_s=5.0,
                 reference_bpm=ref_bpm,
             )
-            st.metrics.bpm_estable_5s = stable.bpm_estable_5s
-            st.metrics.bpm_estable_inicio_s = stable.bpm_estable_inicio_s
-            st.metrics.bpm_estable_fin_s = stable.bpm_estable_fin_s
-            st.metrics.bpm_estable_calidad = stable.bpm_estable_calidad
-            st.metrics.bpm_estable_muestras = stable.bpm_estable_muestras
-            st.metrics.bpm_estable_motivo = stable.bpm_estable_motivo
+            # Legacy fields keep the BLIND value - see Metrics docstring / comments.
+            st.metrics.bpm_estable_5s = blind.bpm_estable_5s
+            st.metrics.bpm_estable_inicio_s = blind.bpm_estable_inicio_s
+            st.metrics.bpm_estable_fin_s = blind.bpm_estable_fin_s
+            st.metrics.bpm_estable_calidad = blind.bpm_estable_calidad
+            st.metrics.bpm_estable_muestras = blind.bpm_estable_muestras
+            st.metrics.bpm_estable_motivo = blind.bpm_estable_motivo
+            st.metrics.bpm_estable_ciego_5s = blind.bpm_estable_5s
+            st.metrics.bpm_estable_ciego_inicio_s = blind.bpm_estable_inicio_s
+            st.metrics.bpm_estable_ciego_fin_s = blind.bpm_estable_fin_s
+            st.metrics.bpm_estable_ciego_calidad = blind.bpm_estable_calidad
+            st.metrics.bpm_estable_ciego_muestras = blind.bpm_estable_muestras
+            st.metrics.bpm_estable_ciego_motivo = blind.bpm_estable_motivo
+            st.metrics.bpm_estable_asistido_5s = assisted.bpm_estable_5s
+            st.metrics.bpm_estable_asistido_inicio_s = assisted.bpm_estable_inicio_s
+            st.metrics.bpm_estable_asistido_fin_s = assisted.bpm_estable_fin_s
+            st.metrics.bpm_estable_asistido_calidad = assisted.bpm_estable_calidad
+            st.metrics.bpm_estable_asistido_muestras = assisted.bpm_estable_muestras
+            st.metrics.bpm_estable_asistido_motivo = assisted.bpm_estable_motivo
             st.bpm_blocks = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=2)
             st.bpm_blocks_10s = block_bpm(t, ir, self.sensor_widget.get_config(), self.analysis_widget.get_config(), block_s=10)
         self.update_raw_manual_reference()
@@ -1958,6 +1985,9 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
             "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_inicio", "anotaciones_finales",
             "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
+            "bpm_estable_ciego_5s", "bpm_estable_ciego_inicio_s", "bpm_estable_ciego_fin_s", "bpm_estable_ciego_calidad", "bpm_estable_ciego_muestras", "bpm_estable_ciego_motivo",
+            "bpm_estable_asistido_5s", "bpm_estable_asistido_inicio_s", "bpm_estable_asistido_fin_s", "bpm_estable_asistido_calidad", "bpm_estable_asistido_muestras", "bpm_estable_asistido_motivo",
+            "bpm_peak_quality", "bpm_fft_quality", "bpm_autocorr_quality", "bpm_estimators_valid", "bpm_estimators_spread", "bpm_final_source", "bpm_final_reason",
         ):
             if field not in fieldnames:
                 fieldnames.append(field)
@@ -1980,6 +2010,25 @@ class PPGSuite(QtWidgets.QMainWindow):
             row["bpm_estable_calidad"] = fmt(st.metrics.bpm_estable_calidad, 1, "")
             row["bpm_estable_muestras"] = str(st.metrics.bpm_estable_muestras or "")
             row["bpm_estable_motivo"] = st.metrics.bpm_estable_motivo
+            row["bpm_estable_ciego_5s"] = fmt(st.metrics.bpm_estable_ciego_5s, 2, "")
+            row["bpm_estable_ciego_inicio_s"] = fmt(st.metrics.bpm_estable_ciego_inicio_s, 3, "")
+            row["bpm_estable_ciego_fin_s"] = fmt(st.metrics.bpm_estable_ciego_fin_s, 3, "")
+            row["bpm_estable_ciego_calidad"] = fmt(st.metrics.bpm_estable_ciego_calidad, 1, "")
+            row["bpm_estable_ciego_muestras"] = str(st.metrics.bpm_estable_ciego_muestras or "")
+            row["bpm_estable_ciego_motivo"] = st.metrics.bpm_estable_ciego_motivo
+            row["bpm_estable_asistido_5s"] = fmt(st.metrics.bpm_estable_asistido_5s, 2, "")
+            row["bpm_estable_asistido_inicio_s"] = fmt(st.metrics.bpm_estable_asistido_inicio_s, 3, "")
+            row["bpm_estable_asistido_fin_s"] = fmt(st.metrics.bpm_estable_asistido_fin_s, 3, "")
+            row["bpm_estable_asistido_calidad"] = fmt(st.metrics.bpm_estable_asistido_calidad, 1, "")
+            row["bpm_estable_asistido_muestras"] = str(st.metrics.bpm_estable_asistido_muestras or "")
+            row["bpm_estable_asistido_motivo"] = st.metrics.bpm_estable_asistido_motivo
+            row["bpm_peak_quality"] = fmt(st.metrics.bpm_peak_quality, 1, "")
+            row["bpm_fft_quality"] = fmt(st.metrics.bpm_fft_quality, 1, "")
+            row["bpm_autocorr_quality"] = fmt(st.metrics.bpm_autocorr_quality, 1, "")
+            row["bpm_estimators_valid"] = str(st.metrics.bpm_estimators_valid or "")
+            row["bpm_estimators_spread"] = fmt(st.metrics.bpm_estimators_spread, 1, "")
+            row["bpm_final_source"] = st.metrics.bpm_final_source
+            row["bpm_final_reason"] = st.metrics.bpm_final_reason
         try:
             with atomic_csv_dict_writer(path, fieldnames, delimiter=";", extrasaction="ignore") as writer:
                 writer.writeheader()
@@ -2036,6 +2085,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
                 "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
+                *NEW_STABLE_METRIC_FIELDS,
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -2063,6 +2113,7 @@ class PPGSuite(QtWidgets.QMainWindow):
                     fmt(bpm_rolling[i], 2, ""), fmt(spo2_rolling[i], 2, ""), fmt(ratio_rolling[i], 5, ""), fmt(quality_rolling[i], 1, ""),
                     fmt(st.metrics.bpm_estable_5s, 2, ""), fmt(st.metrics.bpm_estable_inicio_s, 3, ""), fmt(st.metrics.bpm_estable_fin_s, 3, ""),
                     fmt(st.metrics.bpm_estable_calidad, 1, ""), str(st.metrics.bpm_estable_muestras or ""), st.metrics.bpm_estable_motivo,
+                    *new_stable_metric_row_values(st.metrics),
                 ])
 
     def save_blocks_file(self):
@@ -2173,6 +2224,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             "temperatura_manual_inicio_frt_c", "temperatura_manual_inicio_flt_c", "temperatura_manual_inicio_rrt_c", "temperatura_manual_inicio_rlt_c",
             "pulso_final_pulsio", "pulso_final_fonendo", "anotaciones_finales",
             "raw", "processed", "plot", "screenshot", "summary", "config", "bpm_blocks_10s_json", "blocks_10s_file",
+            *NEW_STABLE_METRIC_FIELDS,
         ]
         self.session_writer.writerow(header); self.session_handle.flush()
 
@@ -2211,6 +2263,7 @@ class PPGSuite(QtWidgets.QMainWindow):
             st.plot_file.name if st.plot_file else "", st.screenshot_file.name if st.screenshot_file else "",
             st.summary_file.name if st.summary_file else "", st.config_file.name if st.config_file else "",
             json.dumps(st.bpm_blocks_10s, ensure_ascii=False), st.blocks_file.name if st.blocks_file else "",
+            *new_stable_metric_row_values(m),
         ]
         self.session_writer.writerow(row); self.session_handle.flush()
 

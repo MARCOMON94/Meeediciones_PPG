@@ -28,7 +28,8 @@ from ..io_utils import atomic_csv_dict_writer
 from ..paths import CONFIG_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR, RESULTS_DIR, SCREENSHOT_DIR, SESSION_DIR
 from ..processing import estimate_hz, processed_ppg, score_and_merge_metrics, stable_bpm_segment, uniform_resample
 from ..trash import TrashBatch
-from ..utils import fmt
+from .agreement_window import AgreementAnalysisPanel
+from ..utils import fmt, mean_valid_reference
 
 
 MODE_LABELS = {
@@ -69,10 +70,6 @@ HEADER_TOOLTIPS = {
     "Estado": "Lectura rápida de calidad: Buena, Aceptable o Dudosa según la calidad calculada.",
     "Pulso ref.": "BPM de referencia introducidos a mano: media de pulso previo, pulsioxímetro final y fonendo final, ignorando ceros y vacíos.",
     "Dif. BPM-ref": "Diferencia absoluta entre el BPM calculado por el sistema y el BPM de referencia manual.",
-    "BA referencia": "Referencia clínica para Bland-Altman: media de pulso final con pulsioxímetro y fonendo (no incluye el pulso previo).",
-    "BA diferencia": "Diferencia con signo (BPM medido - referencia fonendo/pulsioxímetro) usada en el análisis Bland-Altman.",
-    "BA media": "Media entre el BPM medido y la referencia fonendo/pulsioxímetro; eje X del gráfico Bland-Altman.",
-    "BA dentro LoA": "Indica si esta toma cae dentro de los límites de acuerdo (bias ± 1.96 DE) calculados sobre las tomas visibles.",
     "BPM medio": "Estimacion final de frecuencia cardiaca tras combinar estimadores validos y aplicar cribado.",
     "BPM estable": "BPM del mejor segmento estable de 5 segundos.",
     "Tramo estable": "Inicio y fin del segmento estable usado para BPM estable.",
@@ -215,48 +212,7 @@ def _as_ref_pulse(value: object) -> float:
 
 
 def _mean_ref_pulse(*values: object) -> tuple[float, int]:
-    valid = [_as_ref_pulse(value) for value in values]
-    valid = [value for value in valid if np.isfinite(value)]
-    if not valid:
-        return math.nan, 0
-    return float(np.mean(valid)), len(valid)
-
-
-def _mean_clinical_ref_pulse(cap: "CaptureRecord") -> tuple[float, int]:
-    """Reference BPM for Bland-Altman: mean of pulsioximeter/fonendo final readings only.
-
-    Deliberately excludes "pulso previo" (a rough manual guess before the
-    measurement) so the comparison is against actual reference instruments.
-    """
-    return _mean_ref_pulse(cap.value("pulso_final_pulsio"), cap.value("pulso_final_fonendo"))
-
-
-def _bland_altman_stats(pairs: list[tuple[float, float]]) -> dict:
-    """Bland-Altman agreement stats for (measured, reference) BPM pairs.
-
-    diff = measured - reference; bias/SD/limits of agreement follow the
-    standard Bland & Altman (1986) definition (bias +/- 1.96*SD).
-    """
-    if not pairs:
-        return {}
-    diffs = np.asarray([m - r for m, r in pairs], dtype=float)
-    means = np.asarray([(m + r) / 2 for m, r in pairs], dtype=float)
-    n = diffs.size
-    bias = float(np.mean(diffs))
-    sd = float(np.std(diffs, ddof=1)) if n > 1 else 0.0
-    loa_low = bias - 1.96 * sd
-    loa_high = bias + 1.96 * sd
-    within = int(np.sum((diffs >= loa_low) & (diffs <= loa_high)))
-    return {
-        "n": n,
-        "bias": bias,
-        "sd": sd,
-        "loa_low": loa_low,
-        "loa_high": loa_high,
-        "within_pct": (100.0 * within / n) if n else math.nan,
-        "means": means,
-        "diffs": diffs,
-    }
+    return mean_valid_reference(*values)
 
 
 def _strip_prefix(name: str, prefixes: Iterable[str]) -> str:
@@ -510,7 +466,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         "Modo", "Sensor", "Termómetros",
         "Oxígeno medio", "Calidad", "Contacto", "Estado",
         "Dif. BPM-ref", "Medición", "Configuración",
-        "BA referencia", "BA diferencia", "BA media", "BA dentro LoA",
         "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
         "Hora", "Duración", "Hz", "Muestras", "Raw",
     ]
@@ -523,7 +478,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         ("sample", "Muestra", ["Modo", "Sensor", "Termómetros", "Medición", "Configuración", "Hora"]),
         ("quality", "Calidad", ["Calidad", "Contacto", "Estado"]),
         ("pulse", "Pulsaciones", ["Pulso ref.", "BPM medio", "BPM estable", "Tramo estable", "Pulso final pulsio", "Pulso final fonendo", "Dif. BPM-ref"]),
-        ("bland_altman", "Bland-Altman", ["BA referencia", "BA diferencia", "BA media", "BA dentro LoA"]),
         ("temperature", "Temperatura", [
             "Temp RT final", "Temp LT final", "Temp FLT final", "Temp FRT final", "Temp RLT final", "Temp RRT final",
             "Temp manual RT", "Temp manual LT", "Temp manual FLT", "Temp manual FRT", "Temp manual RLT", "Temp manual RRT",
@@ -546,7 +500,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.selected_items: dict[str, SelectionRecord] = {}
         self.compare_items: dict[str, CaptureRecord] = {}
         self.stable_bpm_cache: dict[str, dict[str, float | int]] = {}
-        self.bland_altman_stats: dict = {}
         self.capture_column_group_state = {
             key: key == "animal" for key, _label, _headers in self.capture_column_groups
         }
@@ -605,12 +558,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.quality_min.setValue(0)
         self.btn_clear = QtWidgets.QPushButton("Limpiar")
         self.btn_import = QtWidgets.QPushButton("Leer otra carpeta")
-        self.chk_show_bland_altman = QtWidgets.QCheckBox("Pestaña Bland-Altman")
-        self.chk_show_bland_altman.setChecked(True)
-        self.chk_show_bland_altman.setToolTip(
-            "Muestra u oculta la pestaña de análisis Bland-Altman (confianza del BPM medido "
-            "frente a la referencia manual con fonendo/pulsioxímetro)."
-        )
         fl.addWidget(QtWidgets.QLabel("Texto"), 0, 0)
         fl.addWidget(self.text_filter, 0, 1, 1, 4)
         fl.addWidget(QtWidgets.QLabel("Modo"), 0, 5)
@@ -623,7 +570,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         fl.addWidget(self.quality_min, 1, 1)
         fl.addWidget(self.btn_clear, 1, 2)
         fl.addWidget(self.btn_import, 1, 3)
-        fl.addWidget(self.chk_show_bland_altman, 1, 4, 1, 3)
         self.filters_section = CollapsibleSection("Buscar en sesiones", filters_body, expanded=True)
         root.addWidget(self.filters_section)
         self.text_filter.textChanged.connect(self.apply_filters)
@@ -760,23 +706,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         comparison_graph_layout.addStretch(1)
         self.detail_tabs.addTab(comparison_graph_page, "Graf. comp")
 
-        bland_altman_page = QtWidgets.QWidget()
-        bland_altman_layout = QtWidgets.QHBoxLayout(bland_altman_page)
-        self.bland_altman_info = QtWidgets.QTextEdit()
-        self.bland_altman_info.setReadOnly(True)
-        self.bland_altman_info.setMinimumWidth(230)
-        self.bland_altman_info.setMaximumWidth(300)
-        bland_altman_layout.addWidget(self.bland_altman_info)
-        self.plot_bland_altman = pg.PlotWidget(title="Bland-Altman: BPM medido vs. fonendo/pulsioxímetro")
-        self.plot_bland_altman.setBackground("w")
-        self.plot_bland_altman.showGrid(x=True, y=True, alpha=0.25)
-        self.plot_bland_altman.setLabel("bottom", "Media (medido y referencia)", units="BPM")
-        self.plot_bland_altman.setLabel("left", "Diferencia (medido - referencia)", units="BPM")
-        bland_altman_layout.addWidget(self.plot_bland_altman, stretch=1)
-        self.bland_altman_tab_index = self.detail_tabs.addTab(bland_altman_page, "Bland-Altman")
-        self.chk_show_bland_altman.toggled.connect(
-            lambda checked: self.detail_tabs.setTabVisible(self.bland_altman_tab_index, checked)
-        )
+        self._build_agreement_tab()
 
         temporal_page = QtWidgets.QWidget()
         temporal_layout = QtWidgets.QHBoxLayout(temporal_page)
@@ -874,6 +804,72 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         self.btn_remove_compare.clicked.connect(self.remove_selected_compare)
         self.detail_tabs.addTab(compare_page, "Comparar")
         self.rebalance_main_splitter()
+
+    def _build_agreement_tab(self):
+        scope_options = [
+            ("selected", "Selección manual"),
+            ("session", "Sesión actual"),
+            ("animal", "Animal actual"),
+            ("filtered", "Conjunto filtrado"),
+            ("all", "Todas las capturas"),
+        ]
+        self.agreement_panel = AgreementAnalysisPanel(self._agreement_measurements_for_scope, scope_options=scope_options)
+        self.detail_tabs.addTab(self.agreement_panel, "Concordancia / Bland-Altman")
+
+    def _agreement_row_from_capture(self, cap: CaptureRecord) -> dict[str, object]:
+        row: dict[str, object] = dict(cap.row)
+        row.setdefault("capture_id", cap.capture_id or cap.base_name)
+        row.setdefault("animal_id", cap.value("id"))
+        raw_path = cap.files.get("raw")
+        processed_path = cap.files.get("processed")
+        if raw_path:
+            row["_raw_path"] = str(raw_path)
+        if processed_path:
+            row["_processed_path"] = str(processed_path)
+        return row
+
+    def _agreement_measurements_for_scope(self, scope: str) -> list[dict[str, object]]:
+        if scope == "selected":
+            captures: list[CaptureRecord] = []
+            seen: set[int] = set()
+            for record in self.selected_items.values():
+                if record.kind == "capture":
+                    cap = self.capture_by_selection(record)
+                    if cap is not None and id(cap) not in seen:
+                        seen.add(id(cap))
+                        captures.append(cap)
+                elif record.kind == "session":
+                    session = self.session_by_selection(record)
+                    if session is not None:
+                        for cap in session.captures:
+                            if id(cap) not in seen:
+                                seen.add(id(cap))
+                                captures.append(cap)
+            return [self._agreement_row_from_capture(cap) for cap in captures]
+        if scope == "session":
+            if self.current_session is None:
+                return []
+            return [self._agreement_row_from_capture(cap) for cap in self.current_session.captures]
+        if scope == "animal":
+            if self.current_capture is None:
+                return []
+            animal_id = self.current_capture.value("id")
+            if not animal_id:
+                return []
+            captures = [
+                cap for session in self.filtered_sessions for cap in session.captures if cap.value("id") == animal_id
+            ]
+            return [self._agreement_row_from_capture(cap) for cap in captures]
+        if scope == "all":
+            return [self._agreement_row_from_capture(cap) for session in self.sessions for cap in session.captures]
+        return [self._agreement_row_from_capture(cap) for session in self.filtered_sessions for cap in session.captures]
+
+    def _refresh_agreement_scope_availability(self):
+        panel = getattr(self, "agreement_panel", None)
+        if panel is None:
+            return
+        total = sum(len(session.captures) for session in self.filtered_sessions)
+        panel.scope_label.setText(f"{total} toma(s) en el conjunto filtrado actual. Pulsa \"Calcular\" para analizarlas.")
 
     def pick_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Seleccionar carpeta con CSV", str(RESULTS_DIR))
@@ -980,6 +976,25 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "bpm_estable_calidad": metrics.get("bpm_estable_calidad"),
             "bpm_estable_muestras": metrics.get("bpm_estable_muestras"),
             "bpm_estable_motivo": metrics.get("bpm_estable_motivo"),
+            "bpm_estable_ciego_5s": metrics.get("bpm_estable_ciego_5s"),
+            "bpm_estable_ciego_inicio_s": metrics.get("bpm_estable_ciego_inicio_s"),
+            "bpm_estable_ciego_fin_s": metrics.get("bpm_estable_ciego_fin_s"),
+            "bpm_estable_ciego_calidad": metrics.get("bpm_estable_ciego_calidad"),
+            "bpm_estable_ciego_muestras": metrics.get("bpm_estable_ciego_muestras"),
+            "bpm_estable_ciego_motivo": metrics.get("bpm_estable_ciego_motivo"),
+            "bpm_estable_asistido_5s": metrics.get("bpm_estable_asistido_5s"),
+            "bpm_estable_asistido_inicio_s": metrics.get("bpm_estable_asistido_inicio_s"),
+            "bpm_estable_asistido_fin_s": metrics.get("bpm_estable_asistido_fin_s"),
+            "bpm_estable_asistido_calidad": metrics.get("bpm_estable_asistido_calidad"),
+            "bpm_estable_asistido_muestras": metrics.get("bpm_estable_asistido_muestras"),
+            "bpm_estable_asistido_motivo": metrics.get("bpm_estable_asistido_motivo"),
+            "bpm_peak_quality": metrics.get("bpm_peak_quality"),
+            "bpm_fft_quality": metrics.get("bpm_fft_quality"),
+            "bpm_autocorr_quality": metrics.get("bpm_autocorr_quality"),
+            "bpm_estimators_valid": metrics.get("bpm_estimators_valid"),
+            "bpm_estimators_spread": metrics.get("bpm_estimators_spread"),
+            "bpm_final_source": metrics.get("bpm_final_source"),
+            "bpm_final_reason": metrics.get("bpm_final_reason"),
             "calidad": metrics.get("quality"),
             "calidad_label": metrics.get("quality_label"),
             "spo2_pct": metrics.get("spo2"),
@@ -1210,7 +1225,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             if captures or (not session.captures and not text and mode == "Todos" and udder == "Todos" and vacuum == "Todos"):
                 filtered.append(SessionGroup(key=session.key, path=session.path, captures=captures))
         self.filtered_sessions = filtered
-        self._update_bland_altman_stats(filtered)
+        self._refresh_agreement_scope_availability()
         session_rows = []
         for idx, session in enumerate(filtered):
             row = self._session_row(session)
@@ -1224,71 +1239,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             _select_first_row(self.sessions_table)
         else:
             self.set_session(None)
-
-    def _update_bland_altman_stats(self, sessions: list[SessionGroup]):
-        pairs: list[tuple[float, float]] = []
-        for session in sessions:
-            for cap in session.captures:
-                bpm = _as_float(cap.value("bpm"))
-                ba_ref, _count = _mean_clinical_ref_pulse(cap)
-                if np.isfinite(bpm) and np.isfinite(ba_ref):
-                    pairs.append((bpm, ba_ref))
-        self.bland_altman_stats = _bland_altman_stats(pairs)
-        self.refresh_bland_altman_tab()
-
-    def refresh_bland_altman_tab(self):
-        if not hasattr(self, "plot_bland_altman"):
-            return
-        self.plot_bland_altman.clear()
-        stats = self.bland_altman_stats
-        if not stats:
-            self.plot_bland_altman.setTitle("Bland-Altman: BPM medido vs. fonendo/pulsioxímetro")
-            self.bland_altman_info.setHtml(
-                "<p>Sin pares válidos (BPM medido y pulso final con fonendo/pulsioxímetro) "
-                "en las tomas visibles con los filtros actuales.</p>"
-            )
-            return
-        means = stats["means"]
-        diffs = stats["diffs"]
-        scatter = pg.ScatterPlotItem(size=8, brush=pg.mkBrush(30, 100, 200, 150), pen=pg.mkPen(None))
-        scatter.setData(means.tolist(), diffs.tolist())
-        self.plot_bland_altman.addItem(scatter)
-        bias = stats["bias"]
-        loa_low = stats["loa_low"]
-        loa_high = stats["loa_high"]
-        self.plot_bland_altman.addItem(
-            pg.InfiniteLine(pos=bias, angle=0, pen=pg.mkPen((20, 140, 70), width=2))
-        )
-        for loa_pos in (loa_low, loa_high):
-            self.plot_bland_altman.addItem(
-                pg.InfiniteLine(
-                    pos=loa_pos,
-                    angle=0,
-                    pen=pg.mkPen((200, 60, 60), width=2, style=QtCore.Qt.PenStyle.DashLine),
-                )
-            )
-        self.plot_bland_altman.setTitle(f"Bland-Altman: BPM medido vs. fonendo/pulsioxímetro (n={stats['n']})")
-
-        def row(name: str, value: str) -> str:
-            return f"<tr><td><b>{html.escape(name)}</b></td><td>{html.escape(value)}</td></tr>"
-
-        fields = [
-            ("Pares válidos (n)", str(stats["n"])),
-            ("Sesgo medio (bias)", f"{stats['bias']:.1f} BPM"),
-            ("Desviación típica", f"{stats['sd']:.1f} BPM"),
-            ("Límites de acuerdo (95%)", f"{stats['loa_low']:.1f} a {stats['loa_high']:.1f} BPM"),
-            ("Tomas dentro de LoA", f"{stats['within_pct']:.0f} %"),
-        ]
-        interpretation = (
-            "Cuanto mas estrechos sean los limites de acuerdo y mas cerca de 0 este el sesgo, mayor "
-            "es la confianza del BPM medido frente a la referencia manual (fonendo/pulsioximetro). "
-            "El pulso previo no se incluye en esta referencia; se calcula sobre las tomas visibles "
-            "con los filtros actuales."
-        )
-        self.bland_altman_info.setHtml(
-            "<table cellspacing='4'>" + "".join(row(name, value) for name, value in fields) + "</table>"
-            f"<p>{html.escape(interpretation)}</p>"
-        )
 
     def _session_row(self, session: SessionGroup) -> dict[str, str]:
         caps = session.captures
@@ -1627,19 +1577,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             cap.value("pulso_final_fonendo"),
         )
         diff_ref = abs(bpm - ref_avg) if np.isfinite(bpm) and np.isfinite(ref_avg) else math.nan
-        ba_ref, _ba_ref_count = _mean_clinical_ref_pulse(cap)
-        if np.isfinite(bpm) and np.isfinite(ba_ref):
-            ba_diff = bpm - ba_ref
-            ba_mean = (bpm + ba_ref) / 2
-            loa = self.bland_altman_stats
-            if loa:
-                ba_within = "Sí" if loa["loa_low"] <= ba_diff <= loa["loa_high"] else "No"
-            else:
-                ba_within = ""
-        else:
-            ba_diff = math.nan
-            ba_mean = math.nan
-            ba_within = ""
         stable_bpm = _as_float(cap.value("bpm_estable_5s"))
         stable_start = _as_float(cap.value("bpm_estable_inicio_s"))
         stable_end = _as_float(cap.value("bpm_estable_fin_s"))
@@ -1671,10 +1608,6 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             "Estado": state,
             "Pulso ref.": fmt(ref_avg, 1, ""),
             "Dif. BPM-ref": fmt(diff_ref, 1, ""),
-            "BA referencia": fmt(ba_ref, 1, ""),
-            "BA diferencia": fmt(ba_diff, 1, ""),
-            "BA media": fmt(ba_mean, 1, ""),
-            "BA dentro LoA": ba_within,
             "BPM medio": fmt(bpm, 0, ""),
             "BPM estable": fmt(stable_bpm, 1, ""),
             "Tramo estable": stable_segment,
@@ -2658,11 +2591,9 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
         t, red, ir = self._signal_arrays_from_rows(rows)
         if not t.size:
             return stored
-        ref_avg, ref_count = _mean_ref_pulse(
-            cap.value("pulso_previo"),
-            cap.value("pulso_final_pulsio"),
-            cap.value("pulso_final_fonendo"),
-        )
+        # Blind only (reference_bpm=None): this recompute fallback feeds the
+        # normal "BPM estable" display column, which must stay the blind,
+        # non-circular value - never the manual-reference-assisted one.
         stable = stable_bpm_segment(
             t,
             red,
@@ -2670,7 +2601,7 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
             self._sensor_config_from_capture(cap),
             self._analysis_config_from_capture(cap),
             window_s=5.0,
-            reference_bpm=ref_avg if ref_count else None,
+            reference_bpm=None,
         )
         if not np.isfinite(stable.bpm_estable_5s):
             return {

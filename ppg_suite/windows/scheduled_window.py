@@ -14,10 +14,10 @@ from ..animal_config import POSITION_SUMMARY_PREFIXES, TEMP_CHANNELS, animal_lab
 from ..io_utils import atomic_csv_writer, atomic_write_json
 from ..models import SensorConfig
 from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message, stable_bpm_segment
-from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
+from ..utils import fmt, mean_valid_reference, safe_float_text, sanitize_id, now_stamp
 from ..widgets import AnalysisConfigWidget, AnimalCrotalPicker, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR
-from .measurement_window import PPGSuite, temperature_channel_summary
+from .measurement_window import NEW_STABLE_METRIC_FIELDS, PPGSuite, compute_blind_and_assisted_stable, new_stable_metric_row_values, temperature_channel_summary
 
 
 @dataclass(frozen=True)
@@ -110,11 +110,7 @@ def _ref_pulse(value: object) -> float:
 
 
 def _ref_average(*values: object) -> tuple[float, int]:
-    valid = [_ref_pulse(value) for value in values]
-    valid = [value for value in valid if math.isfinite(value)]
-    if not valid:
-        return math.nan, 0
-    return float(np.mean(valid)), len(valid)
+    return mean_valid_reference(*values)
 
 
 class ScheduledConfigWindow(PPGSuite):
@@ -672,7 +668,7 @@ class ScheduledConfigWindow(PPGSuite):
         analysis_cfg = self.analysis_widget.get_config()
         metrics = score_and_merge_metrics(t, red, ir, step.config, analysis_cfg)
         ref_avg, ref_count = _ref_average(segment.pulse_prev, segment.pulse_final_pulsio, segment.pulse_final_fonendo)
-        stable = stable_bpm_segment(
+        blind, assisted = compute_blind_and_assisted_stable(
             t,
             red,
             ir,
@@ -681,12 +677,25 @@ class ScheduledConfigWindow(PPGSuite):
             window_s=5.0,
             reference_bpm=ref_avg if ref_count else None,
         )
-        metrics.bpm_estable_5s = stable.bpm_estable_5s
-        metrics.bpm_estable_inicio_s = stable.bpm_estable_inicio_s
-        metrics.bpm_estable_fin_s = stable.bpm_estable_fin_s
-        metrics.bpm_estable_calidad = stable.bpm_estable_calidad
-        metrics.bpm_estable_muestras = stable.bpm_estable_muestras
-        metrics.bpm_estable_motivo = stable.bpm_estable_motivo
+        # Legacy fields keep the BLIND value - see Metrics docstring / comments.
+        metrics.bpm_estable_5s = blind.bpm_estable_5s
+        metrics.bpm_estable_inicio_s = blind.bpm_estable_inicio_s
+        metrics.bpm_estable_fin_s = blind.bpm_estable_fin_s
+        metrics.bpm_estable_calidad = blind.bpm_estable_calidad
+        metrics.bpm_estable_muestras = blind.bpm_estable_muestras
+        metrics.bpm_estable_motivo = blind.bpm_estable_motivo
+        metrics.bpm_estable_ciego_5s = blind.bpm_estable_5s
+        metrics.bpm_estable_ciego_inicio_s = blind.bpm_estable_inicio_s
+        metrics.bpm_estable_ciego_fin_s = blind.bpm_estable_fin_s
+        metrics.bpm_estable_ciego_calidad = blind.bpm_estable_calidad
+        metrics.bpm_estable_ciego_muestras = blind.bpm_estable_muestras
+        metrics.bpm_estable_ciego_motivo = blind.bpm_estable_motivo
+        metrics.bpm_estable_asistido_5s = assisted.bpm_estable_5s
+        metrics.bpm_estable_asistido_inicio_s = assisted.bpm_estable_inicio_s
+        metrics.bpm_estable_asistido_fin_s = assisted.bpm_estable_fin_s
+        metrics.bpm_estable_asistido_calidad = assisted.bpm_estable_calidad
+        metrics.bpm_estable_asistido_muestras = assisted.bpm_estable_muestras
+        metrics.bpm_estable_asistido_motivo = assisted.bpm_estable_motivo
         blocks = block_bpm(t, ir, step.config, analysis_cfg, block_s=10)
         temp = self.temp_summary_for_arrays(t, temp_c, temp_raw, channel_arrays)
         def row_temperature_values(i: int) -> tuple[dict[str, tuple[float, float]], dict[str, tuple[float, float]]]:
@@ -712,6 +721,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "pulso_final_pulsio", "pulso_final_fonendo",
                 "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
                 "cfg_confirmacion", "system_time", "anotaciones_inicio", "anotaciones_finales",
+                *NEW_STABLE_METRIC_FIELDS,
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -739,6 +749,7 @@ class ScheduledConfigWindow(PPGSuite):
                     fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""), metrics.bpm_estable_motivo,
                     self.last_config_ack, datetime.now().isoformat(timespec="milliseconds"),
                     st.measurement_condition, segment.final_annotations,
+                    *new_stable_metric_row_values(metrics),
                 ])
 
         processed_file = PROCESSED_DIR / f"proc_{base_name}.csv"
@@ -761,6 +772,7 @@ class ScheduledConfigWindow(PPGSuite):
                 "red_proc_norm", "ir_proc_norm", "artifact_red", "artifact_ir", "peak_ir",
                 "bpm_rolling_5s", "spo2_rolling_5s", "ratio_r_rolling_5s", "quality_rolling_5s",
                 "bpm_estable_5s", "bpm_estable_inicio_s", "bpm_estable_fin_s", "bpm_estable_calidad", "bpm_estable_muestras", "bpm_estable_motivo",
+                *NEW_STABLE_METRIC_FIELDS,
             ])
             for i in range(t.size):
                 tc = temp_c[i] if i < temp_c.size else math.nan
@@ -781,6 +793,7 @@ class ScheduledConfigWindow(PPGSuite):
                     "", "", "", "",
                     fmt(metrics.bpm_estable_5s, 2, ""), fmt(metrics.bpm_estable_inicio_s, 3, ""), fmt(metrics.bpm_estable_fin_s, 3, ""),
                     fmt(metrics.bpm_estable_calidad, 1, ""), str(metrics.bpm_estable_muestras or ""), metrics.bpm_estable_motivo,
+                    *new_stable_metric_row_values(metrics),
                 ])
 
         blocks_file = REPORT_DIR / f"bpm_blocks_10s_{base_name}.csv"

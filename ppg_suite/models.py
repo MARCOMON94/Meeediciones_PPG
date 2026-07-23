@@ -59,12 +59,41 @@ class Metrics:
     bpm_peak: float = math.nan
     bpm_fft: float = math.nan
     bpm_autocorr: float = math.nan
+    # Legacy fields. Since the Bland-Altman blind/assisted split, these are
+    # populated with the BLIND stable segment (reference_bpm=None) so every
+    # existing reader gets the non-circular value without being touched.
     bpm_estable_5s: float = math.nan
     bpm_estable_inicio_s: float = math.nan
     bpm_estable_fin_s: float = math.nan
     bpm_estable_calidad: float = math.nan
     bpm_estable_muestras: int = 0
     bpm_estable_motivo: str = ""
+    # Blind stable segment: selected using only signal quality (artifacts,
+    # saturation, PI, drift, estimator agreement) - never the manual
+    # reference. This is the value Bland-Altman validation must use.
+    bpm_estable_ciego_5s: float = math.nan
+    bpm_estable_ciego_inicio_s: float = math.nan
+    bpm_estable_ciego_fin_s: float = math.nan
+    bpm_estable_ciego_calidad: float = math.nan
+    bpm_estable_ciego_muestras: int = 0
+    bpm_estable_ciego_motivo: str = ""
+    # Assisted stable segment: same search but also rejects windows far from
+    # the manual reference. Diagnostic aid only - never use as the primary
+    # estimator in Bland-Altman, it would compare the reference to itself.
+    bpm_estable_asistido_5s: float = math.nan
+    bpm_estable_asistido_inicio_s: float = math.nan
+    bpm_estable_asistido_fin_s: float = math.nan
+    bpm_estable_asistido_calidad: float = math.nan
+    bpm_estable_asistido_muestras: int = 0
+    bpm_estable_asistido_motivo: str = ""
+    # Per-estimator metadata for the combined `bpm` (score_and_merge_metrics).
+    bpm_peak_quality: float = math.nan
+    bpm_fft_quality: float = math.nan
+    bpm_autocorr_quality: float = math.nan
+    bpm_estimators_valid: int = 0
+    bpm_estimators_spread: float = math.nan
+    bpm_final_source: str = ""
+    bpm_final_reason: str = ""
     spo2: float = math.nan
     ratio_r: float = math.nan
     resp_rate_rpm: float = math.nan

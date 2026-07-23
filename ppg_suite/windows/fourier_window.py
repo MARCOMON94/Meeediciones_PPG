@@ -28,7 +28,7 @@ from ..processing import (
     saturation_percent,
     uniform_resample,
 )
-from ..utils import fmt, now_stamp, open_folder
+from ..utils import fmt, mean_valid_reference, now_stamp, open_folder
 
 HEADER_TOOLTIPS = {
     "Usar": "Marca este raw para incluirlo en el análisis comparativo.",
@@ -97,11 +97,7 @@ def _as_ref_pulse(value: object) -> float:
 
 
 def _mean_ref_pulse(*values: object) -> tuple[float, int]:
-    valid = [_as_ref_pulse(value) for value in values]
-    valid = [value for value in valid if np.isfinite(value)]
-    if not valid:
-        return math.nan, 0
-    return float(np.mean(valid)), len(valid)
+    return mean_valid_reference(*values)
 
 
 def _as_int(value: str) -> int:

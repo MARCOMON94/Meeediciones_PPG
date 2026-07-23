@@ -12,6 +12,8 @@ from .models import AnalysisConfig, Metrics, SensorConfig
 
 RAW_DIGITAL_CEILING = 262143.0
 
+_ESTIMATOR_SOURCE_NAMES = {"picos": "peaks", "FFT": "FFT", "autocorr": "autocorr"}
+
 
 def estimate_hz(t: np.ndarray) -> float:
     if t.size < 2:
@@ -473,33 +475,47 @@ def score_and_merge_metrics(t: np.ndarray, red: np.ndarray, ir: np.ndarray, sens
     m.bpm_fft, q_fft, r_fft = estimate_bpm_fft(tt, ii, cfg)
     m.bpm_autocorr, q_acorr, r_acorr = estimate_bpm_autocorr(tt, ii, cfg)
 
+    m.bpm_peak_quality = float(q_peak)
+    m.bpm_fft_quality = float(q_fft)
+    m.bpm_autocorr_quality = float(q_acorr)
+
     candidates: list[tuple[float, float, str]] = []
     for value, q, name in [(m.bpm_peak, q_peak, "picos"), (m.bpm_fft, q_fft, "FFT"), (m.bpm_autocorr, q_acorr, "autocorr")]:
         if np.isfinite(value) and cfg.bpm_min <= value <= cfg.bpm_max and q > 10:
             candidates.append((float(value), float(q), name))
 
+    m.bpm_estimators_valid = len(candidates)
     reasons = [screen_reason, r_peak, r_fft, r_acorr]
     if not candidates:
         m.bpm = math.nan
         bpm_quality = 0.0
-        reasons.append("sin candidatos BPM válidos")
+        m.bpm_final_source = "no_valid_estimator"
+        m.bpm_final_reason = "sin candidatos BPM válidos"
+        reasons.append(m.bpm_final_reason)
     elif len(candidates) == 1:
         m.bpm = candidates[0][0]
         bpm_quality = min(55.0, candidates[0][1])
-        reasons.append(f"solo {candidates[0][2]}")
+        m.bpm_final_source = _ESTIMATOR_SOURCE_NAMES[candidates[0][2]]
+        m.bpm_final_reason = f"solo {candidates[0][2]}"
+        reasons.append(m.bpm_final_reason)
     else:
         values = np.asarray([c[0] for c in candidates], dtype=float)
         weights = np.asarray([max(c[1], 1.0) for c in candidates], dtype=float)
         spread = float(np.max(values) - np.min(values))
+        m.bpm_estimators_spread = spread
         if spread <= 12.0:
             m.bpm = float(np.average(values, weights=weights))
             bpm_quality = float(np.clip(np.mean(weights) + max(0.0, 20.0 - spread), 0.0, 100.0))
-            reasons.append(f"estimadores coherentes spread={spread:.1f}")
+            m.bpm_final_source = "weighted_mean"
+            m.bpm_final_reason = f"estimadores coherentes spread={spread:.1f}"
+            reasons.append(m.bpm_final_reason)
         else:
             best = max(candidates, key=lambda c: (c[1] + (8.0 if c[2] == "FFT" else 0.0)))
             m.bpm = best[0]
             bpm_quality = float(np.clip(best[1] * 0.50, 0.0, 55.0))
-            reasons.append(f"estimadores discrepantes; se usa {best[2]} spread={spread:.1f}")
+            m.bpm_final_source = _ESTIMATOR_SOURCE_NAMES[best[2]]
+            m.bpm_final_reason = f"estimadores discrepantes; se usa {best[2]} spread={spread:.1f}"
+            reasons.append(m.bpm_final_reason)
 
     spo2, r, spo2_reason, ac_red, dc_red, ac_ir, dc_ir, pi_red, pi_ir = estimate_spo2(tt, rr, ii, cfg)
     m.spo2 = spo2
@@ -836,4 +852,26 @@ def stable_bpm_segment(
     out.bpm_estable_muestras = int(samples)
     out.bpm_estable_motivo = _stable_reason_summary(total_windows, accepted_windows, rejection_counts, [f"ventana elegida {start:.2f}-{end:.2f} s", *best_notes])
     return out
+
+
+def compute_blind_and_assisted_stable(
+    t: np.ndarray,
+    red: np.ndarray,
+    ir: np.ndarray,
+    sensor_cfg: SensorConfig,
+    cfg: AnalysisConfig,
+    window_s: float,
+    reference_bpm: float | None,
+) -> tuple[Metrics, Metrics]:
+    """Blind and assisted stable-BPM segments for a capture.
+
+    Blind (reference_bpm=None) never sees the manual reference - it is the
+    value that must be used for Bland-Altman validation, to avoid comparing
+    the reference against a value that was itself filtered by that reference.
+    Assisted additionally rejects windows far from the manual reference; it
+    is a diagnostic aid only, never the primary agreement estimator.
+    """
+    blind = stable_bpm_segment(t, red, ir, sensor_cfg, cfg, window_s=window_s, reference_bpm=None)
+    assisted = stable_bpm_segment(t, red, ir, sensor_cfg, cfg, window_s=window_s, reference_bpm=reference_bpm)
+    return blind, assisted
 
