@@ -99,6 +99,196 @@ def safe_file_part(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_") or "animal"
 
 
+class AnimalPhotoCell(QtWidgets.QFrame):
+    """Drag-and-droppable image slot used by BulkPhotoDialog's table."""
+
+    def __init__(self, dialog: "BulkPhotoDialog", row_index: int):
+        super().__init__()
+        self.dialog = dialog
+        self.row_index = row_index
+        self.photo_path: Path | None = None
+        self._drag_start: QtCore.QPoint | None = None
+        self.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        self.setFixedSize(112, 92)
+        self.setAcceptDrops(True)
+        self.setCursor(QtCore.Qt.CursorShape.OpenHandCursor)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(2)
+        self.thumb = QtWidgets.QLabel("Sin foto")
+        self.thumb.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.thumb.setFixedSize(82, 60)
+        self.thumb.setStyleSheet("background:#f0f2f4; color:#8a97a3; border:1px dashed #ccd3da;")
+        self.name_label = QtWidgets.QLabel("")
+        self.name_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.name_label.setStyleSheet("font-size: 8pt; color: #45505a;")
+        self.name_label.setWordWrap(True)
+        layout.addWidget(self.thumb)
+        layout.addWidget(self.name_label)
+
+    def set_photo(self, path: Path | None):
+        self.photo_path = path
+        if path and path.exists():
+            pix = QtGui.QPixmap(str(path))
+            if not pix.isNull():
+                self.thumb.setPixmap(
+                    pix.scaled(82, 60, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+                )
+                self.thumb.setText("")
+            else:
+                self.thumb.setPixmap(QtGui.QPixmap())
+                self.thumb.setText("Invalida")
+            self.name_label.setText(path.name)
+        else:
+            self.thumb.setPixmap(QtGui.QPixmap())
+            self.thumb.setText("Sin foto")
+            self.name_label.setText("")
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and self.photo_path:
+            self._drag_start = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent):
+        if (
+            self._drag_start is not None
+            and self.photo_path
+            and (event.position().toPoint() - self._drag_start).manhattanLength() >= QtWidgets.QApplication.startDragDistance()
+        ):
+            drag = QtGui.QDrag(self)
+            mime = QtCore.QMimeData()
+            mime.setText(str(self.row_index))
+            drag.setMimeData(mime)
+            if self.thumb.pixmap() is not None and not self.thumb.pixmap().isNull():
+                drag.setPixmap(self.thumb.pixmap())
+            drag.exec(QtCore.Qt.DropAction.MoveAction)
+            self._drag_start = None
+        super().mouseMoveEvent(event)
+
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent):
+        if event.mimeData().hasText() or event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QtGui.QDropEvent):
+        mime = event.mimeData()
+        if mime.hasUrls():
+            for url in mime.urls():
+                if url.isLocalFile():
+                    self.dialog.assign_photo(self.row_index, Path(url.toLocalFile()))
+                    break
+            event.acceptProposedAction()
+            return
+        if mime.hasText():
+            try:
+                source_row = int(mime.text())
+            except ValueError:
+                return
+            if source_row != self.row_index:
+                self.dialog.swap_photos(source_row, self.row_index)
+            event.acceptProposedAction()
+
+
+class BulkPhotoDialog(QtWidgets.QDialog):
+    """Additional window to assign one photo per checked animal, oldest-first."""
+
+    def __init__(self, parent: QtWidgets.QWidget, rows: list[dict]):
+        super().__init__(parent)
+        self.setWindowTitle("Fotos de animales seleccionados")
+        self.resize(720, 420)
+        self.rows = rows
+        self.photo_cells: list[AnimalPhotoCell] = []
+        self.assignments: dict[str, Path] = {}
+
+        layout = QtWidgets.QVBoxLayout(self)
+        info = QtWidgets.QLabel(
+            f"{len(rows)} animal(es) seleccionado(s), ordenados de mas antiguo a mas nuevo (fecha de alta). "
+            "Sube hasta el mismo numero de fotos: se emparejan por fecha (foto mas antigua con animal mas antiguo). "
+            "Tambien puedes arrastrar una casilla de imagen sobre otra para intercambiarlas."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        controls = QtWidgets.QHBoxLayout()
+        self.btn_upload = QtWidgets.QPushButton(f"Subir fotos (max {len(rows)})")
+        self.btn_upload.clicked.connect(self.pick_photos)
+        controls.addWidget(self.btn_upload)
+        controls.addStretch(1)
+        layout.addLayout(controls)
+
+        self.table = QtWidgets.QTableWidget(len(rows), 4)
+        self.table.setHorizontalHeaderLabels(["Animal", "Crotal", "Hora y fecha de creación", "Imagen"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
+        self.table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        for row_index, row in enumerate(rows):
+            self.table.setItem(row_index, 0, self._read_only_item(row["label"]))
+            self.table.setItem(row_index, 1, self._read_only_item(row["crotal"]))
+            self.table.setItem(row_index, 2, self._read_only_item(row["created_label"]))
+            cell = AnimalPhotoCell(self, row_index)
+            self.photo_cells.append(cell)
+            self.table.setCellWidget(row_index, 3, cell)
+            self.table.setRowHeight(row_index, 96)
+        self.table.setColumnWidth(3, 120)
+        layout.addWidget(self.table, stretch=1)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Save | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.on_save)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    @staticmethod
+    def _read_only_item(value: str) -> QtWidgets.QTableWidgetItem:
+        item = QtWidgets.QTableWidgetItem(value)
+        item.setFlags(QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable)
+        return item
+
+    def pick_photos(self):
+        limit = len(self.rows)
+        paths_text, _filter = QtWidgets.QFileDialog.getOpenFileNames(
+            self,
+            "Seleccionar fotos",
+            str(Path.home()),
+            "Imagenes (*.png *.jpg *.jpeg *.bmp *.webp);;Todos los archivos (*.*)",
+        )
+        if not paths_text:
+            return
+        candidates = [Path(p) for p in paths_text]
+        if len(candidates) > limit:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Fotos",
+                f"Has seleccionado {len(candidates)} fotos pero solo hay {limit} animal(es) seleccionados.\n"
+                f"Se usaran las {limit} mas antiguas segun su fecha de creación.",
+            )
+        candidates.sort(key=lambda p: p.stat().st_ctime if p.exists() else 0.0)
+        for cell, path in zip(self.photo_cells, candidates[:limit]):
+            cell.set_photo(path)
+
+    def assign_photo(self, row_index: int, path: Path):
+        self.photo_cells[row_index].set_photo(path)
+
+    def swap_photos(self, row_a: int, row_b: int):
+        cell_a = self.photo_cells[row_a]
+        cell_b = self.photo_cells[row_b]
+        path_a, path_b = cell_a.photo_path, cell_b.photo_path
+        cell_a.set_photo(path_b)
+        cell_b.set_photo(path_a)
+
+    def on_save(self):
+        self.assignments = {
+            row["animal_key"]: cell.photo_path
+            for row, cell in zip(self.rows, self.photo_cells)
+            if cell.photo_path is not None
+        }
+        if not self.assignments:
+            QtWidgets.QMessageBox.information(self, "Fotos", "No has asignado ninguna foto.")
+            return
+        self.accept()
+
+
 class AnimalsWindow(QtWidgets.QMainWindow):
     back_to_menu = QtCore.pyqtSignal()
 
@@ -332,11 +522,17 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         buttons = QtWidgets.QHBoxLayout()
         self.btn_new = QtWidgets.QPushButton("Nuevo")
         self.btn_save = QtWidgets.QPushButton("Guardar ficha")
+        self.btn_photos = QtWidgets.QPushButton("Fotos")
+        self.btn_photos.setToolTip(
+            "Asigna una foto a cada animal marcado en la tabla (checkbox), de mas antiguo a mas nuevo."
+        )
         buttons.addWidget(self.btn_new)
         buttons.addWidget(self.btn_save)
+        buttons.addWidget(self.btn_photos)
         left_layout.addLayout(buttons)
         self.btn_new.clicked.connect(self.new_animal)
         self.btn_save.clicked.connect(self.save_current_profile)
+        self.btn_photos.clicked.connect(self.open_bulk_photo_dialog)
 
         self.animals_table = QtWidgets.QTableWidget(0, len(self.animal_headers))
         self.configure_table(self.animals_table, self.animal_headers)
@@ -792,6 +988,58 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         target = ANIMAL_PHOTO_DIR / f"{safe_file_part(key)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{suffix}"
         shutil.copy2(source, target)
         return target
+
+    @staticmethod
+    def format_created_stamp(value: object) -> str:
+        text = str(value or "")
+        if not text:
+            return ""
+        try:
+            return datetime.fromisoformat(text).strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            return text
+
+    def open_bulk_photo_dialog(self):
+        seen: dict[str, None] = {}
+        for record in self.selected_items.values():
+            if record.kind == "animal" and record.animal_key:
+                seen.setdefault(record.animal_key, None)
+        if not seen:
+            QtWidgets.QMessageBox.information(
+                self, "Fotos", "Marca la casilla de al menos un animal en la tabla para asignarle una foto."
+            )
+            return
+        ordered_keys = sorted(seen, key=lambda key: self.profile_for_key(key).get("created") or "")
+        rows = []
+        for key in ordered_keys:
+            profile = self.profile_for_key(key)
+            name = str(profile.get("display_name") or "")
+            label = display_key_label(key)
+            rows.append(
+                {
+                    "animal_key": key,
+                    "label": f"{label} ({name})" if name else label,
+                    "crotal": str(profile.get("id") or key.split(":", 1)[-1]),
+                    "created_label": self.format_created_stamp(profile.get("created")),
+                }
+            )
+        dialog = BulkPhotoDialog(self, rows)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+        now = datetime.now().isoformat()
+        for key, source_path in dialog.assignments.items():
+            existing = self.profile_for_key(key)
+            profile = {
+                **existing,
+                "animal_key": key,
+                "photo_path": str(self.copy_photo(source_path, key)),
+                "created": existing.get("created") or now,
+                "updated": now,
+            }
+            self.profiles[key] = profile
+        self.save_profiles()
+        self.reload_data()
+        QtWidgets.QMessageBox.information(self, "Fotos", f"Se han guardado {len(dialog.assignments)} foto(s).")
 
     def update_photo(self, profile: dict):
         self.photo_label.setPixmap(QtGui.QPixmap())

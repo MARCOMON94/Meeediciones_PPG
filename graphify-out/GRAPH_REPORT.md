@@ -1,0 +1,250 @@
+# Graph Report - mtestv2  (2026-07-23)
+
+## Corpus Check
+- 63 files · ~111,874 words
+- Verdict: corpus is large enough that graph structure adds value.
+
+## Summary
+- 977 nodes · 2803 edges · 48 communities (37 shown, 11 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 62 edges (avg confidence: 0.57)
+- Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `8656c12b`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
+
+## Community Hubs (Navigation)
+- AnimalsWindow
+- SensorConfig
+- AppController
+- ModeSelectDialog
+- FourierAnalysisWindow
+- PPGSuite
+- atomic_write_json
+- RelationExplorerWindow
+- CaptureRecord
+- BleSerialAdapter
+- VacuumExperimentWindow
+- _as_float
+- relations_window.py
+- Experiment3MWindow
+- measurement_window.py
+- .current_animal_type
+- .value
+- DictTableModel
+- What You Must Do When Invoked
+- What You Must Do When Invoked
+- .build_ui
+- AnimalPhotoCell
+- mtestv2
+- git_auto_update.py
+- graphify reference: extra exports and benchmark
+- graphify reference: extra exports and benchmark
+- CollapsibleSection
+- build_icon
+- graphify reference: query, path, explain
+- graphify reference: query, path, explain
+- graphify reference: add a URL and watch a folder
+- graphify reference: commit hook and native CLAUDE.md integration
+- graphify reference: incremental update and cluster-only
+- graphify reference: add a URL and watch a folder
+- graphify reference: commit hook and native CLAUDE.md integration
+- graphify reference: incremental update and cluster-only
+- graphify reference: GitHub clone and cross-repo merge
+- graphify reference: transcribe video and audio
+- graphify reference: GitHub clone and cross-repo merge
+- graphify reference: transcribe video and audio
+- AGENTS.md
+- CLAUDE.md
+- .claude/CLAUDE.md
+- .claude/skills/graphify/references/extraction-spec.md
+- .codex/skills/graphify/references/extraction-spec.md
+
+## God Nodes (most connected - your core abstractions)
+1. `PPGSuite` - 122 edges
+2. `RelationExplorerWindow` - 115 edges
+3. `AnimalsWindow` - 98 edges
+4. `SensorConfig` - 45 edges
+5. `CaptureRecord` - 44 edges
+6. `AnalysisConfig` - 43 edges
+7. `fmt()` - 43 edges
+8. `AppController` - 40 edges
+9. `VacuumExperimentWindow` - 37 edges
+10. `estimate_hz()` - 34 edges
+
+## Surprising Connections (you probably didn't know these)
+- `LoadingDialog` --uses--> `ModeSelectDialog`  [INFERRED]
+  controller.py → ppg_suite/menu.py
+- `LoadingDialog` --uses--> `AnimalsWindow`  [INFERRED]
+  controller.py → ppg_suite/windows/animals_window.py
+- `LoadingDialog` --uses--> `FourierAnalysisWindow`  [INFERRED]
+  controller.py → ppg_suite/windows/fourier_window.py
+- `LoadingDialog` --uses--> `RelationExplorerWindow`  [INFERRED]
+  controller.py → ppg_suite/windows/relations_window.py
+- `LoadingDialog` --uses--> `ConfigurationsWindow`  [INFERRED]
+  controller.py → ppg_suite/windows/scheduled_window.py
+
+## Import Cycles
+- None detected.
+
+## Communities (48 total, 11 thin omitted)
+
+### Community 0 - "AnimalsWindow"
+Cohesion: 0.06
+Nodes (18): AnimalMeasurement, AnimalSelectionRecord, AnimalsWindow, display_key_label(), ndarray, Path, QModelIndex, QTableWidget (+10 more)
+
+### Community 1 - "SensorConfig"
+Cohesion: 0.09
+Nodes (60): Counter, AnalysisConfig, SensorConfig, block_bpm(), bpm_from_peak_indices(), compute_ac_dc(), detect_artifacts(), estimate_bpm_autocorr() (+52 more)
+
+### Community 2 - "AppController"
+Cohesion: 0.07
+Nodes (14): AppController, LoadingDialog, Pantalla independiente para reajustes/larga duración.      Importante: ya no s, ReajustesWindow, RealWindow, TemperatureWindow, TestWindow, QApplication (+6 more)
+
+### Community 3 - "ModeSelectDialog"
+Cohesion: 0.08
+Nodes (26): DataImportResult, import_resultados_folder(), Path, validate_resultados_folder(), arduino_cli_path(), available_firmware_ports(), compile_firmware(), FirmwarePort (+18 more)
+
+### Community 4 - "FourierAnalysisWindow"
+Cohesion: 0.10
+Nodes (13): open_folder(), Path, _aggregate_stem_for_child(), _apply_header_tooltips(), FourierAnalysisWindow, datetime, Path, QCloseEvent (+5 more)
+
+### Community 5 - "PPGSuite"
+Cohesion: 0.10
+Nodes (5): Exception, _manual_reference_bpm(), PPGSuite, ndarray, temperature_channel_summary()
+
+### Community 6 - "atomic_write_json"
+Cohesion: 0.11
+Nodes (28): DictWriter, main(), atomic_csv_dict_writer(), atomic_csv_writer(), atomic_text_file(), atomic_write_json(), atomic_write_text(), Path (+20 more)
+
+### Community 7 - "RelationExplorerWindow"
+Cohesion: 0.11
+Nodes (4): QCloseEvent, RelationExplorerWindow, _select_first_row(), QTableView
+
+### Community 8 - "CaptureRecord"
+Cohesion: 0.15
+Nodes (8): CaptureRecord, Path, _read_csv(), SelectionRecord, SessionGroup, Path, test_remove_capture_rows_from_sessions_uses_atomic_rewrite(), test_selected_captures_for_compare_uses_checked_items()
+
+### Community 9 - "BleSerialAdapter"
+Cohesion: 0.10
+Nodes (3): BleSerialAdapter, QCloseEvent, QKeyEvent
+
+### Community 10 - "VacuumExperimentWindow"
+Cohesion: 0.11
+Nodes (4): Path, QCloseEvent, PPG + microphone capture for post-run vacuum/notch analysis., VacuumExperimentWindow
+
+### Community 11 - "_as_float"
+Cohesion: 0.13
+Nodes (4): PenStyle, _as_float(), _as_ref_pulse(), ndarray
+
+### Community 12 - "relations_window.py"
+Cohesion: 0.14
+Nodes (20): active_temp_channels_for_animal(), animal_label(), default_mapping_for_animal(), default_position_for_animal(), display_mapping(), display_position(), inverted_mapping_for_animal(), iter_position_prefixes() (+12 more)
+
+### Community 13 - "Experiment3MWindow"
+Cohesion: 0.07
+Nodes (14): build_12_config_steps(), build_3m_search_space(), build_64_config_steps(), ConfigTableWidget, ConfigurationsWindow, Experiment3MWindow, make_3m_step(), QKeyEvent (+6 more)
+
+### Community 14 - "measurement_window.py"
+Cohesion: 0.18
+Nodes (13): CaptureState, Metrics, Short live warning for SpO2 reliability, while keeping BPM usable., spo2_support_message(), fmt(), now_stamp(), safe_float_text(), sanitize_id() (+5 more)
+
+### Community 16 - ".value"
+Cohesion: 0.21
+Nodes (4): _cap_first(), _csv_row_count(), _mean_ref_pulse(), _mode_label()
+
+### Community 17 - "DictTableModel"
+Cohesion: 0.15
+Nodes (3): Orientation, DictTableModel, QModelIndex
+
+### Community 18 - "What You Must Do When Invoked"
+Cohesion: 0.07
+Nodes (26): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+18 more)
+
+### Community 19 - "What You Must Do When Invoked"
+Cohesion: 0.08
+Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
+
+### Community 20 - ".build_ui"
+Cohesion: 0.14
+Nodes (3): AppMode, QWidget, QComboBox
+
+### Community 21 - "AnimalPhotoCell"
+Cohesion: 0.14
+Nodes (8): AnimalPhotoCell, BulkPhotoDialog, QWidget, Drag-and-droppable image slot used by BulkPhotoDialog's table., Additional window to assign one photo per checked animal, oldest-first., QDragEnterEvent, QDropEvent, QMouseEvent
+
+### Community 22 - "mtestv2"
+Cohesion: 0.15
+Nodes (12): Animales, sensores y temperatura, Arranque, Datos generados, Empaquetado Windows, Estructura del proyecto, Firmware Arduino, Instalacion de desarrollo, Modos principales (+4 more)
+
+### Community 23 - "git_auto_update.py"
+Cohesion: 0.46
+Nodes (7): CompletedProcess, git_env(), is_dirty(), main(), Path, run_git(), update_timeout_seconds()
+
+### Community 24 - "graphify reference: extra exports and benchmark"
+Cohesion: 0.22
+Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
+
+### Community 25 - "graphify reference: extra exports and benchmark"
+Cohesion: 0.22
+Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
+
+### Community 27 - "build_icon"
+Cohesion: 0.47
+Nodes (5): QImage, build_icon(), main(), png_bytes(), Path
+
+### Community 31 - "graphify reference: query, path, explain"
+Cohesion: 0.33
+Nodes (5): For /graphify explain, For /graphify path, graphify reference: query, path, explain, Step 0 — Constrained query expansion (REQUIRED before traversal), Step 1 — Traversal
+
+### Community 32 - "graphify reference: query, path, explain"
+Cohesion: 0.33
+Nodes (5): For /graphify explain, For /graphify path, graphify reference: query, path, explain, Step 0 — Constrained query expansion (REQUIRED before traversal), Step 1 — Traversal
+
+### Community 33 - "graphify reference: add a URL and watch a folder"
+Cohesion: 0.50
+Nodes (3): For /graphify add, For --watch, graphify reference: add a URL and watch a folder
+
+### Community 34 - "graphify reference: commit hook and native CLAUDE.md integration"
+Cohesion: 0.50
+Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify reference: commit hook and native CLAUDE.md integration
+
+### Community 35 - "graphify reference: incremental update and cluster-only"
+Cohesion: 0.50
+Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
+
+### Community 36 - "graphify reference: add a URL and watch a folder"
+Cohesion: 0.50
+Nodes (3): For /graphify add, For --watch, graphify reference: add a URL and watch a folder
+
+### Community 37 - "graphify reference: commit hook and native CLAUDE.md integration"
+Cohesion: 0.50
+Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify reference: commit hook and native CLAUDE.md integration
+
+### Community 38 - "graphify reference: incremental update and cluster-only"
+Cohesion: 0.50
+Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
+
+## Knowledge Gaps
+- **97 isolated node(s):** `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+92 more)
+  These have ≤1 connection - possible missing edges or undocumented components.
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+
+## Suggested Questions
+_Questions this graph is uniquely positioned to answer:_
+
+- **Why does `RelationExplorerWindow` connect `RelationExplorerWindow` to `AppController`, `CaptureRecord`, `_as_float`, `relations_window.py`, `.value`, `DictTableModel`, `CollapsibleSection`?**
+  _High betweenness centrality (0.134) - this node is a cross-community bridge._
+- **Why does `PPGSuite` connect `PPGSuite` to `SensorConfig`, `AppController`, `BleSerialAdapter`, `VacuumExperimentWindow`, `relations_window.py`, `Experiment3MWindow`, `measurement_window.py`, `.current_animal_type`, `.build_ui`?**
+  _High betweenness centrality (0.128) - this node is a cross-community bridge._
+- **Why does `AnimalsWindow` connect `AnimalsWindow` to `AppController`, `relations_window.py`?**
+  _High betweenness centrality (0.121) - this node is a cross-community bridge._
+- **Are the 11 inferred relationships involving `PPGSuite` (e.g. with `ReajustesWindow` and `RealWindow`) actually correct?**
+  _`PPGSuite` has 11 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 5 inferred relationships involving `RelationExplorerWindow` (e.g. with `AppController` and `.show_relations()`) actually correct?**
+  _`RelationExplorerWindow` has 5 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 3 inferred relationships involving `AnimalsWindow` (e.g. with `AppController` and `.show_animals()`) actually correct?**
+  _`AnimalsWindow` has 3 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 5 inferred relationships involving `SensorConfig` (e.g. with `AnalysisConfigWidget` and `NoWheelComboBox`) actually correct?**
+  _`SensorConfig` has 5 INFERRED edges - model-reasoned connections that need verification._
