@@ -90,9 +90,9 @@
     "semantic_hash": "137c2ef1e082bfd7d2db8cb82e3747f4"
   },
   "ppg_suite/widgets.py": {
-    "mtime": 1781850490.466324,
-    "ast_hash": "7ebc67da2d6af60b2e4735dd522b42ae",
-    "semantic_hash": "7ebc67da2d6af60b2e4735dd522b42ae"
+    "mtime": 1784832884.9679956,
+    "ast_hash": "c55a37cb684438879a753ba95320c862",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/__init__.py": {
     "mtime": 1779706058.9356906,
@@ -100,8 +100,8 @@
     "semantic_hash": "676593a7d094628a492ee40b8ebda5d7"
   },
   "ppg_suite/windows/animals_window.py": {
-    "mtime": 1784826264.8557367,
-    "ast_hash": "aa59f81573dd550b9fd4fb0424126a58",
+    "mtime": 1784832379.440189,
+    "ast_hash": "b20fae4e643a022cab23cc62cfaeb010",
     "semantic_hash": ""
   },
   "ppg_suite/windows/fourier_window.py": {
@@ -110,14 +110,14 @@
     "semantic_hash": "9f0dd32b64cf928154893eb091c1d196"
   },
   "ppg_suite/windows/measurement_window.py": {
-    "mtime": 1784360465.0191493,
-    "ast_hash": "7804044d76a40aee04c4fe684b7327a5",
-    "semantic_hash": "7804044d76a40aee04c4fe684b7327a5"
+    "mtime": 1784832909.4843524,
+    "ast_hash": "e6fc99f9d9d4c0fc977f565e8bd54be5",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/reajustes_window.py": {
-    "mtime": 1784324789.0362623,
-    "ast_hash": "f6fc316d36585b685a80d9058af70731",
-    "semantic_hash": "f6fc316d36585b685a80d9058af70731"
+    "mtime": 1784832922.0755768,
+    "ast_hash": "5c5f9597446f2c3940a49e4aedcf1755",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/real_window.py": {
     "mtime": 1779706058.9369268,
@@ -125,19 +125,19 @@
     "semantic_hash": "b46fb3a16341dc54d14139f11e9dfe82"
   },
   "ppg_suite/windows/relations_window.py": {
-    "mtime": 1784828787.6811483,
-    "ast_hash": "6aaa32986e3e5313e8eeeec30ca2fb04",
+    "mtime": 1784832384.8213177,
+    "ast_hash": "ab628abc9de25cfc20bd159dababa810",
     "semantic_hash": ""
   },
   "ppg_suite/windows/scheduled_window.py": {
-    "mtime": 1784360482.4228394,
-    "ast_hash": "a8688e17c919fed34135c7dbc063f813",
-    "semantic_hash": "a8688e17c919fed34135c7dbc063f813"
+    "mtime": 1784832934.5482545,
+    "ast_hash": "846cc7542d255409930a74b6a875c923",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/temperature_window.py": {
-    "mtime": 1784324773.3473349,
-    "ast_hash": "3d73db13fa9ec2b3856a3df590d9b754",
-    "semantic_hash": "3d73db13fa9ec2b3856a3df590d9b754"
+    "mtime": 1784832953.3594413,
+    "ast_hash": "79fc8e8ddbb116297563ab8349cf1dad",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/test_window.py": {
     "mtime": 1779706058.9379435,

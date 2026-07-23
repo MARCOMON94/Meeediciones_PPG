@@ -52,9 +52,8 @@
   "50": "BleSerialAdapter",
   "51": ".populate_animal_list",
   "52": "_read_csv",
-  "53": ".recommended_alerts_for_measurements",
+  "53": "_base_from_row",
   "54": "test_animals_window.py",
   "55": ".update_photo",
-  "56": ".temperature_summary",
-  "57": ".open_history_raw"
+  "56": ".temperature_summary"
 }

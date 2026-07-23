@@ -8,7 +8,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 
 from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
-from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
+from ..widgets import AnalysisConfigWidget, AnimalCrotalPicker, NoWheelDoubleSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite, SIMPLE_CAPTURE_DEFAULT_S
 
 
@@ -62,7 +62,7 @@ class TemperatureWindow(PPGSuite):
 
         capture_group = QtWidgets.QGroupBox("Toma de temperatura")
         form = QtWidgets.QFormLayout(capture_group)
-        self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
+        self.crotal_edit = AnimalCrotalPicker()
         self.duration_spin = NoWheelDoubleSpinBox()
         self.duration_spin.setRange(2, 3600)
         self.duration_spin.setDecimals(1)

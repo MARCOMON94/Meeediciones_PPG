@@ -15,7 +15,7 @@ from ..io_utils import atomic_csv_writer, atomic_write_json
 from ..models import SensorConfig
 from ..processing import block_bpm, detect_artifacts, estimate_bpm_peaks, estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message, stable_bpm_segment
 from ..utils import fmt, safe_float_text, sanitize_id, now_stamp
-from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
+from ..widgets import AnalysisConfigWidget, AnimalCrotalPicker, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from ..paths import DOCUMENTS_DIR, FIGURES_DIR, PROCESSED_DIR, RAW_DIR, REPORT_DIR
 from .measurement_window import PPGSuite, temperature_channel_summary
 
@@ -175,7 +175,7 @@ class ScheduledConfigWindow(PPGSuite):
 
         capture_group = QtWidgets.QGroupBox(self.scheduled_title)
         form = QtWidgets.QFormLayout(capture_group)
-        self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
+        self.crotal_edit = AnimalCrotalPicker()
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.temp_manual_initial_widget = self.create_manual_initial_temp_widget()
         self.animal_combo = QtWidgets.QComboBox()

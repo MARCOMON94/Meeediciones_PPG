@@ -11,7 +11,7 @@ from ..models import CaptureState, Metrics
 from ..paths import FIGURES_DIR, SCREENSHOT_DIR
 from ..processing import estimate_hz, processed_for_plot, score_and_merge_metrics, spo2_support_message
 from ..utils import fmt, now_stamp
-from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
+from ..widgets import AnalysisConfigWidget, AnimalCrotalPicker, NoWheelDoubleSpinBox, NoWheelSpinBox, SensorConfigWidget
 from .measurement_window import PPGSuite
 
 
@@ -64,7 +64,7 @@ class ReajustesWindow(PPGSuite):
 
         identity_group = QtWidgets.QGroupBox("Identificación")
         identity = QtWidgets.QFormLayout(identity_group)
-        self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
+        self.crotal_edit = AnimalCrotalPicker()
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.temp_manual_initial_widget = self.create_manual_initial_temp_widget()
         self.animal_combo = QtWidgets.QComboBox()

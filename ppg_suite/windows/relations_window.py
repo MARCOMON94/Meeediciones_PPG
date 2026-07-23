@@ -2069,7 +2069,11 @@ class RelationExplorerWindow(QtWidgets.QMainWindow):
     ) -> tuple[list[CaptureRecord], list[Path]]:
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("Seleccionar qué mover a papelera")
-        dialog.resize(780, 520)
+        screen = QtWidgets.QApplication.primaryScreen()
+        available_height = screen.availableGeometry().height() if screen else 900
+        max_height = max(420, available_height - 120)
+        dialog.resize(780, min(520, max_height))
+        dialog.setMaximumHeight(max_height)
         layout = QtWidgets.QVBoxLayout(dialog)
         info = QtWidgets.QLabel(
             "Revisa la selección antes de moverla a papelera. Las sesiones muestran sus raws para que marques solo los que quieres retirar."

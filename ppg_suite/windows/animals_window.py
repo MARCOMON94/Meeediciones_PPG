@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import math
 import re
@@ -97,6 +98,24 @@ def display_key_label(key: str) -> str:
 
 def safe_file_part(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_") or "animal"
+
+
+def _load_csv_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+    """Read a project CSV keeping the header order, so it can be rewritten in place."""
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return [], []
+    if not text.strip():
+        return [], []
+    try:
+        dialect = csv.Sniffer().sniff(text[:2048], delimiters=";,\t")
+    except csv.Error:
+        dialect = csv.excel
+        dialect.delimiter = ";"
+    reader = csv.DictReader(text.splitlines(), dialect=dialect)
+    rows = [{str(k or "").strip(): str(v or "").strip() for k, v in row.items()} for row in reader]
+    return list(reader.fieldnames or []), rows
 
 
 def load_oriented_pixmap(path: Path) -> QtGui.QPixmap:
@@ -880,6 +899,102 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         for widget in (self.baseline_temp_delta, self.baseline_bpm_delta, self.baseline_min_records):
             widget.setEnabled(bool(enabled))
 
+    def _rewrite_capture_file_ids(self, path: Path, base: str, new_id: str, new_type: str, *, match_base: bool) -> bool:
+        """Rewrite the id/animal_type columns of a capture CSV so it re-associates with the new crotal.
+
+        `match_base` is True for session_*.csv, which can hold rows for several
+        animals in one file: only the row matching this capture's base_name is
+        touched. Per-capture files (raw/processed/blocks) hold one animal per
+        file, so every row is updated.
+        """
+        fieldnames, rows = _load_csv_rows(path)
+        if not fieldnames or not rows:
+            return False
+        changed = False
+        for row in rows:
+            if match_base and _base_from_row(row) != base:
+                continue
+            if "id" in row and row.get("id") != new_id:
+                row["id"] = new_id
+                changed = True
+            if new_type and "animal_type" in row and row.get("animal_type") != new_type:
+                row["animal_type"] = new_type
+                changed = True
+        if not changed:
+            return False
+        with atomic_csv_dict_writer(path, fieldnames) as writer:
+            writer.writeheader()
+            writer.writerows(rows)
+        return True
+
+    def reassign_measurements(self, old_key: str, new_type: str, new_id: str) -> int:
+        """Re-point every raw/session/summary file for `old_key` to the new crotal.
+
+        Without this, editing the crotal in the animal form only moved the
+        profile card (photo/notes/alerts); the historical raw/session/summary
+        files still carried the old id, so the animal's measurement history
+        silently detached from it on the next reload.
+        """
+        moved = 0
+        for measurement in self.measurements_by_animal.get(old_key, []):
+            base = _base_from_row(measurement.row)
+            files = measurement.files
+            summary_path = files.get("summary")
+            if summary_path and summary_path.exists():
+                try:
+                    data = json.loads(summary_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    data = None
+                if isinstance(data, dict):
+                    data_changed = False
+                    if data.get("id") != new_id:
+                        data["id"] = new_id
+                        data_changed = True
+                    if new_type and data.get("animal_type") != new_type:
+                        data["animal_type"] = new_type
+                        data_changed = True
+                    if data_changed:
+                        atomic_write_json(summary_path, data)
+            for kind in ("raw", "processed", "blocks"):
+                path = files.get(kind)
+                if path and path.exists():
+                    self._rewrite_capture_file_ids(path, base, new_id, new_type, match_base=False)
+            session_path = files.get("session")
+            if session_path and session_path.exists():
+                self._rewrite_capture_file_ids(session_path, base, new_id, new_type, match_base=True)
+            moved += 1
+        return moved
+
+    def _merge_profile_data(self, primary: dict, secondary: dict) -> dict:
+        """Combine two profile dicts when an animal is renamed onto an existing crotal.
+
+        `primary` wins field-by-field conflicts (it's the more relevant/recent
+        record); `secondary` only fills gaps so photos/notes/alerts from the
+        old record are never silently dropped. Notes from both are unioned.
+        """
+        merged = dict(primary)
+        notes = list(primary.get("notes") or []) + list(secondary.get("notes") or [])
+        seen: set[tuple[str, str]] = set()
+        deduped: list[dict] = []
+        for note in notes:
+            marker = (str(note.get("date", "")), str(note.get("text", "")))
+            if marker in seen:
+                continue
+            seen.add(marker)
+            deduped.append(note)
+        deduped.sort(key=lambda row: row.get("date", ""), reverse=True)
+        merged["notes"] = deduped
+        if not merged.get("photo_path") and secondary.get("photo_path"):
+            merged["photo_path"] = secondary["photo_path"]
+        primary_baseline = primary.get("baseline_settings") or {}
+        secondary_baseline = secondary.get("baseline_settings") or {}
+        if not primary_baseline.get("enabled") and secondary_baseline.get("enabled"):
+            merged["baseline_settings"] = secondary_baseline
+        created_values = [v for v in (primary.get("created"), secondary.get("created")) if v]
+        if created_values:
+            merged["created"] = min(created_values)
+        return merged
+
     def save_current_profile(self) -> str:
         key = self.current_form_key()
         if not key:
@@ -887,15 +1002,33 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             return ""
         now = datetime.now().isoformat()
         old_key = self.current_key if self.current_key in self.profiles else ""
+        renaming = bool(old_key and old_key != key)
+        duplicate_merge = renaming and key in self.profiles
+
+        if duplicate_merge:
+            pending_count = len(self.measurements_by_animal.get(old_key, []))
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                "Animales",
+                f"El crotal '{display_key_label(key)}' ya existe como otro animal.\n\n"
+                f"Se combinarán las {pending_count} toma(s), fotos, notas y avisos de ambos registros "
+                "bajo este crotal. Esta acción no se puede deshacer. ¿Continuar?",
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No,
+            )
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return ""
+
         existing = self.profile_for_key(key)
+        base = self._merge_profile_data(existing, self.profile_for_key(old_key)) if renaming else existing
         profile = {
-            **existing,
+            **base,
             "animal_key": key,
             "id": sanitize_id(self.id_edit.text()),
             "animal_type": normalize_animal_type(str(self.species_combo.currentData() or "")),
             "display_name": self.name_edit.text().strip(),
-            "baseline_settings": existing.get("baseline_settings") or {"enabled": False, "temp_delta_c": 1.0, "bpm_delta": 15.0, "min_records": 5},
-            "created": existing.get("created") or now,
+            "baseline_settings": base.get("baseline_settings") or {"enabled": False, "temp_delta_c": 1.0, "bpm_delta": 15.0, "min_records": 5},
+            "created": base.get("created") or now,
             "updated": now,
         }
         if self.pending_photo_source:
@@ -907,8 +1040,19 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         self.profiles[key] = profile
         self.current_key = key
         self.save_profiles()
+
+        moved = 0
+        if renaming:
+            moved = self.reassign_measurements(old_key, profile["animal_type"], profile["id"])
+
         self.reload_data()
         self.select_animal(key)
+
+        if renaming and (moved or duplicate_merge):
+            message = f"Se han movido {moved} toma(s) de '{display_key_label(old_key)}' a '{display_key_label(key)}'."
+            if duplicate_merge:
+                message += "\nLos datos de ambos animales se han combinado bajo este crotal."
+            QtWidgets.QMessageBox.information(self, "Animales", message)
         return key
 
     def save_alert_settings(self):
@@ -1795,7 +1939,11 @@ class AnimalsWindow(QtWidgets.QMainWindow):
     ) -> tuple[list[AnimalMeasurement], list[Path]]:
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("Seleccionar qué mover a papelera")
-        dialog.resize(780, 520)
+        screen = QtWidgets.QApplication.primaryScreen()
+        available_height = screen.availableGeometry().height() if screen else 900
+        max_height = max(420, available_height - 120)
+        dialog.resize(780, min(520, max_height))
+        dialog.setMaximumHeight(max_height)
         layout = QtWidgets.QVBoxLayout(dialog)
         info = QtWidgets.QLabel(
             "Revisa la selección antes de moverla a papelera. Cada raw muestra sus archivos relacionados."

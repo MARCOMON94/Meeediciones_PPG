@@ -52,7 +52,7 @@ from ..processing import (
     processed_for_plot, processed_ppg, robust_normalize, score_and_merge_metrics, spo2_support_message, stable_bpm_segment, uniform_resample,
 )
 from ..utils import fmt, now_stamp, safe_float_text, sanitize_id
-from ..widgets import AnalysisConfigWidget, NoWheelDoubleSpinBox, SensorConfigWidget
+from ..widgets import AnalysisConfigWidget, AnimalCrotalPicker, NoWheelDoubleSpinBox, SensorConfigWidget
 
 
 TEMP_SETTLE_S = 1.0
@@ -338,7 +338,7 @@ class PPGSuite(QtWidgets.QMainWindow):
 
         capture_group = QtWidgets.QGroupBox("Toma normal")
         cap = QtWidgets.QFormLayout(capture_group)
-        self.crotal_edit = QtWidgets.QLineEdit("SIN_CROTAL")
+        self.crotal_edit = AnimalCrotalPicker()
         self.duration_spin = NoWheelDoubleSpinBox(); self.duration_spin.setRange(2, 3600); self.duration_spin.setDecimals(1); self.duration_spin.setValue(SIMPLE_CAPTURE_DEFAULT_S); self.duration_spin.setSuffix(" s")
         self.prev_pulse_edit = QtWidgets.QLineEdit()
         self.temp_manual_initial_widget = self.create_manual_initial_temp_widget()
