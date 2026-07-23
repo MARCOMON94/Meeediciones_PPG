@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import math
+from dataclasses import asdict
+
 import numpy as np
 
-from ppg_suite.models import AnalysisConfig, SensorConfig
-from ppg_suite.processing import detect_artifacts, estimate_hz, robust_normalize, score_and_merge_metrics, stable_bpm_segment
+from ppg_suite.models import AnalysisConfig, Metrics, SensorConfig
+from ppg_suite.processing import (
+    compute_blind_and_assisted_stable,
+    detect_artifacts,
+    estimate_hz,
+    robust_normalize,
+    score_and_merge_metrics,
+    stable_bpm_segment,
+)
 
 
 def test_estimate_hz_regular_samples():
@@ -105,3 +115,48 @@ def test_stable_bpm_segment_rejects_strong_baseline_drift():
     assert not np.isfinite(metrics.bpm_estable_5s)
     assert metrics.bpm_estable_muestras == 0
     assert "deriva" in metrics.bpm_estable_motivo
+
+
+def test_blind_stable_segment_ignores_manual_reference():
+    hz = 100.0
+    t = np.arange(0.0, 20.0, 1.0 / hz)
+    pulse_hz = 1.2
+    ir = 50000.0 + 1200.0 * np.sin(2 * np.pi * pulse_hz * t)
+    red = 45000.0 + 800.0 * np.sin(2 * np.pi * pulse_hz * t + 0.05)
+    cfg = AnalysisConfig(ignore_initial_seconds=0.0, bpm_min=45, bpm_max=180)
+
+    blind_close, assisted_close = compute_blind_and_assisted_stable(
+        t, red, ir, SensorConfig(), cfg, window_s=5.0, reference_bpm=80.0
+    )
+    blind_far, assisted_far = compute_blind_and_assisted_stable(
+        t, red, ir, SensorConfig(), cfg, window_s=5.0, reference_bpm=200.0
+    )
+
+    # Changing the manual reference must not change the blind segment at all.
+    assert np.isfinite(blind_close.bpm_estable_5s)
+    assert blind_close.bpm_estable_5s == blind_far.bpm_estable_5s
+    assert blind_close.bpm_estable_inicio_s == blind_far.bpm_estable_inicio_s
+    assert blind_close.bpm_estable_fin_s == blind_far.bpm_estable_fin_s
+    assert blind_close.bpm_estable_calidad == blind_far.bpm_estable_calidad
+
+    # The assisted segment CAN change: a reference close to the true ~72 BPM
+    # accepts the window, a reference far from it rejects it.
+    assert np.isfinite(assisted_close.bpm_estable_5s)
+    assert not np.isfinite(assisted_far.bpm_estable_5s)
+
+
+def test_metrics_defaults_are_backward_compatible():
+    m = Metrics()
+
+    assert math.isnan(m.bpm_estable_ciego_5s)
+    assert math.isnan(m.bpm_estable_asistido_5s)
+    assert m.bpm_estimators_valid == 0
+    assert m.bpm_final_source == ""
+
+    # asdict() is what measurement_window.py::save_summary() serializes into
+    # summary_*.json - it must never fail, and old readers that only know
+    # about bpm_estable_5s must still find that key present.
+    data = asdict(m)
+    assert "bpm_estable_5s" in data
+    assert "bpm_estable_ciego_5s" in data
+    assert "bpm_estable_asistido_5s" in data

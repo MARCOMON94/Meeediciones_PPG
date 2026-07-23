@@ -50,6 +50,7 @@ from .relations_window import (
     _read_csv,
     _strip_prefix,
 )
+from .agreement_window import AgreementAnalysisPanel
 
 
 UNASSIGNED_IDS = {"", "SIN_CROTAL", "-", "NONE", "NULL"}
@@ -556,13 +557,17 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         self.btn_photos.setToolTip(
             "Asigna una foto a cada animal marcado en la tabla (checkbox), de mas antiguo a mas nuevo."
         )
+        self.btn_agreement = QtWidgets.QPushButton("Analizar concordancia")
+        self.btn_agreement.setToolTip("Análisis Bland-Altman del BPM estable ciego frente a la referencia manual, para el animal seleccionado.")
         buttons.addWidget(self.btn_new)
         buttons.addWidget(self.btn_save)
         buttons.addWidget(self.btn_photos)
+        buttons.addWidget(self.btn_agreement)
         left_layout.addLayout(buttons)
         self.btn_new.clicked.connect(self.new_animal)
         self.btn_save.clicked.connect(self.save_current_profile)
         self.btn_photos.clicked.connect(self.open_bulk_photo_dialog)
+        self.btn_agreement.clicked.connect(self.open_agreement_dialog)
 
         self.animals_table = QtWidgets.QTableWidget(0, len(self.animal_headers))
         self.configure_table(self.animals_table, self.animal_headers)
@@ -1055,6 +1060,39 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.information(self, "Animales", message)
         return key
 
+    def open_agreement_dialog(self):
+        key = self.current_key
+        if not key:
+            QtWidgets.QMessageBox.information(self, "Concordancia", "Selecciona primero un animal.")
+            return
+        measurements = self.measurements_by_animal.get(key, [])
+        if not measurements:
+            QtWidgets.QMessageBox.information(self, "Concordancia", "Este animal no tiene tomas para analizar.")
+            return
+
+        def provider(_scope: str) -> list[dict]:
+            rows: list[dict] = []
+            for measurement in measurements:
+                row = dict(measurement.row)
+                row.setdefault("capture_id", self.capture_delete_key(measurement))
+                row.setdefault("animal_id", row.get("id") or key.split(":", 1)[-1])
+                raw_path = measurement.files.get("raw")
+                processed_path = measurement.files.get("processed")
+                if raw_path:
+                    row["_raw_path"] = str(raw_path)
+                if processed_path:
+                    row["_processed_path"] = str(processed_path)
+                rows.append(row)
+            return rows
+
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(f"Concordancia / Bland-Altman - {display_key_label(key)}")
+        dialog.resize(1100, 800)
+        layout = QtWidgets.QVBoxLayout(dialog)
+        panel = AgreementAnalysisPanel(provider, scope_options=None)
+        layout.addWidget(panel)
+        dialog.exec()
+
     def save_alert_settings(self):
         enabled = bool(self.baseline_enabled.isChecked())
         key = self.current_form_key()
@@ -1380,11 +1418,9 @@ class AnimalsWindow(QtWidgets.QMainWindow):
         t = np.asarray([_as_float(row.get("tiempo_s", "")) for row in rows], dtype=float)
         red = np.asarray([_as_float(row.get("red_raw", "")) for row in rows], dtype=float)
         ir = np.asarray([_as_float(row.get("ir_raw", "")) for row in rows], dtype=float)
-        ref_avg, ref_count = _mean_ref_pulse(
-            measurement.row.get("pulso_previo"),
-            measurement.row.get("pulso_final_pulsio"),
-            measurement.row.get("pulso_final_fonendo"),
-        )
+        # Blind only (reference_bpm=None): this recompute fallback feeds the
+        # normal "BPM estable" display column, which must stay the blind,
+        # non-circular value - never the manual-reference-assisted one.
         stable = stable_bpm_segment(
             t,
             red,
@@ -1392,7 +1428,7 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             self.sensor_config_from_row(measurement.row),
             AnalysisConfig(),
             window_s=5.0,
-            reference_bpm=ref_avg if ref_count else None,
+            reference_bpm=None,
         )
         value = stable.bpm_estable_5s if np.isfinite(stable.bpm_estable_5s) else math.nan
         self.stable_bpm_cache[cache_key] = {
@@ -2299,6 +2335,26 @@ class AnimalsWindow(QtWidgets.QMainWindow):
             "bpm_estable_calidad": metrics.get("bpm_estable_calidad"),
             "bpm_estable_muestras": metrics.get("bpm_estable_muestras"),
             "bpm_estable_motivo": metrics.get("bpm_estable_motivo"),
+            "bpm_estable_ciego_5s": metrics.get("bpm_estable_ciego_5s"),
+            "bpm_estable_ciego_inicio_s": metrics.get("bpm_estable_ciego_inicio_s"),
+            "bpm_estable_ciego_fin_s": metrics.get("bpm_estable_ciego_fin_s"),
+            "bpm_estable_ciego_calidad": metrics.get("bpm_estable_ciego_calidad"),
+            "bpm_estable_ciego_muestras": metrics.get("bpm_estable_ciego_muestras"),
+            "bpm_estable_ciego_motivo": metrics.get("bpm_estable_ciego_motivo"),
+            "bpm_estable_asistido_5s": metrics.get("bpm_estable_asistido_5s"),
+            "bpm_estable_asistido_inicio_s": metrics.get("bpm_estable_asistido_inicio_s"),
+            "bpm_estable_asistido_fin_s": metrics.get("bpm_estable_asistido_fin_s"),
+            "bpm_estable_asistido_calidad": metrics.get("bpm_estable_asistido_calidad"),
+            "bpm_estable_asistido_muestras": metrics.get("bpm_estable_asistido_muestras"),
+            "bpm_estable_asistido_motivo": metrics.get("bpm_estable_asistido_motivo"),
+            "bpm_peak_quality": metrics.get("bpm_peak_quality"),
+            "bpm_fft_quality": metrics.get("bpm_fft_quality"),
+            "bpm_autocorr_quality": metrics.get("bpm_autocorr_quality"),
+            "bpm_estimators_valid": metrics.get("bpm_estimators_valid"),
+            "bpm_estimators_spread": metrics.get("bpm_estimators_spread"),
+            "bpm_final_source": metrics.get("bpm_final_source"),
+            "bpm_final_reason": metrics.get("bpm_final_reason"),
+            "saturation_pct": metrics.get("saturation_pct"),
             "spo2_pct": metrics.get("spo2"),
             "calidad": metrics.get("quality"),
             "calidad_label": metrics.get("quality_label"),

@@ -505,8 +505,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "ppg_suite_animal_config_iter_position_prefixes",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": "iter_position_prefixes()"
     },
     {
@@ -1088,8 +1088,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "ppg_suite_models_sensorconfig",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": "sensorconfig"
     },
     {
@@ -1099,8 +1099,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "ppg_suite_models_sensorconfig_command",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".command()"
     },
     {
@@ -1110,8 +1110,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "ppg_suite_models_sensorconfig_clean",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".clean()"
     },
     {
@@ -1811,7 +1811,7 @@
       "label": "NoWheelSpinBox",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L8",
+      "source_location": "L13",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheelspinbox",
       "community": 12,
@@ -1822,7 +1822,7 @@
       "label": ".wheelEvent()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L9",
+      "source_location": "L14",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheelspinbox_wheelevent",
       "community": 12,
@@ -1833,7 +1833,7 @@
       "label": "NoWheelDoubleSpinBox",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L13",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheeldoublespinbox",
       "community": 12,
@@ -1844,7 +1844,7 @@
       "label": ".wheelEvent()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L14",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheeldoublespinbox_wheelevent",
       "community": 12,
@@ -1855,7 +1855,7 @@
       "label": "NoWheelComboBox",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L18",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheelcombobox",
       "community": 12,
@@ -1866,7 +1866,7 @@
       "label": ".wheelEvent()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L19",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheelcombobox_wheelevent",
       "community": 12,
@@ -1877,7 +1877,7 @@
       "label": "SensorConfigWidget",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L23",
+      "source_location": "L28",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget",
       "community": 12,
@@ -1888,7 +1888,7 @@
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L26",
+      "source_location": "L31",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget_init",
       "community": 12,
@@ -1899,29 +1899,29 @@
       "label": ".get_config()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L50",
+      "source_location": "L55",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget_get_config",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".get_config()"
     },
     {
       "label": ".set_config()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L56",
+      "source_location": "L61",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget_set_config",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".set_config()"
     },
     {
       "label": "AnalysisConfigWidget",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L60",
+      "source_location": "L65",
       "_origin": "ast",
       "id": "ppg_suite_widgets_analysisconfigwidget",
       "community": 12,
@@ -1932,7 +1932,7 @@
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L63",
+      "source_location": "L68",
       "_origin": "ast",
       "id": "ppg_suite_widgets_analysisconfigwidget_init",
       "community": 12,
@@ -1943,12 +1943,144 @@
       "label": ".get_config()",
       "file_type": "code",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L87",
+      "source_location": "L92",
       "_origin": "ast",
       "id": "ppg_suite_widgets_analysisconfigwidget_get_config",
       "community": 1,
       "community_name": "SensorConfig",
       "norm_label": ".get_config()"
+    },
+    {
+      "label": "load_known_animals()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L103",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_load_known_animals",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "load_known_animals()"
+    },
+    {
+      "label": "AnimalCrotalPicker",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L128",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "animalcrotalpicker"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L141",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_init",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": ".__init__()"
+    },
+    {
+      "label": "._item_label()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L169",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_item_label",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "._item_label()"
+    },
+    {
+      "label": "._on_item_activated()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L174",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_on_item_activated",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "._on_item_activated()"
+    },
+    {
+      "label": "._match_for_text()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L181",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_match_for_text",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "._match_for_text()"
+    },
+    {
+      "label": "._update_hint()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L190",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "._update_hint()"
+    },
+    {
+      "label": ".text()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L206",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_text",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": ".text()"
+    },
+    {
+      "label": ".setText()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L209",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_settext",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": ".settext()"
+    },
+    {
+      "label": ".clear()",
+      "file_type": "code",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L212",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_animalcrotalpicker_clear",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": ".clear()"
+    },
+    {
+      "label": "Read saved animal profiles (id/type/display_name) from Animales for pickers.",
+      "file_type": "rationale",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L104",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_rationale_104",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "read saved animal profiles (id/type/display_name) from animales for pickers."
+    },
+    {
+      "label": "Crotal/ID entry for measurement screens.      Drop-in replacement for a plain QL",
+      "file_type": "rationale",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L129",
+      "_origin": "ast",
+      "id": "ppg_suite_widgets_rationale_129",
+      "community": 12,
+      "community_name": "relations_window.py",
+      "norm_label": "crotal/id entry for measurement screens.      drop-in replacement for a plain ql"
     },
     {
       "label": "windows/__init__.py",
@@ -1990,8 +2122,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalselectionrecord",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "animalselectionrecord"
     },
     {
@@ -2012,8 +2144,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_display_key_label",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "display_key_label()"
     },
     {
@@ -2023,8 +2155,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_safe_file_part",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 49,
+      "community_name": ".select_animal",
       "norm_label": "safe_file_part()"
     },
     {
@@ -2034,8 +2166,8 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_load_csv_rows",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "_load_csv_rows()"
     },
     {
@@ -2056,8 +2188,8 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_load_oriented_pixmap",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": "load_oriented_pixmap()"
     },
     {
@@ -2067,8 +2199,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_py_qpixmap",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": "qpixmap"
     },
     {
@@ -2100,8 +2232,8 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalphotocell_set_photo",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": ".set_photo()"
     },
     {
@@ -2166,8 +2298,8 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalphotocell_dropevent",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": ".dropevent()"
     },
     {
@@ -2177,8 +2309,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "qdropevent",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": "qdropevent"
     },
     {
@@ -2243,8 +2375,8 @@
       "source_location": "L278",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_bulkphotodialog_pick_photos",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": ".pick_photos()"
     },
     {
@@ -2254,8 +2386,8 @@
       "source_location": "L300",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_bulkphotodialog_assign_photo",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": ".assign_photo()"
     },
     {
@@ -2265,8 +2397,8 @@
       "source_location": "L303",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_bulkphotodialog_swap_photos",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": ".swap_photos()"
     },
     {
@@ -2298,8 +2430,8 @@
       "source_location": "L354",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_init",
-      "community": 0,
-      "community_name": "AnimalsWindow",
+      "community": 21,
+      "community_name": "AnimalPhotoCell",
       "norm_label": ".__init__()"
     },
     {
@@ -2364,8 +2496,8 @@
       "source_location": "L431",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_on_selection_item_changed",
-      "community": 0,
-      "community_name": "AnimalsWindow",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".on_selection_item_changed()"
     },
     {
@@ -2375,8 +2507,8 @@
       "source_location": "L452",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_selection_status",
-      "community": 0,
-      "community_name": "AnimalsWindow",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".update_selection_status()"
     },
     {
@@ -2386,8 +2518,8 @@
       "source_location": "L458",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_clear_selection",
-      "community": 0,
-      "community_name": "AnimalsWindow",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".clear_selection()"
     },
     {
@@ -2540,8 +2672,8 @@
       "source_location": "L760",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_all_animal_keys",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".all_animal_keys()"
     },
     {
@@ -2639,8 +2771,8 @@
       "source_location": "L902",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_rewrite_capture_file_ids",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "._rewrite_capture_file_ids()"
     },
     {
@@ -2650,8 +2782,8 @@
       "source_location": "L930",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_reassign_measurements",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".reassign_measurements()"
     },
     {
@@ -2694,8 +2826,8 @@
       "source_location": "L1099",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_pick_photo",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": ".pick_photo()"
     },
     {
@@ -2727,8 +2859,8 @@
       "source_location": "L1148",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_format_created_stamp",
-      "community": 49,
-      "community_name": ".select_animal",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".format_created_stamp()"
     },
     {
@@ -2749,8 +2881,8 @@
       "source_location": "L1199",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_photo",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": ".update_photo()"
     },
     {
@@ -2760,8 +2892,8 @@
       "source_location": "L1213",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_resizeevent",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": ".resizeevent()"
     },
     {
@@ -2771,8 +2903,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "qresizeevent",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": "qresizeevent"
     },
     {
@@ -2782,8 +2914,8 @@
       "source_location": "L1218",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_current_measurements",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".current_measurements()"
     },
     {
@@ -2859,8 +2991,8 @@
       "source_location": "L1294",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_capture_label",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".capture_label()"
     },
     {
@@ -2870,8 +3002,8 @@
       "source_location": "L1306",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_capture_raw_path",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".capture_raw_path()"
     },
     {
@@ -2892,8 +3024,8 @@
       "source_location": "L1329",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_measurement_for_path",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".measurement_for_path()"
     },
     {
@@ -2947,8 +3079,8 @@
       "source_location": "L1409",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_measurement_position_temp",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".measurement_position_temp()"
     },
     {
@@ -2958,8 +3090,8 @@
       "source_location": "L1435",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_recommended_alerts_for_measurements",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".recommended_alerts_for_measurements()"
     },
     {
@@ -2969,8 +3101,8 @@
       "source_location": "L1484",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_recommended_alert_lines",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".recommended_alert_lines()"
     },
     {
@@ -2980,8 +3112,8 @@
       "source_location": "L1515",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_recommended_alerts",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".update_recommended_alerts()"
     },
     {
@@ -2991,8 +3123,8 @@
       "source_location": "L1526",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_apply_recommended_alerts",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".apply_recommended_alerts()"
     },
     {
@@ -3002,8 +3134,8 @@
       "source_location": "L1551",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_summary",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".update_summary()"
     },
     {
@@ -3112,8 +3244,8 @@
       "source_location": "L1769",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_desktop_dir",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".desktop_dir()"
     },
     {
@@ -3123,8 +3255,8 @@
       "source_location": "L1775",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_selected_paths_for_mail",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".selected_paths_for_mail()"
     },
     {
@@ -3134,8 +3266,8 @@
       "source_location": "L1796",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_prepare_mail_zip",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".prepare_mail_zip()"
     },
     {
@@ -3145,8 +3277,8 @@
       "source_location": "L1821",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_delete_checked_items",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".delete_checked_items()"
     },
     {
@@ -3167,8 +3299,8 @@
       "source_location": "L1935",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_pick_delete_targets",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".pick_delete_targets()"
     },
     {
@@ -3178,8 +3310,8 @@
       "source_location": "L2016",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_delete_paths_for_measurement",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".delete_paths_for_measurement()"
     },
     {
@@ -3189,8 +3321,8 @@
       "source_location": "L2025",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_delete_paths_for_targets",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".delete_paths_for_targets()"
     },
     {
@@ -3200,8 +3332,8 @@
       "source_location": "L2036",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_session_update_notes",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".session_update_notes()"
     },
     {
@@ -3211,8 +3343,8 @@
       "source_location": "L2040",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_remove_capture_rows_from_sessions",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".remove_capture_rows_from_sessions()"
     },
     {
@@ -3222,8 +3354,8 @@
       "source_location": "L2075",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_keep_failed_delete_selection",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".keep_failed_delete_selection()"
     },
     {
@@ -3233,8 +3365,8 @@
       "source_location": "L2102",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_profile_photo_path",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".profile_photo_path()"
     },
     {
@@ -3244,8 +3376,8 @@
       "source_location": "L2109",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_confirm_profile_delete_only",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".confirm_profile_delete_only()"
     },
     {
@@ -3255,8 +3387,8 @@
       "source_location": "L2120",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_remove_profiles",
-      "community": 54,
-      "community_name": "test_animals_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".remove_profiles()"
     },
     {
@@ -3266,8 +3398,8 @@
       "source_location": "L2129",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_mean_value",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".mean_value()"
     },
     {
@@ -3299,8 +3431,8 @@
       "source_location": "L2155",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_last_measurement_stamp",
-      "community": 51,
-      "community_name": ".populate_animal_list",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".last_measurement_stamp()"
     },
     {
@@ -3398,8 +3530,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_104",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "read a project csv keeping the header order, so it can be rewritten in place."
     },
     {
@@ -3409,8 +3541,8 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_122",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 53,
+      "community_name": "_base_from_row",
       "norm_label": "load an image applying its exif orientation, so it matches how the     file look"
     },
     {
@@ -3442,8 +3574,8 @@
       "source_location": "L903",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_903",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "rewrite the id/animal_type columns of a capture csv so it re-associates with the"
     },
     {
@@ -3453,8 +3585,8 @@
       "source_location": "L931",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_931",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "re-point every raw/session/summary file for `old_key` to the new crotal."
     },
     {
@@ -3497,8 +3629,8 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_read_csv",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 4,
+      "community_name": "FourierAnalysisWindow",
       "norm_label": "_read_csv()"
     },
     {
@@ -3618,8 +3750,8 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_rawfileinfo",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 4,
+      "community_name": "FourierAnalysisWindow",
       "norm_label": "rawfileinfo"
     },
     {
@@ -4113,8 +4245,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_py_datetime",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 4,
+      "community_name": "FourierAnalysisWindow",
       "norm_label": "datetime"
     },
     {
@@ -4190,8 +4322,8 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_temp_primary_channel_for",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": "temp_primary_channel_for()"
     },
     {
@@ -4201,8 +4333,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_temperature_channel_summary",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "temperature_channel_summary()"
     },
     {
@@ -4212,8 +4344,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_py_ndarray",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "ndarray"
     },
     {
@@ -4465,8 +4597,8 @@
       "source_location": "L500",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_configure_udder_combo",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".configure_udder_combo()"
     },
     {
@@ -4575,8 +4707,8 @@
       "source_location": "L604",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_monitor_seconds",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".current_temp_monitor_seconds()"
     },
     {
@@ -4586,8 +4718,8 @@
       "source_location": "L609",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_alert_threshold",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".current_temp_alert_threshold()"
     },
     {
@@ -4597,8 +4729,8 @@
       "source_location": "L614",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_apply_temperature_monitor_config_to_state",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".apply_temperature_monitor_config_to_state()"
     },
     {
@@ -4619,8 +4751,8 @@
       "source_location": "L647",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_active_temp_channels",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".active_temp_channels()"
     },
     {
@@ -4630,8 +4762,8 @@
       "source_location": "L653",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_format_active_temp_channels",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".format_active_temp_channels()"
     },
     {
@@ -4641,8 +4773,8 @@
       "source_location": "L656",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_sync_temperature_curve_visibility",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".sync_temperature_curve_visibility()"
     },
     {
@@ -4652,8 +4784,8 @@
       "source_location": "L672",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_refresh_temperature_curve_channels",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".refresh_temperature_curve_channels()"
     },
     {
@@ -4685,8 +4817,8 @@
       "source_location": "L709",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_animal_profile_path",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".animal_profile_path()"
     },
     {
@@ -4696,8 +4828,8 @@
       "source_location": "L712",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_load_animal_profiles",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".load_animal_profiles()"
     },
     {
@@ -4707,8 +4839,8 @@
       "source_location": "L720",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_save_animal_profiles",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".save_animal_profiles()"
     },
     {
@@ -4718,8 +4850,8 @@
       "source_location": "L724",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_animal_profile",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".current_animal_profile()"
     },
     {
@@ -4729,8 +4861,8 @@
       "source_location": "L741",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_profile_for_animal",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".profile_for_animal()"
     },
     {
@@ -4773,8 +4905,8 @@
       "source_location": "L788",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_profile_summary_text",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".profile_summary_text()"
     },
     {
@@ -4784,8 +4916,8 @@
       "source_location": "L800",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_save_animal_profile_clicked",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".save_animal_profile_clicked()"
     },
     {
@@ -4982,8 +5114,8 @@
       "source_location": "L1044",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_parse_cfg_line",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 50,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".parse_cfg_line()"
     },
     {
@@ -4993,8 +5125,8 @@
       "source_location": "L1052",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_config_ack_from_line",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 50,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".update_config_ack_from_line()"
     },
     {
@@ -5081,8 +5213,8 @@
       "source_location": "L1190",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_looks_like_data",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 50,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".looks_like_data()"
     },
     {
@@ -5092,8 +5224,8 @@
       "source_location": "L1217",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_handle_line",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 50,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".handle_line()"
     },
     {
@@ -5103,8 +5235,8 @@
       "source_location": "L1259",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_process_data_line",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".process_data_line()"
     },
     {
@@ -5191,8 +5323,8 @@
       "source_location": "L1591",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_check_auto_stop",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".check_auto_stop()"
     },
     {
@@ -5202,8 +5334,8 @@
       "source_location": "L1597",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_arrays",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".arrays()"
     },
     {
@@ -5213,8 +5345,8 @@
       "source_location": "L1602",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temp_arrays",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".temp_arrays()"
     },
     {
@@ -5224,8 +5356,8 @@
       "source_location": "L1607",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temp_dual_arrays",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".temp_dual_arrays()"
     },
     {
@@ -5235,8 +5367,8 @@
       "source_location": "L1617",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temp_channel_arrays",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".temp_channel_arrays()"
     },
     {
@@ -5246,8 +5378,8 @@
       "source_location": "L1630",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temperature_monitor_start_index",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".temperature_monitor_start_index()"
     },
     {
@@ -5257,8 +5389,8 @@
       "source_location": "L1633",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temperature_monitor_elapsed",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".temperature_monitor_elapsed()"
     },
     {
@@ -5268,8 +5400,8 @@
       "source_location": "L1640",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temperature_window_max",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".temperature_window_max()"
     },
     {
@@ -5279,8 +5411,8 @@
       "source_location": "L1678",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temp_monitor_status_line",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".temp_monitor_status_line()"
     },
     {
@@ -5312,8 +5444,8 @@
       "source_location": "L1738",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_live_temperature_plot",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".update_live_temperature_plot()"
     },
     {
@@ -5323,8 +5455,8 @@
       "source_location": "L1772",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temperature_summary",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".temperature_summary()"
     },
     {
@@ -5334,8 +5466,8 @@
       "source_location": "L1846",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_compute_current_metrics",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".compute_current_metrics()"
     },
     {
@@ -5345,8 +5477,8 @@
       "source_location": "L1856",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_live_metrics",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".update_live_metrics()"
     },
     {
@@ -5477,8 +5609,8 @@
       "source_location": "L2217",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_tick",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".tick()"
     },
     {
@@ -5488,8 +5620,8 @@
       "source_location": "L2234",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_info",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".update_info()"
     },
     {
@@ -5499,8 +5631,8 @@
       "source_location": "L2299",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_plots",
-      "community": 56,
-      "community_name": ".temperature_summary",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".update_plots()"
     },
     {
@@ -5669,7 +5801,7 @@
       "norm_label": ".open_long_window()"
     },
     {
-      "label": "Pantalla independiente para reajustes/larga duraci\u00f3n.      Importante: ya no s",
+      "label": "Pantalla independiente para reajustes/larga duraci\u00f3n.      Importante: ya no se",
       "file_type": "rationale",
       "source_file": "ppg_suite/windows/reajustes_window.py",
       "source_location": "L19",
@@ -5677,7 +5809,7 @@
       "id": "ppg_suite_windows_reajustes_window_rationale_19",
       "community": 2,
       "community_name": "AppController",
-      "norm_label": "pantalla independiente para reajustes/larga duracion.      importante: ya no s"
+      "norm_label": "pantalla independiente para reajustes/larga duracion.      importante: ya no se"
     },
     {
       "label": "real_window.py",
@@ -5840,8 +5972,8 @@
       "source_location": "L262",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_strip_prefix",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "_strip_prefix()"
     },
     {
@@ -5851,8 +5983,8 @@
       "source_location": "L270",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_base_from_row",
-      "community": 53,
-      "community_name": "_base_from_row",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "_base_from_row()"
     },
     {
@@ -7578,8 +7710,8 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_start_scheduled_capture",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".start_scheduled_capture()"
     },
     {
@@ -7699,8 +7831,8 @@
       "source_location": "L587",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_save_signal_plot",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".save_signal_plot()"
     },
     {
@@ -7710,8 +7842,8 @@
       "source_location": "L663",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_save_segment_capture",
-      "community": 1,
-      "community_name": "SensorConfig",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".save_segment_capture()"
     },
     {
@@ -8172,8 +8304,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": "temperaturewindow"
     },
     {
@@ -8183,8 +8315,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_init",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".__init__()"
     },
     {
@@ -8216,8 +8348,8 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_check_auto_stop",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".check_auto_stop()"
     },
     {
@@ -8227,8 +8359,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_update_live_metrics",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".update_live_metrics()"
     },
     {
@@ -8238,8 +8370,8 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_update_plots",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".update_plots()"
     },
     {
@@ -8249,8 +8381,8 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_temp_channel_status",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": "._temp_channel_status()"
     },
     {
@@ -8260,8 +8392,8 @@
       "source_location": "L229",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_last_data_fields",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": "._last_data_fields()"
     },
     {
@@ -8271,8 +8403,8 @@
       "source_location": "L241",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_update_info",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".update_info()"
     },
     {
@@ -8282,8 +8414,8 @@
       "source_location": "L320",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_save_images",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".save_images()"
     },
     {
@@ -8293,8 +8425,8 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_finalize_capture",
-      "community": 12,
-      "community_name": "relations_window.py",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".finalize_capture()"
     },
     {
@@ -8502,8 +8634,8 @@
       "source_location": "L372",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_start_normal_capture",
-      "community": 10,
-      "community_name": "VacuumExperimentWindow",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".start_normal_capture()"
     },
     {
@@ -8579,8 +8711,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_py_ndarray",
-      "community": 10,
-      "community_name": "VacuumExperimentWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "ndarray"
     },
     {
@@ -8590,8 +8722,8 @@
       "source_location": "L451",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_dominant_band",
-      "community": 10,
-      "community_name": "VacuumExperimentWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "._dominant_band()"
     },
     {
@@ -8612,8 +8744,8 @@
       "source_location": "L503",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_ppg_fft_bpm",
-      "community": 10,
-      "community_name": "VacuumExperimentWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "._ppg_fft_bpm()"
     },
     {
@@ -8623,8 +8755,8 @@
       "source_location": "L531",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_notch_processed_ir",
-      "community": 10,
-      "community_name": "VacuumExperimentWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "._notch_processed_ir()"
     },
     {
@@ -8634,8 +8766,8 @@
       "source_location": "L551",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_analyze_ppg_with_notch",
-      "community": 10,
-      "community_name": "VacuumExperimentWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".analyze_ppg_with_notch()"
     },
     {
@@ -12640,6 +12772,18 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
+      "target": "ppg_suite_animal_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "ppg_suite/windows/animals_window.py",
       "source_location": "L17",
       "weight": 1.0,
@@ -12995,6 +13139,42 @@
       "_origin": "ast",
       "source": "ppg_suite_windows_relations_window_relationexplorerwindow_row_is_two_sensor",
       "target": "ppg_suite_animal_config_normalize_animal_type"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
+      "target": "ppg_suite_animal_config_animal_label",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L170",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_item_label",
+      "target": "ppg_suite_animal_config_animal_label"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L193",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "target": "ppg_suite_animal_config_animal_label"
     },
     {
       "relation": "imports",
@@ -15792,7 +15972,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -15982,7 +16162,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -15993,7 +16173,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget",
@@ -16004,7 +16184,18 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
+      "weight": 0.8,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_models_sensorconfig",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheelcombobox",
@@ -16015,7 +16206,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheeldoublespinbox",
@@ -16026,7 +16217,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheelspinbox",
@@ -16037,7 +16228,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget",
@@ -16049,7 +16240,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L50",
+      "source_location": "L55",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget_get_config",
@@ -16061,7 +16252,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L56",
+      "source_location": "L61",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget_set_config",
@@ -16589,7 +16780,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -16600,7 +16791,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget",
@@ -16612,7 +16803,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L87",
+      "source_location": "L92",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget_get_config",
@@ -16623,7 +16814,18 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
+      "weight": 0.8,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_models_analysisconfig",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheelcombobox",
@@ -16634,7 +16836,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheeldoublespinbox",
@@ -16645,7 +16847,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheelspinbox",
@@ -16656,7 +16858,7 @@
       "relation": "uses",
       "confidence": "INFERRED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L5",
+      "source_location": "L8",
       "weight": 0.8,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget",
@@ -17160,6 +17362,18 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_trash",
+      "target": "ppg_suite_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
       "target": "ppg_suite_paths",
       "confidence_score": 1.0
     },
@@ -20698,6 +20912,18 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
+      "target": "ppg_suite_utils",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "ppg_suite/windows/animals_window.py",
       "source_location": "L42",
       "weight": 1.0,
@@ -20981,6 +21207,42 @@
       "_origin": "ast",
       "source": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_start_normal_capture",
       "target": "ppg_suite_utils_now_stamp"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
+      "target": "ppg_suite_utils_sanitize_id",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L182",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_match_for_text",
+      "target": "ppg_suite_utils_sanitize_id"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L199",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "target": "ppg_suite_utils_sanitize_id"
     },
     {
       "relation": "imports",
@@ -21874,7 +22136,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L60",
+      "source_location": "L65",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -21885,7 +22147,29 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L18",
+      "source_location": "L128",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
+      "target": "ppg_suite_widgets_animalcrotalpicker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L103",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets",
+      "target": "ppg_suite_widgets_load_known_animals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L23",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -21896,7 +22180,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L13",
+      "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -21907,7 +22191,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L8",
+      "source_location": "L13",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -21918,7 +22202,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L23",
+      "source_location": "L28",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets",
@@ -21978,7 +22262,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L66",
+      "source_location": "L71",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget_init",
@@ -21989,7 +22273,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L9",
+      "source_location": "L14",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheelspinbox",
@@ -22001,7 +22285,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L29",
+      "source_location": "L34",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget_init",
@@ -22061,7 +22345,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L68",
+      "source_location": "L73",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget_init",
@@ -22072,7 +22356,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L14",
+      "source_location": "L19",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheeldoublespinbox",
@@ -22192,7 +22476,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L73",
+      "source_location": "L78",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget_init",
@@ -22200,10 +22484,22 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L146",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_init",
+      "target": "ppg_suite_widgets_nowheelcombobox",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L19",
+      "source_location": "L24",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_nowheelcombobox",
@@ -22215,7 +22511,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L31",
+      "source_location": "L36",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget_init",
@@ -22226,7 +22522,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L50",
+      "source_location": "L55",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget",
@@ -22237,7 +22533,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L26",
+      "source_location": "L31",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget",
@@ -22248,7 +22544,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L56",
+      "source_location": "L61",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget",
@@ -22356,18 +22652,18 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L27",
+      "source_location": "L32",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_sensorconfigwidget_init",
-      "target": "ppg_suite_widgets_analysisconfigwidget_init",
+      "target": "ppg_suite_widgets_animalcrotalpicker_init",
       "confidence_score": 1.0
     },
     {
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L87",
+      "source_location": "L92",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget",
@@ -22378,7 +22674,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "ppg_suite/widgets.py",
-      "source_location": "L63",
+      "source_location": "L68",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ppg_suite_widgets_analysisconfigwidget",
@@ -22480,6 +22776,284 @@
       "_origin": "ast",
       "source": "ppg_suite_windows_temperature_window_temperaturewindow_build_ui",
       "target": "ppg_suite_widgets_analysisconfigwidget"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_analysisconfigwidget_init",
+      "target": "ppg_suite_widgets_animalcrotalpicker_init",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L149",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_init",
+      "target": "ppg_suite_widgets_load_known_animals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L104",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_rationale_104",
+      "target": "ppg_suite_widgets_load_known_animals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L212",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_clear",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L141",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_init",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L169",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_item_label",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L181",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_match_for_text",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L174",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_on_item_activated",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L209",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_settext",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L206",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_text",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L190",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker",
+      "target": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L129",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_rationale_129",
+      "target": "ppg_suite_widgets_animalcrotalpicker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/windows/measurement_window.py",
+      "source_location": "L55",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_measurement_window",
+      "target": "ppg_suite_widgets_animalcrotalpicker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/windows/measurement_window.py",
+      "source_location": "L341",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_measurement_window_ppgsuite_build_ui",
+      "target": "ppg_suite_widgets_animalcrotalpicker"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/windows/reajustes_window.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_reajustes_window",
+      "target": "ppg_suite_widgets_animalcrotalpicker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/windows/reajustes_window.py",
+      "source_location": "L67",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_reajustes_window_reajusteswindow_build_ui",
+      "target": "ppg_suite_widgets_animalcrotalpicker"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/windows/scheduled_window.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_scheduled_window",
+      "target": "ppg_suite_widgets_animalcrotalpicker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/windows/scheduled_window.py",
+      "source_location": "L178",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_build_ui",
+      "target": "ppg_suite_widgets_animalcrotalpicker"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/windows/temperature_window.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_temperature_window",
+      "target": "ppg_suite_widgets_animalcrotalpicker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ppg_suite/windows/temperature_window.py",
+      "source_location": "L65",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_windows_temperature_window_temperaturewindow_build_ui",
+      "target": "ppg_suite_widgets_animalcrotalpicker"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L152",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_init",
+      "target": "ppg_suite_widgets_animalcrotalpicker_item_label",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L166",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_init",
+      "target": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L191",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "target": "ppg_suite_widgets_animalcrotalpicker_match_for_text",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "ppg_suite/widgets.py",
+      "source_location": "L196",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "ppg_suite_widgets_animalcrotalpicker_update_hint",
+      "target": "ppg_suite_widgets_animalcrotalpicker_settext",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",

@@ -65,19 +65,19 @@
     "semantic_hash": "bd7e77b8f034e07f0fd29c25f37735c6"
   },
   "ppg_suite/models.py": {
-    "mtime": 1784359773.7585974,
-    "ast_hash": "019a62766c32395b72c7270e73f34cf3",
-    "semantic_hash": "019a62766c32395b72c7270e73f34cf3"
+    "mtime": 1784840848.29285,
+    "ast_hash": "5b53b38f393283ea395521133574e6af",
+    "semantic_hash": ""
   },
   "ppg_suite/paths.py": {
-    "mtime": 1784382908.5806606,
-    "ast_hash": "966084f2e569375576d8ac805dd40668",
-    "semantic_hash": "966084f2e569375576d8ac805dd40668"
+    "mtime": 1784841271.0266144,
+    "ast_hash": "a9063f71b45e0692314f91b666a9faef",
+    "semantic_hash": ""
   },
   "ppg_suite/processing.py": {
-    "mtime": 1784360866.3716342,
-    "ast_hash": "983f2acf05b4cc646d65f1a51c2af152",
-    "semantic_hash": "983f2acf05b4cc646d65f1a51c2af152"
+    "mtime": 1784840898.941933,
+    "ast_hash": "f2368ff4443f3d9bec386d4816e71e1c",
+    "semantic_hash": ""
   },
   "ppg_suite/trash.py": {
     "mtime": 1784323689.8369806,
@@ -85,9 +85,9 @@
     "semantic_hash": "f898651d0e61c757755d9285a96c0ed6"
   },
   "ppg_suite/utils.py": {
-    "mtime": 1779706058.9347055,
-    "ast_hash": "137c2ef1e082bfd7d2db8cb82e3747f4",
-    "semantic_hash": "137c2ef1e082bfd7d2db8cb82e3747f4"
+    "mtime": 1784840718.7600365,
+    "ast_hash": "0410f1565aceaf81a3be821478573d64",
+    "semantic_hash": ""
   },
   "ppg_suite/widgets.py": {
     "mtime": 1784832884.9679956,
@@ -100,18 +100,18 @@
     "semantic_hash": "676593a7d094628a492ee40b8ebda5d7"
   },
   "ppg_suite/windows/animals_window.py": {
-    "mtime": 1784832379.440189,
-    "ast_hash": "b20fae4e643a022cab23cc62cfaeb010",
+    "mtime": 1784842705.038519,
+    "ast_hash": "f742c034e6510a308b1870e5f47eb01e",
     "semantic_hash": ""
   },
   "ppg_suite/windows/fourier_window.py": {
-    "mtime": 1784325261.9366672,
-    "ast_hash": "9f0dd32b64cf928154893eb091c1d196",
-    "semantic_hash": "9f0dd32b64cf928154893eb091c1d196"
+    "mtime": 1784840813.170109,
+    "ast_hash": "9e00daaf46fe31a0a407d2f05b6b1dbf",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/measurement_window.py": {
-    "mtime": 1784832909.4843524,
-    "ast_hash": "e6fc99f9d9d4c0fc977f565e8bd54be5",
+    "mtime": 1784841081.5870757,
+    "ast_hash": "c563db7aaddfb248f964bbc6bd6afecd",
     "semantic_hash": ""
   },
   "ppg_suite/windows/reajustes_window.py": {
@@ -125,13 +125,13 @@
     "semantic_hash": "b46fb3a16341dc54d14139f11e9dfe82"
   },
   "ppg_suite/windows/relations_window.py": {
-    "mtime": 1784832384.8213177,
-    "ast_hash": "ab628abc9de25cfc20bd159dababa810",
+    "mtime": 1784842626.3930573,
+    "ast_hash": "7bfe99a6ab7555c21c6b7ccb9063ba6a",
     "semantic_hash": ""
   },
   "ppg_suite/windows/scheduled_window.py": {
-    "mtime": 1784832934.5482545,
-    "ast_hash": "846cc7542d255409930a74b6a875c923",
+    "mtime": 1784841190.056286,
+    "ast_hash": "955d3e64eca806d89d2f893892754e01",
     "semantic_hash": ""
   },
   "ppg_suite/windows/temperature_window.py": {
@@ -180,9 +180,9 @@
     "semantic_hash": "50013f8462f70f0fa67afad34c1b881f"
   },
   "tests/test_processing.py": {
-    "mtime": 1784360618.648146,
-    "ast_hash": "c20eb5ead80b589843d0102578a5d983",
-    "semantic_hash": "c20eb5ead80b589843d0102578a5d983"
+    "mtime": 1784841676.23931,
+    "ast_hash": "4ceac65ef90135a84a2297802dbd5a3c",
+    "semantic_hash": ""
   },
   "tests/test_relations_delete.py": {
     "mtime": 1784359444.7331884,
@@ -392,6 +392,21 @@
   "ppg_suite/assets/rumiando/rumiando-sheep-tech-app-colors.png": {
     "mtime": 1781260960.8798459,
     "ast_hash": "040ff32149cbdbcb4c8f35ab6d7d8e7b",
+    "semantic_hash": ""
+  },
+  "ppg_suite/agreement.py": {
+    "mtime": 1784842187.0412066,
+    "ast_hash": "28047f403afaa81604ab39e0c3b273d6",
+    "semantic_hash": ""
+  },
+  "ppg_suite/windows/agreement_window.py": {
+    "mtime": 1784842046.0876627,
+    "ast_hash": "a8ff60167cbccc67cf3f25a4201205ec",
+    "semantic_hash": ""
+  },
+  "tests/test_agreement.py": {
+    "mtime": 1784841614.9332144,
+    "ast_hash": "5d07cae6227842eb14f5d60423bc90e8",
     "semantic_hash": ""
   }
 }
