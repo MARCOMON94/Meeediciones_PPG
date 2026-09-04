@@ -12,6 +12,7 @@ from ppg_suite.windows.relations_window import RelationExplorerWindow
 from ppg_suite.windows.fourier_window import FourierAnalysisWindow
 from ppg_suite.windows.vacuum_window import VacuumExperimentWindow
 from ppg_suite.windows.animals_window import AnimalsWindow
+from ppg_suite.windows.respiration_window import RespirationWindow
 
 
 class LoadingDialog(QtWidgets.QDialog):
@@ -102,6 +103,8 @@ class AppController(QtCore.QObject):
             self.show_fourier()
         elif dialog.selected_mode == "animals":
             self.show_animals()
+        elif dialog.selected_mode == "respiracion":
+            self.show_respiration()
 
     def _wire_common_signals(self, win):
         win.back_to_menu.connect(self.show_menu)
@@ -155,3 +158,6 @@ class AppController(QtCore.QObject):
 
     def show_animals(self):
         self._open_workspace(AnimalsWindow)
+
+    def show_respiration(self):
+        self._open_workspace(RespirationWindow)
