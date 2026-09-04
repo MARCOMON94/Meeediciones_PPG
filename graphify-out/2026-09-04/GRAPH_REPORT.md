@@ -1,11 +1,11 @@
 # Graph Report - mtestv2  (2026-09-04)
 
 ## Corpus Check
-- 85 files · ~129,401 words
+- 84 files · ~127,194 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1220 nodes · 3570 edges · 71 communities (55 shown, 16 thin omitted)
+- 1207 nodes · 3558 edges · 66 communities (45 shown, 21 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 97 edges (avg confidence: 0.55)
 - Token cost: 0 input · 0 output
 
@@ -60,6 +60,7 @@
 - .claude/CLAUDE.md
 - .claude/skills/graphify/references/extraction-spec.md
 - .codex/skills/graphify/references/extraction-spec.md
+- CaptureRecord
 - .select_animal
 - BleSerialAdapter
 - .populate_animal_list
@@ -70,14 +71,13 @@
 - fourier_window.py
 - SensorConfig
 - ._build_ui
+- .open_history_raw
 - fmt
 - ScheduledConfigWindow
 - ConfigurationsWindow
 - .discover_measurements
 - .__init__
 - ConfigTableWidget
-- Pipeline de frecuencia respiratoria (RR) — informe de implementación
-- .open_history_raw
 
 ## God Nodes (most connected - your core abstractions)
 1. `PPGSuite` - 122 edges
@@ -100,21 +100,25 @@
   controller.py → ppg_suite/windows/fourier_window.py
 - `LoadingDialog` --uses--> `RelationExplorerWindow`  [INFERRED]
   controller.py → ppg_suite/windows/relations_window.py
-- `LoadingDialog` --uses--> `ConfigurationsWindow`  [INFERRED]
-  controller.py → ppg_suite/windows/scheduled_window.py
+- `LoadingDialog` --uses--> `RespirationWindow`  [INFERRED]
+  controller.py → ppg_suite/windows/respiration_window.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (71 total, 16 thin omitted)
+## Communities (66 total, 21 thin omitted)
+
+### Community 0 - "AnimalsWindow"
+Cohesion: 0.13
+Nodes (3): display_key_label(), ndarray, QTableWidgetItem
 
 ### Community 1 - "SensorConfig"
-Cohesion: 0.15
-Nodes (38): Counter, AnalysisConfig, block_bpm(), bpm_from_peak_indices(), compute_ac_dc(), compute_blind_and_assisted_stable(), detect_artifacts(), estimate_bpm_peaks() (+30 more)
+Cohesion: 0.09
+Nodes (66): Counter, AnalysisConfig, block_bpm(), bpm_from_peak_indices(), compute_ac_dc(), compute_blind_and_assisted_stable(), detect_artifacts(), estimate_bpm_autocorr() (+58 more)
 
 ### Community 2 - "AppController"
-Cohesion: 0.07
-Nodes (17): AppController, LoadingDialog, Pantalla independiente para reajustes/larga duración.      Importante: ya no se, ReajustesWindow, RealWindow, _duration_band(), Path, RespirationRawInfo (+9 more)
+Cohesion: 0.09
+Nodes (13): AppController, LoadingDialog, Pantalla independiente para reajustes/larga duración.      Importante: ya no se, ReajustesWindow, RealWindow, TestWindow, QApplication, QMainWindow (+5 more)
 
 ### Community 3 - "ModeSelectDialog"
 Cohesion: 0.08
@@ -124,48 +128,36 @@ Nodes (26): DataImportResult, import_resultados_folder(), Path, validate_resulta
 Cohesion: 0.10
 Nodes (13): open_folder(), Path, _aggregate_stem_for_child(), _apply_header_tooltips(), FourierAnalysisWindow, datetime, Path, QCloseEvent (+5 more)
 
-### Community 5 - "PPGSuite"
-Cohesion: 0.18
-Nodes (3): PPGSuite, ndarray, temperature_channel_summary()
-
 ### Community 6 - "atomic_write_json"
-Cohesion: 0.12
-Nodes (28): autocorr_rr(), AutocorrPeak, method_agreement(), ndarray, build_candidate(), ndarray, Confidence-weighted median across valid candidates, with MAD-based outlier rejec, robust_consensus() (+20 more)
+Cohesion: 0.24
+Nodes (5): _read_csv(), SessionGroup, Path, test_remove_capture_rows_from_sessions_uses_atomic_rewrite(), test_selected_captures_for_compare_uses_checked_items()
 
 ### Community 7 - "RelationExplorerWindow"
-Cohesion: 0.10
+Cohesion: 0.12
 Nodes (4): QCloseEvent, RelationExplorerWindow, _select_first_row(), QTableView
-
-### Community 8 - "CaptureRecord"
-Cohesion: 0.15
-Nodes (8): CaptureRecord, Path, _read_csv(), SelectionRecord, SessionGroup, Path, test_remove_capture_rows_from_sessions_uses_atomic_rewrite(), test_selected_captures_for_compare_uses_checked_items()
 
 ### Community 10 - "VacuumExperimentWindow"
 Cohesion: 0.11
 Nodes (4): Path, QCloseEvent, PPG + microphone capture for post-run vacuum/notch analysis., VacuumExperimentWindow
 
 ### Community 11 - "_as_float"
-Cohesion: 0.20
+Cohesion: 0.19
 Nodes (3): PenStyle, _as_float(), ndarray
 
 ### Community 12 - "relations_window.py"
-Cohesion: 0.17
-Nodes (5): AnimalCrotalPicker, load_known_animals(), NoWheelComboBox, Read saved animal profiles (id/type/display_name) from Animales for pickers., Crotal/ID entry for measurement screens.      Drop-in replacement for a plain QL
-
-### Community 13 - "Experiment3MWindow"
-Cohesion: 0.11
-Nodes (5): Experiment3MWindow, ndarray, _ref_pulse(), ScheduledConfigWindow, ScheduledSegment
+Cohesion: 0.13
+Nodes (7): AnimalCrotalPicker, load_known_animals(), NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox, Read saved animal profiles (id/type/display_name) from Animales for pickers., Crotal/ID entry for measurement screens.      Drop-in replacement for a plain QL
 
 ### Community 15 - ".current_animal_type"
-Cohesion: 0.25
-Nodes (17): active_temp_channels_for_animal(), animal_label(), default_mapping_for_animal(), default_position_for_animal(), display_position(), inverted_mapping_for_animal(), iter_position_prefixes(), mapping_from_assignments() (+9 more)
+Cohesion: 0.17
+Nodes (15): active_temp_channels_for_animal(), default_mapping_for_animal(), default_position_for_animal(), display_mapping(), display_position(), inverted_mapping_for_animal(), iter_position_prefixes(), mapping_from_assignments() (+7 more)
 
 ### Community 16 - ".value"
-Cohesion: 0.19
-Nodes (7): display_mapping(), _as_ref_pulse(), _cap_first(), _cap_temp_final(), _csv_row_count(), _mean_ref_pulse(), _mode_label()
+Cohesion: 0.30
+Nodes (4): _cap_first(), _csv_row_count(), _mean_ref_pulse(), _mode_label()
 
 ### Community 17 - "DictTableModel"
-Cohesion: 0.18
+Cohesion: 0.14
 Nodes (3): Orientation, DictTableModel, QModelIndex
 
 ### Community 18 - "What You Must Do When Invoked"
@@ -181,7 +173,7 @@ Cohesion: 0.14
 Nodes (3): Exception, BleSerialAdapter, QCloseEvent
 
 ### Community 21 - "AnimalPhotoCell"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (8): AnimalPhotoCell, BulkPhotoDialog, QWidget, Drag-and-droppable image slot used by BulkPhotoDialog's table., Additional window to assign one photo per checked animal, oldest-first., QDragEnterEvent, QDropEvent, QMouseEvent
 
 ### Community 22 - "mtestv2"
@@ -202,7 +194,7 @@ Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only
 
 ### Community 26 - "CollapsibleSection"
 Cohesion: 0.19
-Nodes (3): AnimalMeasurement, display_key_label(), Path
+Nodes (3): AnimalMeasurement, Path, QModelIndex
 
 ### Community 27 - "build_icon"
 Cohesion: 0.47
@@ -241,7 +233,7 @@ Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
 ### Community 49 - ".select_animal"
-Cohesion: 0.23
+Cohesion: 0.20
 Nodes (3): Best-effort 'age' of an animal: explicit profile creation date,         falling, Combine two profile dicts when an animal is renamed onto an existing crotal., safe_file_part()
 
 ### Community 50 - "BleSerialAdapter"
@@ -249,8 +241,8 @@ Cohesion: 0.07
 Nodes (57): AnalysisMode, AgreementAnalysisConfig, AgreementExclusion, AgreementPair, _as_float(), bland_altman_auto(), bland_altman_classic(), bland_altman_repeated() (+49 more)
 
 ### Community 51 - ".populate_animal_list"
-Cohesion: 0.12
-Nodes (32): ndarray, analyze_file(), _as_float(), discover_raw_files(), duration_band(), _hz_from_t(), load_raw_csv(), main() (+24 more)
+Cohesion: 0.05
+Nodes (84): _duration_band(), ndarray, Path, RespirationRawInfo, RespirationWindow, autocorr_rr(), AutocorrPeak, method_agreement() (+76 more)
 
 ### Community 53 - "_base_from_row"
 Cohesion: 0.29
@@ -261,55 +253,43 @@ Cohesion: 0.36
 Nodes (8): AnimalSelectionRecord, make_window(), Path, test_animal_table_row_selection_uses_animal_key_from_checkbox_metadata(), test_recommended_alerts_exclude_measurements_without_stable_bpm(), test_remove_capture_rows_from_sessions_uses_atomic_rewrite(), test_selected_animal_mail_paths_use_raws(), test_selection_column_header_is_compact_like_statistics()
 
 ### Community 55 - ".update_photo"
-Cohesion: 0.11
-Nodes (28): DictWriter, main(), atomic_csv_dict_writer(), atomic_csv_writer(), atomic_text_file(), atomic_write_json(), atomic_write_text(), Path (+20 more)
+Cohesion: 0.09
+Nodes (36): DictWriter, main(), atomic_csv_dict_writer(), atomic_csv_writer(), atomic_text_file(), atomic_write_json(), atomic_write_text(), Path (+28 more)
 
 ### Community 56 - "fourier_window.py"
-Cohesion: 0.19
-Nodes (12): CaptureState, mean_valid_reference(), now_stamp(), Mean of manually-entered reference BPM values, ignoring blanks, non-numeric, safe_float_text(), sanitize_id(), AnalysisConfigWidget, NoWheelDoubleSpinBox (+4 more)
+Cohesion: 0.26
+Nodes (12): CaptureState, Metrics, mean_valid_reference(), now_stamp(), Mean of manually-entered reference BPM values, ignoring blanks, non-numeric, safe_float_text(), sanitize_id(), AnalysisConfigWidget (+4 more)
 
 ### Community 57 - "SensorConfig"
-Cohesion: 0.22
-Nodes (20): RespirationConfig, analyze_respiration(), ndarray, Estimate respiratory rate from raw RED/IR PPG using RIIV/RIAV/RIFV consensus., artifact_penalty(), compute_confidence(), cycle_score(), duration_score() (+12 more)
-
-### Community 58 - "._build_ui"
-Cohesion: 0.12
-Nodes (3): AnimalsWindow, ndarray, QTableWidget
+Cohesion: 0.24
+Nodes (4): SensorConfig, SensorConfigWidget, build_3m_search_space(), make_3m_step()
 
 ### Community 60 - "fmt"
-Cohesion: 0.15
-Nodes (7): Metrics, Short live warning for SpO2 reliability, while keeping BPM usable., spo2_support_message(), fmt(), new_stable_metric_row_values(), TemperatureWindow, test_metrics_defaults_are_backward_compatible()
+Cohesion: 0.17
+Nodes (4): Short live warning for SpO2 reliability, while keeping BPM usable., spo2_support_message(), fmt(), TemperatureWindow
 
 ### Community 61 - "ScheduledConfigWindow"
-Cohesion: 0.13
-Nodes (26): estimate_bpm_autocorr(), estimate_bpm_fft(), estimate_hz(), processed_for_plot(), processed_ppg(), uniform_resample(), _ac_dc_pi(), _analytic_signal() (+18 more)
+Cohesion: 0.16
+Nodes (4): temperature_channel_summary(), ndarray, _ref_pulse(), ScheduledConfigWindow
 
 ### Community 62 - "ConfigurationsWindow"
-Cohesion: 0.15
-Nodes (8): SensorConfig, build_12_config_steps(), build_3m_search_space(), build_64_config_steps(), ConfigurationsWindow, make_3m_step(), QTableWidgetItem, ScheduledStep
-
-### Community 63 - ".discover_measurements"
-Cohesion: 0.15
-Nodes (6): _load_csv_rows(), Read a project CSV keeping the header order, so it can be rewritten in place., Rewrite the id/animal_type columns of a capture CSV so it re-associates with the, Re-point every raw/session/summary file for `old_key` to the new crotal., _base_from_row(), _strip_prefix()
-
-### Community 67 - "Pipeline de frecuencia respiratoria (RR) — informe de implementación"
-Cohesion: 0.15
-Nodes (12): 1. Resumen, 2.1 Investigación previa (spec §41), 2.2 Arquitectura, 2.3 Fórmulas y parámetros clave, 2. Implementación, 3. Análisis retrospectivo, 4. Comparación RIIV / RIAV / RIFV / RED / IR, 5. Problemas encontrados (relevante para trabajo futuro) (+4 more)
+Cohesion: 0.27
+Nodes (5): build_12_config_steps(), build_64_config_steps(), ConfigurationsWindow, QTableWidgetItem, ScheduledStep
 
 ## Knowledge Gaps
-- **107 isolated node(s):** `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+102 more)
+- **97 isolated node(s):** `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+92 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `RelationExplorerWindow` connect `RelationExplorerWindow` to `AppController`, `CaptureRecord`, `_as_float`, `.value`, `DictTableModel`, `BleSerialAdapter`, `_read_csv`, `.open_history_raw`?**
-  _High betweenness centrality (0.120) - this node is a cross-community bridge._
-- **Why does `PPGSuite` connect `PPGSuite` to `.__init__`, `ConfigTableWidget`, `.current_animal_type`, `AppController`, `.apply_config_and_wait`, `.active_temp_channels`, `BleSerialAdapter`, `VacuumExperimentWindow`, `Experiment3MWindow`, `measurement_window.py`, `.current_animal_type`, `CaptureRecord`, `.build_ui`, `fourier_window.py`, `fmt`, `ScheduledConfigWindow`, `ConfigurationsWindow`?**
-  _High betweenness centrality (0.103) - this node is a cross-community bridge._
-- **Why does `AnimalsWindow` connect `._build_ui` to `AnimalsWindow`, `AppController`, `.open_history_raw`, `.current_animal_type`, `.select_animal`, `BleSerialAdapter`, `AnimalPhotoCell`, `_base_from_row`, `test_animals_window.py`, `CollapsibleSection`, `.discover_measurements`?**
-  _High betweenness centrality (0.091) - this node is a cross-community bridge._
+- **Why does `RelationExplorerWindow` connect `RelationExplorerWindow` to `AppController`, `atomic_write_json`, `CaptureRecord`, `_as_float`, `.value`, `DictTableModel`, `BleSerialAdapter`, `_read_csv`, `.update_photo`, `.open_history_raw`?**
+  _High betweenness centrality (0.122) - this node is a cross-community bridge._
+- **Why does `PPGSuite` connect `PPGSuite` to `.__init__`, `SensorConfig`, `AppController`, `ConfigTableWidget`, `BleSerialAdapter`, `VacuumExperimentWindow`, `Experiment3MWindow`, `measurement_window.py`, `.current_animal_type`, `CaptureRecord`, `.build_ui`, `fourier_window.py`, `fmt`, `ScheduledConfigWindow`, `ConfigurationsWindow`?**
+  _High betweenness centrality (0.105) - this node is a cross-community bridge._
+- **Why does `AnimalsWindow` connect `._build_ui` to `AnimalsWindow`, `AppController`, `.select_animal`, `BleSerialAdapter`, `_base_from_row`, `test_animals_window.py`, `.update_photo`, `CollapsibleSection`, `.discover_measurements`?**
+  _High betweenness centrality (0.092) - this node is a cross-community bridge._
 - **Are the 11 inferred relationships involving `PPGSuite` (e.g. with `ReajustesWindow` and `RealWindow`) actually correct?**
   _`PPGSuite` has 11 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `RelationExplorerWindow` (e.g. with `AppController` and `.show_relations()`) actually correct?**

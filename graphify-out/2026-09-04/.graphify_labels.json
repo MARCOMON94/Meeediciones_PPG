@@ -64,10 +64,5 @@
   "62": "ConfigurationsWindow",
   "63": ".discover_measurements",
   "64": ".__init__",
-  "65": "ConfigTableWidget",
-  "66": ".current_animal_type",
-  "67": "Pipeline de frecuencia respiratoria (RR) — informe de implementación",
-  "68": ".apply_config_and_wait",
-  "69": ".active_temp_channels",
-  "70": ".open_history_raw"
+  "65": "ConfigTableWidget"
 }

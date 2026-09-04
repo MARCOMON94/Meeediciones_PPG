@@ -420,8 +420,8 @@
     "semantic_hash": ""
   },
   "respiration/autocorr.py": {
-    "mtime": 1788506156.1897829,
-    "ast_hash": "d1bb1be2cee2ffe848b8ffc93f860d1c",
+    "mtime": 1788504787.276774,
+    "ast_hash": "659205000a951865353fd44358410a28",
     "semantic_hash": ""
   },
   "respiration/batch.py": {
@@ -497,11 +497,6 @@
   "tests/test_respiration.py": {
     "mtime": 1788505543.183711,
     "ast_hash": "805b5eefe39ef093ae1a3d8cda4fe5b2",
-    "semantic_hash": ""
-  },
-  "RESPIRATION_IMPLEMENTATION_REPORT.md": {
-    "mtime": 1788506404.5916505,
-    "ast_hash": "b89361adb176bc1564b29a57b59ed4ea",
     "semantic_hash": ""
   }
 }

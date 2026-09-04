@@ -780,8 +780,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "ppg_suite_animal_config_animal_label",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": "animal_label()"
     },
     {
@@ -901,8 +901,8 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "ppg_suite_animal_config_display_mapping",
-      "community": 16,
-      "community_name": ".value",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": "display_mapping()"
     },
     {
@@ -1517,8 +1517,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "ppg_suite_models_sensorconfig",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": "sensorconfig"
     },
     {
@@ -1528,8 +1528,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "ppg_suite_models_sensorconfig_command",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".command()"
     },
     {
@@ -1539,8 +1539,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "ppg_suite_models_sensorconfig_clean",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".clean()"
     },
     {
@@ -1561,8 +1561,8 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "ppg_suite_models_metrics",
-      "community": 60,
-      "community_name": "fmt",
+      "community": 56,
+      "community_name": "fourier_window.py",
       "norm_label": "metrics"
     },
     {
@@ -1660,8 +1660,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "ppg_suite_processing_estimate_hz",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "estimate_hz()"
     },
     {
@@ -1726,8 +1726,8 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "ppg_suite_processing_processed_ppg",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "processed_ppg()"
     },
     {
@@ -1737,8 +1737,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "ppg_suite_processing_processed_for_plot",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "processed_for_plot()"
     },
     {
@@ -1792,8 +1792,8 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "ppg_suite_processing_uniform_resample",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "uniform_resample()"
     },
     {
@@ -1836,8 +1836,8 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "ppg_suite_processing_estimate_bpm_fft",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "estimate_bpm_fft()"
     },
     {
@@ -1847,8 +1847,8 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "ppg_suite_processing_estimate_bpm_autocorr",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "estimate_bpm_autocorr()"
     },
     {
@@ -2287,8 +2287,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheelspinbox",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": "nowheelspinbox"
     },
     {
@@ -2298,8 +2298,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheelspinbox_wheelevent",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".wheelevent()"
     },
     {
@@ -2309,8 +2309,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheeldoublespinbox",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": "nowheeldoublespinbox"
     },
     {
@@ -2320,8 +2320,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "ppg_suite_widgets_nowheeldoublespinbox_wheelevent",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".wheelevent()"
     },
     {
@@ -2353,8 +2353,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": "sensorconfigwidget"
     },
     {
@@ -2375,8 +2375,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget_get_config",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".get_config()"
     },
     {
@@ -2386,8 +2386,8 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "ppg_suite_widgets_sensorconfigwidget_set_config",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".set_config()"
     },
     {
@@ -2419,8 +2419,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "ppg_suite_widgets_analysisconfigwidget_get_config",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".get_config()"
     },
     {
@@ -2848,8 +2848,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "animals_window.py"
     },
     {
@@ -2881,8 +2881,8 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animal_key",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 63,
+      "community_name": ".discover_measurements",
       "norm_label": "animal_key()"
     },
     {
@@ -2892,8 +2892,8 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_display_key_label",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": "display_key_label()"
     },
     {
@@ -2914,8 +2914,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_load_csv_rows",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "_load_csv_rows()"
     },
     {
@@ -3178,8 +3178,8 @@
       "source_location": "L355",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_init",
-      "community": 21,
-      "community_name": "AnimalPhotoCell",
+      "community": 58,
+      "community_name": "._build_ui",
       "norm_label": ".__init__()"
     },
     {
@@ -3189,8 +3189,8 @@
       "source_location": "L376",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_data_file",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".data_file()"
     },
     {
@@ -3255,8 +3255,8 @@
       "source_location": "L453",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_selection_status",
-      "community": 0,
-      "community_name": "AnimalsWindow",
+      "community": 58,
+      "community_name": "._build_ui",
       "norm_label": ".update_selection_status()"
     },
     {
@@ -3266,8 +3266,8 @@
       "source_location": "L459",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_clear_selection",
-      "community": 0,
-      "community_name": "AnimalsWindow",
+      "community": 58,
+      "community_name": "._build_ui",
       "norm_label": ".clear_selection()"
     },
     {
@@ -3519,8 +3519,8 @@
       "source_location": "L907",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_rewrite_capture_file_ids",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "._rewrite_capture_file_ids()"
     },
     {
@@ -3530,8 +3530,8 @@
       "source_location": "L935",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_reassign_measurements",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": ".reassign_measurements()"
     },
     {
@@ -3563,8 +3563,8 @@
       "source_location": "L1063",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_open_agreement_dialog",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".open_agreement_dialog()"
     },
     {
@@ -3618,8 +3618,8 @@
       "source_location": "L1186",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_format_created_stamp",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 49,
+      "community_name": ".select_animal",
       "norm_label": ".format_created_stamp()"
     },
     {
@@ -3673,8 +3673,8 @@
       "source_location": "L1256",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_current_measurements",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".current_measurements()"
     },
     {
@@ -3816,8 +3816,8 @@
       "source_location": "L1396",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_stable_values_for_measurement",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".stable_values_for_measurement()"
     },
     {
@@ -3827,8 +3827,8 @@
       "source_location": "L1442",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_stable_bpm_for_measurement",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".stable_bpm_for_measurement()"
     },
     {
@@ -3849,8 +3849,8 @@
       "source_location": "L1471",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_recommended_alerts_for_measurements",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".recommended_alerts_for_measurements()"
     },
     {
@@ -3860,8 +3860,8 @@
       "source_location": "L1520",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_recommended_alert_lines",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".recommended_alert_lines()"
     },
     {
@@ -3871,8 +3871,8 @@
       "source_location": "L1551",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_recommended_alerts",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".update_recommended_alerts()"
     },
     {
@@ -3882,8 +3882,8 @@
       "source_location": "L1562",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_apply_recommended_alerts",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".apply_recommended_alerts()"
     },
     {
@@ -3893,8 +3893,8 @@
       "source_location": "L1587",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_summary",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".update_summary()"
     },
     {
@@ -3926,8 +3926,8 @@
       "source_location": "L1758",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_update_graph",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".update_graph()"
     },
     {
@@ -3937,8 +3937,8 @@
       "source_location": "L1779",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_plot_series",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".plot_series()"
     },
     {
@@ -3948,8 +3948,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_py_ndarray",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": "ndarray"
     },
     {
@@ -3959,8 +3959,8 @@
       "source_location": "L1784",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_open_history_raw",
-      "community": 70,
-      "community_name": ".open_history_raw",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".open_history_raw()"
     },
     {
@@ -3970,8 +3970,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_py_qmodelindex",
-      "community": 70,
-      "community_name": ".open_history_raw",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": "qmodelindex"
     },
     {
@@ -3981,8 +3981,8 @@
       "source_location": "L1792",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_open_selected_file",
-      "community": 70,
-      "community_name": ".open_history_raw",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".open_selected_file()"
     },
     {
@@ -3992,8 +3992,8 @@
       "source_location": "L1800",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_open_path",
-      "community": 70,
-      "community_name": ".open_history_raw",
+      "community": 26,
+      "community_name": "CollapsibleSection",
       "norm_label": ".open_path()"
     },
     {
@@ -4003,8 +4003,8 @@
       "source_location": "L1805",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_desktop_dir",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 58,
+      "community_name": "._build_ui",
       "norm_label": ".desktop_dir()"
     },
     {
@@ -4025,8 +4025,8 @@
       "source_location": "L1832",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_prepare_mail_zip",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 58,
+      "community_name": "._build_ui",
       "norm_label": ".prepare_mail_zip()"
     },
     {
@@ -4135,8 +4135,8 @@
       "source_location": "L2145",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_confirm_profile_delete_only",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".confirm_profile_delete_only()"
     },
     {
@@ -4146,8 +4146,8 @@
       "source_location": "L2156",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_remove_profiles",
-      "community": 26,
-      "community_name": "CollapsibleSection",
+      "community": 49,
+      "community_name": ".select_animal",
       "norm_label": ".remove_profiles()"
     },
     {
@@ -4157,8 +4157,8 @@
       "source_location": "L2165",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_animalswindow_mean_value",
-      "community": 58,
-      "community_name": "._build_ui",
+      "community": 0,
+      "community_name": "AnimalsWindow",
       "norm_label": ".mean_value()"
     },
     {
@@ -4289,8 +4289,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_105",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "read a project csv keeping the header order, so it can be rewritten in place."
     },
     {
@@ -4333,8 +4333,8 @@
       "source_location": "L908",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_908",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "rewrite the id/animal_type columns of a capture csv so it re-associates with the"
     },
     {
@@ -4344,8 +4344,8 @@
       "source_location": "L936",
       "_origin": "ast",
       "id": "ppg_suite_windows_animals_window_rationale_936",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "re-point every raw/session/summary file for `old_key` to the new crotal."
     },
     {
@@ -4377,8 +4377,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "fourier_window.py"
     },
     {
@@ -4410,8 +4410,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_as_float",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_as_float()"
     },
     {
@@ -4421,8 +4421,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_as_ref_pulse",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_as_ref_pulse()"
     },
     {
@@ -4432,8 +4432,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_mean_ref_pulse",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_mean_ref_pulse()"
     },
     {
@@ -4443,8 +4443,8 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_as_int",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_as_int()"
     },
     {
@@ -4454,8 +4454,8 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_esc",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_esc()"
     },
     {
@@ -4487,8 +4487,8 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_load_manual_refs",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_load_manual_refs()"
     },
     {
@@ -4498,8 +4498,8 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_ref_diff",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_ref_diff()"
     },
     {
@@ -4520,8 +4520,8 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_spectrumresult",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "spectrumresult"
     },
     {
@@ -4531,8 +4531,8 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_spectrumresult_best_bpm_estimate",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".best_bpm_estimate()"
     },
     {
@@ -4542,8 +4542,8 @@
       "source_location": "L238",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_safe_percent",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_safe_percent()"
     },
     {
@@ -4553,8 +4553,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_py_ndarray",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "ndarray"
     },
     {
@@ -4564,8 +4564,8 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_fft_details",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_fft_details()"
     },
     {
@@ -4575,8 +4575,8 @@
       "source_location": "L302",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_analytic_signal",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_analytic_signal()"
     },
     {
@@ -4586,8 +4586,8 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_hilbert_details",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_hilbert_details()"
     },
     {
@@ -4597,8 +4597,8 @@
       "source_location": "L356",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_wavelet_details",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_wavelet_details()"
     },
     {
@@ -4608,8 +4608,8 @@
       "source_location": "L432",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_ac_dc_pi",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_ac_dc_pi()"
     },
     {
@@ -4619,8 +4619,8 @@
       "source_location": "L443",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_estimate_spo2_quality",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_estimate_spo2_quality()"
     },
     {
@@ -4630,8 +4630,8 @@
       "source_location": "L494",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_group_rows",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_group_rows()"
     },
     {
@@ -4652,8 +4652,8 @@
       "source_location": "L514",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_drop_leading_timestamp_gap",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_drop_leading_timestamp_gap()"
     },
     {
@@ -4663,8 +4663,8 @@
       "source_location": "L529",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_keep_longest_contiguous_chunk",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "_keep_longest_contiguous_chunk()"
     },
     {
@@ -4674,8 +4674,8 @@
       "source_location": "L561",
       "_origin": "ast",
       "id": "ppg_suite_windows_fourier_window_analyze_raw_file",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "analyze_raw_file()"
     },
     {
@@ -5048,8 +5048,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 56,
+      "community_name": "fourier_window.py",
       "norm_label": "measurement_window.py"
     },
     {
@@ -5070,8 +5070,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_new_stable_metric_row_values",
-      "community": 60,
-      "community_name": "fmt",
+      "community": 56,
+      "community_name": "fourier_window.py",
       "norm_label": "new_stable_metric_row_values()"
     },
     {
@@ -5081,8 +5081,8 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_normalize_udder_text",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 56,
+      "community_name": "fourier_window.py",
       "norm_label": "normalize_udder_text()"
     },
     {
@@ -5103,8 +5103,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_temperature_channel_summary",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": "temperature_channel_summary()"
     },
     {
@@ -5114,8 +5114,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_py_ndarray",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "ndarray"
     },
     {
@@ -5191,8 +5191,8 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_bleserialadapter_read",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".read()"
     },
     {
@@ -5356,7 +5356,7 @@
       "source_location": "L506",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_animal_type",
-      "community": 66,
+      "community": 15,
       "community_name": ".current_animal_type",
       "norm_label": ".current_animal_type()"
     },
@@ -5433,8 +5433,8 @@
       "source_location": "L582",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_refresh_manual_initial_temp_widget",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".refresh_manual_initial_temp_widget()"
     },
     {
@@ -5444,8 +5444,8 @@
       "source_location": "L591",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_manual_initial_temps",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".current_manual_initial_temps()"
     },
     {
@@ -5455,8 +5455,8 @@
       "source_location": "L604",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_set_manual_initial_temps",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".set_manual_initial_temps()"
     },
     {
@@ -5466,7 +5466,7 @@
       "source_location": "L610",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_manual_initial_temp_summary",
-      "community": 66,
+      "community": 15,
       "community_name": ".current_animal_type",
       "norm_label": ".manual_initial_temp_summary()"
     },
@@ -5477,8 +5477,8 @@
       "source_location": "L618",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_monitor_seconds",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".current_temp_monitor_seconds()"
     },
     {
@@ -5488,8 +5488,8 @@
       "source_location": "L623",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_alert_threshold",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".current_temp_alert_threshold()"
     },
     {
@@ -5499,8 +5499,8 @@
       "source_location": "L628",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_apply_temperature_monitor_config_to_state",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".apply_temperature_monitor_config_to_state()"
     },
     {
@@ -5510,8 +5510,8 @@
       "source_location": "L636",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_refresh_animal_dependent_controls",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".refresh_animal_dependent_controls()"
     },
     {
@@ -5521,8 +5521,8 @@
       "source_location": "L661",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_active_temp_channels",
-      "community": 69,
-      "community_name": ".active_temp_channels",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".active_temp_channels()"
     },
     {
@@ -5532,8 +5532,8 @@
       "source_location": "L667",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_format_active_temp_channels",
-      "community": 69,
-      "community_name": ".active_temp_channels",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".format_active_temp_channels()"
     },
     {
@@ -5543,8 +5543,8 @@
       "source_location": "L670",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_sync_temperature_curve_visibility",
-      "community": 69,
-      "community_name": ".active_temp_channels",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".sync_temperature_curve_visibility()"
     },
     {
@@ -5554,8 +5554,8 @@
       "source_location": "L686",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_refresh_temperature_curve_channels",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".refresh_temperature_curve_channels()"
     },
     {
@@ -5576,7 +5576,7 @@
       "source_location": "L714",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_assignments",
-      "community": 66,
+      "community": 15,
       "community_name": ".current_animal_type",
       "norm_label": ".current_temp_assignments()"
     },
@@ -5620,8 +5620,8 @@
       "source_location": "L738",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_animal_profile",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 48,
+      "community_name": "CaptureRecord",
       "norm_label": ".current_animal_profile()"
     },
     {
@@ -5631,8 +5631,8 @@
       "source_location": "L755",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_profile_for_animal",
-      "community": 48,
-      "community_name": "CaptureRecord",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".profile_for_animal()"
     },
     {
@@ -5642,8 +5642,8 @@
       "source_location": "L760",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_apply_current_animal_profile_to_controls",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".apply_current_animal_profile_to_controls()"
     },
     {
@@ -5653,8 +5653,8 @@
       "source_location": "L763",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_apply_default_animal_profile_to_controls",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".apply_default_animal_profile_to_controls()"
     },
     {
@@ -5664,8 +5664,8 @@
       "source_location": "L771",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_apply_animal_profile_to_controls",
-      "community": 14,
-      "community_name": "measurement_window.py",
+      "community": 15,
+      "community_name": ".current_animal_type",
       "norm_label": ".apply_animal_profile_to_controls()"
     },
     {
@@ -5851,8 +5851,8 @@
       "source_location": "L1001",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_expected_config_matches_last_ack",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".expected_config_matches_last_ack()"
     },
     {
@@ -5862,8 +5862,8 @@
       "source_location": "L1020",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_confirm_config_before_start",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".confirm_config_before_start()"
     },
     {
@@ -5873,8 +5873,8 @@
       "source_location": "L1037",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_apply_config_and_wait",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".apply_config_and_wait()"
     },
     {
@@ -5884,8 +5884,8 @@
       "source_location": "L1058",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_parse_cfg_line",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".parse_cfg_line()"
     },
     {
@@ -5895,8 +5895,8 @@
       "source_location": "L1066",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_config_ack_from_line",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".update_config_ack_from_line()"
     },
     {
@@ -5917,7 +5917,7 @@
       "source_location": "L1090",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_udder_text",
-      "community": 66,
+      "community": 15,
       "community_name": ".current_animal_type",
       "norm_label": ".current_udder_text()"
     },
@@ -5928,7 +5928,7 @@
       "source_location": "L1098",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_mapping",
-      "community": 66,
+      "community": 15,
       "community_name": ".current_animal_type",
       "norm_label": ".current_temp_mapping()"
     },
@@ -5939,7 +5939,7 @@
       "source_location": "L1107",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_temp_primary_channel",
-      "community": 66,
+      "community": 15,
       "community_name": ".current_animal_type",
       "norm_label": ".current_temp_primary_channel()"
     },
@@ -5950,8 +5950,8 @@
       "source_location": "L1110",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_current_vacuum_text",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".current_vacuum_text()"
     },
     {
@@ -5961,8 +5961,8 @@
       "source_location": "L1115",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_ensure_initial_pulse_or_confirm",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".ensure_initial_pulse_or_confirm()"
     },
     {
@@ -5972,8 +5972,8 @@
       "source_location": "L1184",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_read_serial",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".read_serial()"
     },
     {
@@ -5983,8 +5983,8 @@
       "source_location": "L1204",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_looks_like_data",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".looks_like_data()"
     },
     {
@@ -5994,8 +5994,8 @@
       "source_location": "L1231",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_handle_line",
-      "community": 68,
-      "community_name": ".apply_config_and_wait",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".handle_line()"
     },
     {
@@ -6005,8 +6005,8 @@
       "source_location": "L1273",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_process_data_line",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".process_data_line()"
     },
     {
@@ -6016,8 +6016,8 @@
       "source_location": "L1436",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_reset_capture_state",
-      "community": 66,
-      "community_name": ".current_animal_type",
+      "community": 9,
+      "community_name": "BleSerialAdapter",
       "norm_label": ".reset_capture_state()"
     },
     {
@@ -6126,8 +6126,8 @@
       "source_location": "L1621",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temp_dual_arrays",
-      "community": 5,
-      "community_name": "PPGSuite",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".temp_dual_arrays()"
     },
     {
@@ -6148,8 +6148,8 @@
       "source_location": "L1644",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temperature_monitor_start_index",
-      "community": 69,
-      "community_name": ".active_temp_channels",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".temperature_monitor_start_index()"
     },
     {
@@ -6170,8 +6170,8 @@
       "source_location": "L1654",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_temperature_window_max",
-      "community": 69,
-      "community_name": ".active_temp_channels",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".temperature_window_max()"
     },
     {
@@ -6214,8 +6214,8 @@
       "source_location": "L1752",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_live_temperature_plot",
-      "community": 69,
-      "community_name": ".active_temp_channels",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".update_live_temperature_plot()"
     },
     {
@@ -6346,8 +6346,8 @@
       "source_location": "L2140",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_save_summary",
-      "community": 15,
-      "community_name": ".current_animal_type",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".save_summary()"
     },
     {
@@ -6401,8 +6401,8 @@
       "source_location": "L2352",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_plots",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 5,
+      "community_name": "PPGSuite",
       "norm_label": ".update_plots()"
     },
     {
@@ -6412,8 +6412,8 @@
       "source_location": "L2382",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_fft_plot",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".update_fft_plot()"
     },
     {
@@ -6423,8 +6423,8 @@
       "source_location": "L2397",
       "_origin": "ast",
       "id": "ppg_suite_windows_measurement_window_ppgsuite_update_peak_plot",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".update_peak_plot()"
     },
     {
@@ -6511,8 +6511,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "ppg_suite_windows_reajustes_window_reajusteswindow_build_ui",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".build_ui()"
     },
     {
@@ -6555,8 +6555,8 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "ppg_suite_windows_reajustes_window_reajusteswindow_update_plots",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 2,
+      "community_name": "AppController",
       "norm_label": ".update_plots()"
     },
     {
@@ -6621,8 +6621,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window",
-      "community": 16,
-      "community_name": ".value",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "relations_window.py"
     },
     {
@@ -6643,8 +6643,8 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_mode_from_label",
-      "community": 16,
-      "community_name": ".value",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "_mode_from_label()"
     },
     {
@@ -6654,8 +6654,8 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_read_csv",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "_read_csv()"
     },
     {
@@ -6698,8 +6698,8 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_as_ref_pulse",
-      "community": 16,
-      "community_name": ".value",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "_as_ref_pulse()"
     },
     {
@@ -6720,8 +6720,8 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_strip_prefix",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "_strip_prefix()"
     },
     {
@@ -6731,8 +6731,8 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_base_from_row",
-      "community": 63,
-      "community_name": ".discover_measurements",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "_base_from_row()"
     },
     {
@@ -6753,8 +6753,8 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_cap_temp_final",
-      "community": 16,
-      "community_name": ".value",
+      "community": 55,
+      "community_name": ".update_photo",
       "norm_label": "_cap_temp_final()"
     },
     {
@@ -6786,8 +6786,8 @@
       "source_location": "L262",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_capturerecord",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 59,
+      "community_name": ".open_history_raw",
       "norm_label": "capturerecord"
     },
     {
@@ -6808,8 +6808,8 @@
       "source_location": "L274",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_sessiongroup",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "sessiongroup"
     },
     {
@@ -6819,8 +6819,8 @@
       "source_location": "L280",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_sessiongroup_name",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": ".name()"
     },
     {
@@ -7094,8 +7094,8 @@
       "source_location": "L831",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_agreement_measurements_for_scope",
-      "community": 59,
-      "community_name": ".open_history_raw",
+      "community": 8,
+      "community_name": "CaptureRecord",
       "norm_label": "._agreement_measurements_for_scope()"
     },
     {
@@ -7149,8 +7149,8 @@
       "source_location": "L919",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_find_files",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "._find_files()"
     },
     {
@@ -7160,8 +7160,8 @@
       "source_location": "L937",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_enrich_capture_from_summary",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "._enrich_capture_from_summary()"
     },
     {
@@ -7182,8 +7182,8 @@
       "source_location": "L1131",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_attach_files_from_row",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "._attach_files_from_row()"
     },
     {
@@ -7193,8 +7193,8 @@
       "source_location": "L1148",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_discover_sessions",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "._discover_sessions()"
     },
     {
@@ -7204,8 +7204,8 @@
       "source_location": "L1194",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_session_date",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "._session_date()"
     },
     {
@@ -7259,8 +7259,8 @@
       "source_location": "L1285",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_selection_key",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 16,
+      "community_name": ".value",
       "norm_label": ".selection_key()"
     },
     {
@@ -7325,8 +7325,8 @@
       "source_location": "L1335",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_desktop_dir",
-      "community": 7,
-      "community_name": "RelationExplorerWindow",
+      "community": 8,
+      "community_name": "CaptureRecord",
       "norm_label": ".desktop_dir()"
     },
     {
@@ -7336,8 +7336,8 @@
       "source_location": "L1341",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_prepare_mail_zip",
-      "community": 7,
-      "community_name": "RelationExplorerWindow",
+      "community": 8,
+      "community_name": "CaptureRecord",
       "norm_label": ".prepare_mail_zip()"
     },
     {
@@ -7424,8 +7424,8 @@
       "source_location": "L1460",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_stable_cache_key",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 59,
+      "community_name": ".open_history_raw",
       "norm_label": ".stable_cache_key()"
     },
     {
@@ -7600,8 +7600,8 @@
       "source_location": "L1803",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_open_path",
-      "community": 7,
-      "community_name": "RelationExplorerWindow",
+      "community": 17,
+      "community_name": "DictTableModel",
       "norm_label": ".open_path()"
     },
     {
@@ -7611,8 +7611,8 @@
       "source_location": "L1813",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_open_selected_session_file",
-      "community": 7,
-      "community_name": "RelationExplorerWindow",
+      "community": 17,
+      "community_name": "DictTableModel",
       "norm_label": ".open_selected_session_file()"
     },
     {
@@ -7622,8 +7622,8 @@
       "source_location": "L1823",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_open_selected_capture_file",
-      "community": 7,
-      "community_name": "RelationExplorerWindow",
+      "community": 17,
+      "community_name": "DictTableModel",
       "norm_label": ".open_selected_capture_file()"
     },
     {
@@ -7633,8 +7633,8 @@
       "source_location": "L1832",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_open_file_from_files_table",
-      "community": 7,
-      "community_name": "RelationExplorerWindow",
+      "community": 17,
+      "community_name": "DictTableModel",
       "norm_label": ".open_file_from_files_table()"
     },
     {
@@ -7853,8 +7853,8 @@
       "source_location": "L2188",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_compare_source_for_capture",
-      "community": 17,
-      "community_name": "DictTableModel",
+      "community": 8,
+      "community_name": "CaptureRecord",
       "norm_label": ".compare_source_for_capture()"
     },
     {
@@ -7875,8 +7875,8 @@
       "source_location": "L2217",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_add_current_capture_to_compare",
-      "community": 17,
-      "community_name": "DictTableModel",
+      "community": 8,
+      "community_name": "CaptureRecord",
       "norm_label": ".add_current_capture_to_compare()"
     },
     {
@@ -7941,8 +7941,8 @@
       "source_location": "L2335",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_compare_label",
-      "community": 11,
-      "community_name": "_as_float",
+      "community": 59,
+      "community_name": ".open_history_raw",
       "norm_label": "._compare_label()"
     },
     {
@@ -8029,8 +8029,8 @@
       "source_location": "L2516",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_params_html",
-      "community": 16,
-      "community_name": ".value",
+      "community": 59,
+      "community_name": ".open_history_raw",
       "norm_label": "._params_html()"
     },
     {
@@ -8073,8 +8073,8 @@
       "source_location": "L2624",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_normalized_for_display",
-      "community": 59,
-      "community_name": ".open_history_raw",
+      "community": 11,
+      "community_name": "_as_float",
       "norm_label": "._normalized_for_display()"
     },
     {
@@ -8117,8 +8117,8 @@
       "source_location": "L2770",
       "_origin": "ast",
       "id": "ppg_suite_windows_relations_window_relationexplorerwindow_update_capture_plot",
-      "community": 16,
-      "community_name": ".value",
+      "community": 11,
+      "community_name": "_as_float",
       "norm_label": ".update_capture_plot()"
     },
     {
@@ -8315,8 +8315,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_duration_band",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "_duration_band()"
     },
     {
@@ -8326,8 +8326,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationrawinfo",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "respirationrawinfo"
     },
     {
@@ -8337,8 +8337,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "respirationwindow"
     },
     {
@@ -8348,8 +8348,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_init",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".__init__()"
     },
     {
@@ -8359,8 +8359,8 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_build_ui",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "._build_ui()"
     },
     {
@@ -8370,8 +8370,8 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_reload_raws",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".reload_raws()"
     },
     {
@@ -8381,8 +8381,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_apply_filters",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".apply_filters()"
     },
     {
@@ -8392,8 +8392,8 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_on_selection_changed",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "._on_selection_changed()"
     },
     {
@@ -8403,8 +8403,8 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_selected_path",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "._selected_path()"
     },
     {
@@ -8414,8 +8414,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_py_path",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "path"
     },
     {
@@ -8425,8 +8425,8 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_analyze_current",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".analyze_current()"
     },
     {
@@ -8436,8 +8436,8 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "ppg_suite_windows_respiration_window_respirationwindow_show_details",
-      "community": 2,
-      "community_name": "AppController",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "._show_details()"
     },
     {
@@ -8524,8 +8524,8 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_build_3m_search_space",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": "build_3m_search_space()"
     },
     {
@@ -8535,8 +8535,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_make_3m_step",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": "make_3m_step()"
     },
     {
@@ -8546,8 +8546,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_ref_pulse",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": "_ref_pulse()"
     },
     {
@@ -8568,8 +8568,8 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": "scheduledconfigwindow"
     },
     {
@@ -8579,8 +8579,8 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_init",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".__init__()"
     },
     {
@@ -8590,8 +8590,8 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_capture_mode_name",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".capture_mode_name()"
     },
     {
@@ -8601,8 +8601,8 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_build_ui",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".build_ui()"
     },
     {
@@ -8612,8 +8612,8 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_build_plot_tabs",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".build_plot_tabs()"
     },
     {
@@ -8623,8 +8623,8 @@
       "source_location": "L278",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_start_scheduled_capture",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 56,
+      "community_name": "fourier_window.py",
       "norm_label": ".start_scheduled_capture()"
     },
     {
@@ -8634,8 +8634,8 @@
       "source_location": "L337",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_temperature_monitor_start_index",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".temperature_monitor_start_index()"
     },
     {
@@ -8645,8 +8645,8 @@
       "source_location": "L342",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_temperature_monitor_elapsed",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".temperature_monitor_elapsed()"
     },
     {
@@ -8656,8 +8656,8 @@
       "source_location": "L348",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_ask_transition_reference",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".ask_transition_reference()"
     },
     {
@@ -8667,8 +8667,8 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_ask_last_segment_reference",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".ask_last_segment_reference()"
     },
     {
@@ -8678,8 +8678,8 @@
       "source_location": "L409",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_apply_scheduled_step",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".apply_scheduled_step()"
     },
     {
@@ -8689,8 +8689,8 @@
       "source_location": "L444",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_check_auto_stop",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".check_auto_stop()"
     },
     {
@@ -8700,8 +8700,8 @@
       "source_location": "L456",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_finalize_capture",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".finalize_capture()"
     },
     {
@@ -8722,8 +8722,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_py_ndarray",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": "ndarray"
     },
     {
@@ -8733,8 +8733,8 @@
       "source_location": "L509",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_temp_summary_for_arrays",
-      "community": 13,
-      "community_name": "Experiment3MWindow",
+      "community": 61,
+      "community_name": "ScheduledConfigWindow",
       "norm_label": ".temp_summary_for_arrays()"
     },
     {
@@ -8744,8 +8744,8 @@
       "source_location": "L583",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_scheduledconfigwindow_save_signal_plot",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".save_signal_plot()"
     },
     {
@@ -8799,8 +8799,8 @@
       "source_location": "L948",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_configtablewidget_init",
-      "community": 65,
-      "community_name": "ConfigTableWidget",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".__init__()"
     },
     {
@@ -9008,8 +9008,8 @@
       "source_location": "L1180",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_experiment3mwindow_init",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".__init__()"
     },
     {
@@ -9030,8 +9030,8 @@
       "source_location": "L1201",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_experiment3mwindow_build_ui",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 13,
+      "community_name": "Experiment3MWindow",
       "norm_label": ".build_ui()"
     },
     {
@@ -9041,8 +9041,8 @@
       "source_location": "L1210",
       "_origin": "ast",
       "id": "ppg_suite_windows_scheduled_window_experiment3mwindow_start_scheduled_capture",
-      "community": 62,
-      "community_name": "ConfigurationsWindow",
+      "community": 57,
+      "community_name": "SensorConfig",
       "norm_label": ".start_scheduled_capture()"
     },
     {
@@ -9239,8 +9239,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "ppg_suite_windows_temperature_window_temperaturewindow_build_ui",
-      "community": 56,
-      "community_name": "fourier_window.py",
+      "community": 12,
+      "community_name": "relations_window.py",
       "norm_label": ".build_ui()"
     },
     {
@@ -9624,8 +9624,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_py_ndarray",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "ndarray"
     },
     {
@@ -9635,8 +9635,8 @@
       "source_location": "L451",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_dominant_band",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "._dominant_band()"
     },
     {
@@ -9657,8 +9657,8 @@
       "source_location": "L503",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_ppg_fft_bpm",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "._ppg_fft_bpm()"
     },
     {
@@ -9668,8 +9668,8 @@
       "source_location": "L531",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_notch_processed_ir",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "._notch_processed_ir()"
     },
     {
@@ -9679,8 +9679,8 @@
       "source_location": "L551",
       "_origin": "ast",
       "id": "ppg_suite_windows_vacuum_window_vacuumexperimentwindow_analyze_ppg_with_notch",
-      "community": 61,
-      "community_name": "ScheduledConfigWindow",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": ".analyze_ppg_with_notch()"
     },
     {
@@ -9778,8 +9778,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_init",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "respiration/__init__.py"
     },
     {
@@ -9789,8 +9789,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "respiration_init_rr_field",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "_rr_field()"
     },
     {
@@ -9800,8 +9800,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "respiration_init_analyze_respiration",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "analyze_respiration()"
     },
     {
@@ -9811,8 +9811,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "respiration_init_py_ndarray",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "ndarray"
     },
     {
@@ -9822,8 +9822,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "respiration_init_rationale_25",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "estimate respiratory rate from raw red/ir ppg using riiv/riav/rifv consensus."
     },
     {
@@ -9833,8 +9833,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_autocorr",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "autocorr.py"
     },
     {
@@ -9844,8 +9844,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "respiration_autocorr_autocorrpeak",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "autocorrpeak"
     },
     {
@@ -9855,8 +9855,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "respiration_autocorr_autocorr_rr",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "autocorr_rr()"
     },
     {
@@ -9866,19 +9866,19 @@
       "source_location": "",
       "_origin": "ast",
       "id": "respiration_autocorr_py_ndarray",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "ndarray"
     },
     {
       "label": "method_agreement()",
       "file_type": "code",
       "source_file": "respiration/autocorr.py",
-      "source_location": "L57",
+      "source_location": "L47",
       "_origin": "ast",
       "id": "respiration_autocorr_method_agreement",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "method_agreement()"
     },
     {
@@ -10042,8 +10042,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "respiration_config_respirationconfig",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "respirationconfig"
     },
     {
@@ -10141,8 +10141,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_fusion",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "fusion.py"
     },
     {
@@ -10152,8 +10152,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "respiration_fusion_build_candidate",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "build_candidate()"
     },
     {
@@ -10163,8 +10163,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "respiration_fusion_py_ndarray",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "ndarray"
     },
     {
@@ -10174,8 +10174,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "respiration_fusion_robust_consensus",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "robust_consensus()"
     },
     {
@@ -10185,8 +10185,8 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "respiration_fusion_rationale_81",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "confidence-weighted median across valid candidates, with mad-based outlier rejec"
     },
     {
@@ -10196,8 +10196,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_models",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "respiration/models.py"
     },
     {
@@ -10218,8 +10218,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "respiration_models_candidateestimate",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "candidateestimate"
     },
     {
@@ -10229,8 +10229,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "respiration_models_windowrr",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "windowrr"
     },
     {
@@ -10240,8 +10240,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "respiration_models_windowedresult",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "windowedresult"
     },
     {
@@ -10251,8 +10251,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_pipeline",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "pipeline.py"
     },
     {
@@ -10262,8 +10262,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "respiration_pipeline_rr_of",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "_rr_of()"
     },
     {
@@ -10273,8 +10273,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "respiration_pipeline_compute_rr_estimate",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "compute_rr_estimate()"
     },
     {
@@ -10284,8 +10284,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "respiration_pipeline_rationale_23",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "run the full riiv/riav/rifv -> spectral/autocorr -> fusion stack once.      shar"
     },
     {
@@ -10295,8 +10295,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_plotting",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "plotting.py"
     },
     {
@@ -10306,8 +10306,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "respiration_plotting_build_diagnostic_layout",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "build_diagnostic_layout()"
     },
     {
@@ -10317,8 +10317,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "respiration_plotting_py_ndarray",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "ndarray"
     },
     {
@@ -10328,8 +10328,8 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "respiration_plotting_render_diagnostic_png",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "render_diagnostic_png()"
     },
     {
@@ -10339,8 +10339,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "respiration_plotting_py_path",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "path"
     },
     {
@@ -10350,8 +10350,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "respiration_plotting_rationale_28",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "build the 6-panel respiratory diagnostic (spec section 25) as a pyqtgraph widget"
     },
     {
@@ -10361,8 +10361,8 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "respiration_plotting_rationale_87",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "render the diagnostic panels to a png file, offscreen (no display required)."
     },
     {
@@ -10383,8 +10383,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "respiration_preprocessing_preparedsignal",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "preparedsignal"
     },
     {
@@ -10394,8 +10394,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "respiration_preprocessing_preparedsignal_slice_resp",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": ".slice_resp()"
     },
     {
@@ -10438,8 +10438,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_quality",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "quality.py"
     },
     {
@@ -10449,8 +10449,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "respiration_quality_duration_score",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "duration_score()"
     },
     {
@@ -10460,8 +10460,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "respiration_quality_cycle_score",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "cycle_score()"
     },
     {
@@ -10471,8 +10471,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "respiration_quality_artifact_penalty",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "artifact_penalty()"
     },
     {
@@ -10482,8 +10482,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "respiration_quality_compute_confidence",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "compute_confidence()"
     },
     {
@@ -10493,8 +10493,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "respiration_quality_rejection_reason",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "rejection_reason()"
     },
     {
@@ -10658,8 +10658,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_spectral",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "spectral.py"
     },
     {
@@ -10669,8 +10669,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "respiration_spectral_welch_psd",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "welch_psd()"
     },
     {
@@ -10680,8 +10680,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "respiration_spectral_py_ndarray",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "ndarray"
     },
     {
@@ -10691,8 +10691,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "respiration_spectral_spectralpeak",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "spectralpeak"
     },
     {
@@ -10702,8 +10702,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "respiration_spectral_spectral_peak_metrics",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "spectral_peak_metrics()"
     },
     {
@@ -10713,8 +10713,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "respiration_spectral_rationale_10",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "hand-rolled welch-style psd (segment-averaged, hanning-windowed periodogram)."
     },
     {
@@ -10724,8 +10724,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "respiration_windows",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "windows.py"
     },
     {
@@ -10735,8 +10735,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "respiration_windows_analyze_windows",
-      "community": 6,
-      "community_name": "atomic_write_json",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "analyze_windows()"
     },
     {
@@ -11384,8 +11384,8 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "tests_test_processing_test_metrics_defaults_are_backward_compatible",
-      "community": 60,
-      "community_name": "fmt",
+      "community": 1,
+      "community_name": "SensorConfig",
       "norm_label": "test_metrics_defaults_are_backward_compatible()"
     },
     {
@@ -11395,8 +11395,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_relations_delete",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "test_relations_delete.py"
     },
     {
@@ -11406,8 +11406,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "tests_test_relations_delete_test_remove_capture_rows_from_sessions_uses_atomic_rewrite",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "test_remove_capture_rows_from_sessions_uses_atomic_rewrite()"
     },
     {
@@ -11417,8 +11417,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_relations_delete_py_path",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "path"
     },
     {
@@ -11428,8 +11428,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "tests_test_relations_delete_test_selected_captures_for_compare_uses_checked_items",
-      "community": 8,
-      "community_name": "CaptureRecord",
+      "community": 6,
+      "community_name": "atomic_write_json",
       "norm_label": "test_selected_captures_for_compare_uses_checked_items()"
     },
     {
@@ -11439,8 +11439,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_respiration",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_respiration.py"
     },
     {
@@ -11450,8 +11450,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "tests_test_respiration_synthetic_ppg",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "_synthetic_ppg()"
     },
     {
@@ -11461,8 +11461,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_test_respiration_test_riiv_recovers_baseline_modulated_respiratory_rate",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_riiv_recovers_baseline_modulated_respiratory_rate()"
     },
     {
@@ -11472,8 +11472,8 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "tests_test_respiration_test_riav_recovers_pulse_amplitude_modulated_respiratory_rate",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_riav_recovers_pulse_amplitude_modulated_respiratory_rate()"
     },
     {
@@ -11483,8 +11483,8 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "tests_test_respiration_test_confidence_degrades_with_noise",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_confidence_degrades_with_noise()"
     },
     {
@@ -11494,8 +11494,8 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "tests_test_respiration_test_strong_motion_artifact_does_not_hijack_consensus",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_strong_motion_artifact_does_not_hijack_consensus()"
     },
     {
@@ -11505,8 +11505,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "tests_test_respiration_test_no_respiratory_modulation_is_rejected",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_no_respiratory_modulation_is_rejected()"
     },
     {
@@ -11516,8 +11516,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "tests_test_respiration_test_too_short_recording_gets_reduced_confidence",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_too_short_recording_gets_reduced_confidence()"
     },
     {
@@ -11527,8 +11527,8 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "tests_test_respiration_first_long_raw_csv",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "_first_long_raw_csv()"
     },
     {
@@ -11538,8 +11538,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_respiration_py_path",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "path"
     },
     {
@@ -11549,8 +11549,8 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "tests_test_respiration_test_pipeline_runs_end_to_end_on_a_real_long_recording",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "test_pipeline_runs_end_to_end_on_a_real_long_recording()"
     },
     {
@@ -11560,8 +11560,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "tests_test_respiration_rationale_23",
-      "community": 57,
-      "community_name": "SensorConfig",
+      "community": 51,
+      "community_name": ".populate_animal_list",
       "norm_label": "synthetic red/ir pair: a raised-cosine cardiac pulse riding on a dc baseline,"
     },
     {
@@ -13279,149 +13279,6 @@
       "community": 22,
       "community_name": "mtestv2",
       "norm_label": "notas para publicacion"
-    },
-    {
-      "label": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "respiration_implementation_report",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "respiration_implementation_report.md"
-    },
-    {
-      "label": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "pipeline de frecuencia respiratoria (rr) \u2014 informe de implementacion"
-    },
-    {
-      "label": "1. Resumen",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L3",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_1_resumen",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "1. resumen"
-    },
-    {
-      "label": "2. Implementaci\u00f3n",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L19",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_2_implementaci\u00f3n",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "2. implementacion"
-    },
-    {
-      "label": "2.1 Investigaci\u00f3n previa (spec \u00a741)",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L21",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_2_1_investigaci\u00f3n_previa_spec_41",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "2.1 investigacion previa (spec \u00a741)"
-    },
-    {
-      "label": "2.2 Arquitectura",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L43",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_2_2_arquitectura",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "2.2 arquitectura"
-    },
-    {
-      "label": "2.3 F\u00f3rmulas y par\u00e1metros clave",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L73",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_2_3_f\u00f3rmulas_y_par\u00e1metros_clave",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "2.3 formulas y parametros clave"
-    },
-    {
-      "label": "3. An\u00e1lisis retrospectivo",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L101",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_3_an\u00e1lisis_retrospectivo",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "3. analisis retrospectivo"
-    },
-    {
-      "label": "4. Comparaci\u00f3n RIIV / RIAV / RIFV / RED / IR",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L130",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_4_comparaci\u00f3n_riiv_riav_rifv_red_ir",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "4. comparacion riiv / riav / rifv / red / ir"
-    },
-    {
-      "label": "5. Problemas encontrados (relevante para trabajo futuro)",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L151",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_5_problemas_encontrados_relevante_para_trabajo_futuro",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "5. problemas encontrados (relevante para trabajo futuro)"
-    },
-    {
-      "label": "6. Recomendaciones para futuras mediciones",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L186",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_6_recomendaciones_para_futuras_mediciones",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "6. recomendaciones para futuras mediciones"
-    },
-    {
-      "label": "7. Tests",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L208",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_7_tests",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "7. tests"
-    },
-    {
-      "label": "8. Archivos creados / modificados",
-      "file_type": "document",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L221",
-      "_origin": "ast",
-      "id": "respiration_implementation_report_8_archivos_creados_modificados",
-      "community": 67,
-      "community_name": "Pipeline de frecuencia respiratoria (RR) \u2014 informe de implementaci\u00f3n",
-      "norm_label": "8. archivos creados / modificados"
     }
   ],
   "links": [
@@ -49600,7 +49457,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "respiration/autocorr.py",
-      "source_location": "L57",
+      "source_location": "L47",
       "weight": 1.0,
       "_origin": "ast",
       "source": "respiration_autocorr",
@@ -55004,138 +54861,6 @@
       "_origin": "ast",
       "source": "readme_mtestv2",
       "target": "readme_tecnologias",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report",
-      "target": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L3",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_1_resumen",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L19",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_2_implementaci\u00f3n",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L101",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_3_an\u00e1lisis_retrospectivo",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L130",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_4_comparaci\u00f3n_riiv_riav_rifv_red_ir",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L151",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_5_problemas_encontrados_relevante_para_trabajo_futuro",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L186",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_6_recomendaciones_para_futuras_mediciones",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L208",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_7_tests",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L221",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_pipeline_de_frecuencia_respiratoria_rr_informe_de_implementaci\u00f3n",
-      "target": "respiration_implementation_report_8_archivos_creados_modificados",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L21",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_2_implementaci\u00f3n",
-      "target": "respiration_implementation_report_2_1_investigaci\u00f3n_previa_spec_41",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L43",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_2_implementaci\u00f3n",
-      "target": "respiration_implementation_report_2_2_arquitectura",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "RESPIRATION_IMPLEMENTATION_REPORT.md",
-      "source_location": "L73",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "respiration_implementation_report_2_implementaci\u00f3n",
-      "target": "respiration_implementation_report_2_3_f\u00f3rmulas_y_par\u00e1metros_clave",
       "confidence_score": 1.0
     }
   ],

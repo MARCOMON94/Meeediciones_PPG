@@ -17,7 +17,7 @@ from .firmware_update import (
 from .paths import ARDUINO_FIRMWARE_SKETCH, RESULTS_DIR, RUMIANDO_ASSET_DIR, UPDATES_DIR
 
 
-AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "experimento_vacio", "temp", "relations", "fourier", "animals"]
+AppMode = Literal["reajustes", "test", "real", "configurations", "experimento_3m", "experimento_vacio", "temp", "relations", "fourier", "animals", "respiracion"]
 def icon_text(text: str) -> str:
     return f"  {text}"
 
@@ -77,10 +77,11 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_relations = QtWidgets.QPushButton(icon_text("Estadísticas"))
         self.btn_animals = QtWidgets.QPushButton(icon_text("Animales"))
         self.btn_fourier = QtWidgets.QPushButton(icon_text("Análisis experimental de Fourier"))
+        self.btn_respiracion = QtWidgets.QPushButton(icon_text("Respiración"))
 
         secondary_buttons = [
             self.btn_relations, self.btn_animals, self.btn_fourier, self.btn_configurations,
-            self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_3m, self.btn_vacuum,
+            self.btn_respiracion, self.btn_test, self.btn_temp, self.btn_reajustes, self.btn_3m, self.btn_vacuum,
         ]
         for button in secondary_buttons:
             button.setMinimumHeight(58)
@@ -96,6 +97,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         main_buttons.addWidget(self.btn_animals, 0, 1)
         main_buttons.addWidget(self.btn_fourier, 1, 0)
         main_buttons.addWidget(self.btn_configurations, 1, 1)
+        main_buttons.addWidget(self.btn_respiracion, 2, 0, 1, 2)
         main_buttons.setColumnStretch(0, 1)
         main_buttons.setColumnStretch(1, 1)
         layout.addLayout(main_buttons)
@@ -131,7 +133,8 @@ class ModeSelectDialog(QtWidgets.QDialog):
             "Experimento con vacío: PPG y micrófono sincronizados; el notch se aplica solo al informe final.\n"
             "Estadísticas: sesiones, resultados, configuraciones y gráficas comparativas.\n"
             "Animales: fichas, notas, archivos, medias e histórico por animal.\n"
-            "Fourier experimental: compara varios raw y razona qué configuración separa mejor el pulso."
+            "Fourier experimental: compara varios raw y razona qué configuración separa mejor el pulso.\n"
+            "Respiración: estima frecuencia respiratoria (RIIV/RIAV/RIFV) sobre registros ya realizados de al menos 30 s."
         )
         info.setObjectName("infoText")
         info.setWordWrap(True)
@@ -168,6 +171,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
         self.btn_relations.clicked.connect(lambda: self.choose("relations"))
         self.btn_animals.clicked.connect(lambda: self.choose("animals"))
         self.btn_fourier.clicked.connect(lambda: self.choose("fourier"))
+        self.btn_respiracion.clicked.connect(lambda: self.choose("respiracion"))
         self.btn_other_toggle.toggled.connect(self.toggle_other_modes)
         self.btn_updates.clicked.connect(self.show_latest_updates)
         self.btn_import_data.clicked.connect(self.import_data)
@@ -272,6 +276,7 @@ class ModeSelectDialog(QtWidgets.QDialog):
             self.btn_relations: "icon-estadisticas-green.png",
             self.btn_animals: "icon-ganado-outline-green.png",
             self.btn_fourier: "icon-ia-green.png",
+            self.btn_respiracion: "icon-ia-green.png",
             self.btn_configurations: "icon-settings-green.png",
             self.btn_reajustes: "icon-settings-green.png",
             self.btn_test: "icon-listado-green.png",
