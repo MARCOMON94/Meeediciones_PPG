@@ -54,15 +54,5 @@
   "52": "_read_csv",
   "53": "_base_from_row",
   "54": "test_animals_window.py",
-  "55": ".update_photo",
-  "56": "fourier_window.py",
-  "57": "SensorConfig",
-  "58": "._build_ui",
-  "59": ".open_history_raw",
-  "60": "fmt",
-  "61": "ScheduledConfigWindow",
-  "62": "ConfigurationsWindow",
-  "63": ".discover_measurements",
-  "64": ".__init__",
-  "65": "ConfigTableWidget"
+  "55": ".update_photo"
 }

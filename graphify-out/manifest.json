@@ -20,9 +20,9 @@
     "semantic_hash": "7435f5469bd066a72d213a7d96c172cc"
   },
   "controller.py": {
-    "mtime": 1784386210.4260814,
-    "ast_hash": "dfe8f7a4adb1dad777099f67fe9d707d",
-    "semantic_hash": "dfe8f7a4adb1dad777099f67fe9d707d"
+    "mtime": 1788537865.6303399,
+    "ast_hash": "46dd2ab1c3bd5eae9a691b3340b1abd5",
+    "semantic_hash": ""
   },
   "main.py": {
     "mtime": 1784381230.8535185,
@@ -60,24 +60,24 @@
     "semantic_hash": "01d9df3a0506be5cded49a0b73ed814b"
   },
   "ppg_suite/menu.py": {
-    "mtime": 1784386376.0983186,
-    "ast_hash": "bd7e77b8f034e07f0fd29c25f37735c6",
-    "semantic_hash": "bd7e77b8f034e07f0fd29c25f37735c6"
+    "mtime": 1788537882.6118925,
+    "ast_hash": "03884b15859d3af00bfa86d3f0a90a0a",
+    "semantic_hash": ""
   },
   "ppg_suite/models.py": {
-    "mtime": 1784359773.7585974,
-    "ast_hash": "019a62766c32395b72c7270e73f34cf3",
-    "semantic_hash": "019a62766c32395b72c7270e73f34cf3"
+    "mtime": 1788537855.0203433,
+    "ast_hash": "6b109a7aa28c82f5b8116a5528616d2b",
+    "semantic_hash": ""
   },
   "ppg_suite/paths.py": {
-    "mtime": 1784382908.5806606,
-    "ast_hash": "966084f2e569375576d8ac805dd40668",
-    "semantic_hash": "966084f2e569375576d8ac805dd40668"
+    "mtime": 1788537855.026343,
+    "ast_hash": "383419a01ea8450aad1d7b61dd715c4c",
+    "semantic_hash": ""
   },
   "ppg_suite/processing.py": {
-    "mtime": 1784360866.3716342,
-    "ast_hash": "983f2acf05b4cc646d65f1a51c2af152",
-    "semantic_hash": "983f2acf05b4cc646d65f1a51c2af152"
+    "mtime": 1788537855.0343535,
+    "ast_hash": "f00248b762fb66289194ca6002e318b6",
+    "semantic_hash": ""
   },
   "ppg_suite/trash.py": {
     "mtime": 1784323689.8369806,
@@ -85,7 +85,7 @@
     "semantic_hash": "f898651d0e61c757755d9285a96c0ed6"
   },
   "ppg_suite/utils.py": {
-    "mtime": 1779706058.9347055,
+    "mtime": 1788537855.0353544,
     "ast_hash": "137c2ef1e082bfd7d2db8cb82e3747f4",
     "semantic_hash": "137c2ef1e082bfd7d2db8cb82e3747f4"
   },
@@ -100,18 +100,18 @@
     "semantic_hash": "676593a7d094628a492ee40b8ebda5d7"
   },
   "ppg_suite/windows/animals_window.py": {
-    "mtime": 1784832379.440189,
-    "ast_hash": "b20fae4e643a022cab23cc62cfaeb010",
+    "mtime": 1788537855.0437977,
+    "ast_hash": "ab52fc1a865010a409e57cc975e15d45",
     "semantic_hash": ""
   },
   "ppg_suite/windows/fourier_window.py": {
-    "mtime": 1784325261.9366672,
-    "ast_hash": "9f0dd32b64cf928154893eb091c1d196",
-    "semantic_hash": "9f0dd32b64cf928154893eb091c1d196"
+    "mtime": 1788537855.0528026,
+    "ast_hash": "7eb5d8f14d3b90662f16da2cfbc3195f",
+    "semantic_hash": ""
   },
   "ppg_suite/windows/measurement_window.py": {
-    "mtime": 1784832909.4843524,
-    "ast_hash": "e6fc99f9d9d4c0fc977f565e8bd54be5",
+    "mtime": 1788537855.0614314,
+    "ast_hash": "01ca60711dbe035b43ad73769e9f5608",
     "semantic_hash": ""
   },
   "ppg_suite/windows/reajustes_window.py": {
@@ -125,13 +125,13 @@
     "semantic_hash": "b46fb3a16341dc54d14139f11e9dfe82"
   },
   "ppg_suite/windows/relations_window.py": {
-    "mtime": 1784832384.8213177,
-    "ast_hash": "ab628abc9de25cfc20bd159dababa810",
+    "mtime": 1788537855.0719588,
+    "ast_hash": "b6ca32b01366a2169db0adc3e5693a89",
     "semantic_hash": ""
   },
   "ppg_suite/windows/scheduled_window.py": {
-    "mtime": 1784832934.5482545,
-    "ast_hash": "846cc7542d255409930a74b6a875c923",
+    "mtime": 1788537855.0794034,
+    "ast_hash": "d1985799d353039b10c5ef792043cc58",
     "semantic_hash": ""
   },
   "ppg_suite/windows/temperature_window.py": {
@@ -180,9 +180,9 @@
     "semantic_hash": "50013f8462f70f0fa67afad34c1b881f"
   },
   "tests/test_processing.py": {
-    "mtime": 1784360618.648146,
-    "ast_hash": "c20eb5ead80b589843d0102578a5d983",
-    "semantic_hash": "c20eb5ead80b589843d0102578a5d983"
+    "mtime": 1788537855.0882082,
+    "ast_hash": "9ae3d25bd5a261bf2039316fda7f4323",
+    "semantic_hash": ""
   },
   "tests/test_relations_delete.py": {
     "mtime": 1784359444.7331884,
@@ -392,6 +392,101 @@
   "ppg_suite/assets/rumiando/rumiando-sheep-tech-app-colors.png": {
     "mtime": 1781260960.8798459,
     "ast_hash": "040ff32149cbdbcb4c8f35ab6d7d8e7b",
+    "semantic_hash": ""
+  },
+  "ppg_suite/windows/respiration_window.py": {
+    "mtime": 1788537865.6788075,
+    "ast_hash": "4596f9fb9f4e094acfc1ea9775f290ef",
+    "semantic_hash": ""
+  },
+  "respiration/__init__.py": {
+    "mtime": 1788537865.679808,
+    "ast_hash": "5622d22f9a95c1d5da46da14fc0d40ab",
+    "semantic_hash": ""
+  },
+  "respiration/autocorr.py": {
+    "mtime": 1788537865.679808,
+    "ast_hash": "d87d85913d8717c99999932aae9f1a58",
+    "semantic_hash": ""
+  },
+  "respiration/batch.py": {
+    "mtime": 1788537865.6808095,
+    "ast_hash": "36e26154200086b8808d203a7d645969",
+    "semantic_hash": ""
+  },
+  "respiration/config.py": {
+    "mtime": 1788537865.6818092,
+    "ast_hash": "b287e789704aa2b3f998d3f8b4f6402d",
+    "semantic_hash": ""
+  },
+  "respiration/filters.py": {
+    "mtime": 1788537865.682809,
+    "ast_hash": "86c213b5df6f930d435f0e3d5893bc6d",
+    "semantic_hash": ""
+  },
+  "respiration/fusion.py": {
+    "mtime": 1788537865.6838126,
+    "ast_hash": "da62c48f732637efe80c6de2aa1eb887",
+    "semantic_hash": ""
+  },
+  "respiration/models.py": {
+    "mtime": 1788537865.6838126,
+    "ast_hash": "f83b28aafa2aa06b93118238dbef8d02",
+    "semantic_hash": ""
+  },
+  "respiration/pipeline.py": {
+    "mtime": 1788537865.684811,
+    "ast_hash": "8a43c983c58b90ad3acaef0fc3e909bf",
+    "semantic_hash": ""
+  },
+  "respiration/plotting.py": {
+    "mtime": 1788537865.684811,
+    "ast_hash": "5c8be0bb6822f963855b70137741537e",
+    "semantic_hash": ""
+  },
+  "respiration/preprocessing.py": {
+    "mtime": 1788537865.685809,
+    "ast_hash": "69c0154e0569fbf30d734b6e6bd83182",
+    "semantic_hash": ""
+  },
+  "respiration/quality.py": {
+    "mtime": 1788537865.6868074,
+    "ast_hash": "b52bbde50f1656af3f1f3ebc2d8cd6e4",
+    "semantic_hash": ""
+  },
+  "respiration/riav.py": {
+    "mtime": 1788537865.6868074,
+    "ast_hash": "12cb97b7bea226338f1910e5a62e12ed",
+    "semantic_hash": ""
+  },
+  "respiration/rifv.py": {
+    "mtime": 1788537865.6878095,
+    "ast_hash": "b0b5dad93ed2da0fdd2edc91161b74ed",
+    "semantic_hash": ""
+  },
+  "respiration/riiv.py": {
+    "mtime": 1788537865.6878095,
+    "ast_hash": "d5dc31258caeaf4ce1975aec0593055d",
+    "semantic_hash": ""
+  },
+  "respiration/spectral.py": {
+    "mtime": 1788537865.6888075,
+    "ast_hash": "1417547d3191f68628c3e0f2f44090c9",
+    "semantic_hash": ""
+  },
+  "respiration/windows.py": {
+    "mtime": 1788537865.6888075,
+    "ast_hash": "2f7a89530491fea4eca76ad92d921fe6",
+    "semantic_hash": ""
+  },
+  "tests/test_respiration.py": {
+    "mtime": 1788537865.689807,
+    "ast_hash": "ac8e4b1b362a9ac7d36456b13c18a6ba",
+    "semantic_hash": ""
+  },
+  "RESPIRATION_IMPLEMENTATION_REPORT.md": {
+    "mtime": 1788537865.6293466,
+    "ast_hash": "dc26f7719019ed73ebf82ec23bbdcbeb",
     "semantic_hash": ""
   }
 }

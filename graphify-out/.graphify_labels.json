@@ -54,5 +54,6 @@
   "52": "_read_csv",
   "53": "_base_from_row",
   "54": "test_animals_window.py",
-  "55": ".update_photo"
+  "55": ".update_photo",
+  "56": "_base_from_row"
 }
